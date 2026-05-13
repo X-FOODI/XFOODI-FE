@@ -1,0 +1,20 @@
+'use client';
+
+import React from 'react';
+import { ThemeProvider } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
+import restxTheme from './restxTheme';
+
+export default function ThemeRegistry({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <ThemeProvider theme={restxTheme}>
+      <CssBaseline />
+      {children}
+    </ThemeProvider>
+  );
+}
+

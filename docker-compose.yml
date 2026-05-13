@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  restx-frontend:
+    build:
+      context: .
+      dockerfile: dockerfile
+    container_name: restx-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - INTERNAL_ADMIN_API_URL=https://admin.restx.food/api
+      - INTERNAL_API_URL=https://demo.restx.food/api
+      - NEXT_PUBLIC_API_URL=https://demo.restx.food/api
+      - NEXT_PUBLIC_ADMIN_API_URL=https://admin.restx.food/api
+    restart: unless-stopped
+    networks:
+      - restx-network
+
+networks:
+  restx-network:
+    driver: bridge
