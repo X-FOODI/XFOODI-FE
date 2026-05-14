@@ -85,6 +85,138 @@ function clearAuthCookie() {
   document.cookie = 'accessToken=; path=/; max-age=0; SameSite=Lax';
 }
 
+/** Google JWT payload only — not verified; used as fallback when API omits user.email. */
+function decodeGoogleCredentialEmail(idToken: string): string | undefined {
+  try {
+    const payloadB64 = idToken.split('.')[1];
+    if (!payloadB64) return undefined;
+    const json = atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/'));
+    const payload = JSON.parse(json) as { email?: string };
+    return typeof payload.email === 'string' ? payload.email : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function throwNormalizedLoginError(error: any, mode: 'password' | 'google'): never {
+  console.error('Login error:', error);
+  console.error('Error response:', error.response?.data);
+
+  if (error.response?.data?.error) {
+    throw new Error(error.response.data.error);
+  }
+
+  if (error.response?.data?.message) {
+    throw new Error(error.response.data.message);
+  }
+
+  if (error.response?.status === 401) {
+    throw new Error(
+      mode === 'google'
+        ? 'Google sign-in failed or this account is not registered.'
+        : 'Invalid email or password'
+    );
+  }
+
+  if (error.response?.status === 400) {
+    throw new Error(mode === 'google' ? 'Invalid Google sign-in request.' : 'Invalid login credentials');
+  }
+
+  if (error.message === 'Network Error' || error.code === 'ERR_NETWORK') {
+    throw new Error('Cannot connect to server. Please check your internet connection.');
+  }
+
+  if (error.code === 'ECONNABORTED') {
+    throw new Error('Request timeout. Please try again.');
+  }
+
+  throw error;
+}
+
+function parseAuthLoginPayload(
+  responseData: any,
+  emailFallback: string
+): { user: User; tokens: { accessToken: string; refreshToken: string } } {
+  let user: User;
+  let tokens: { accessToken: string; refreshToken: string };
+
+  if (responseData?.success && responseData?.data?.accessToken && responseData?.data?.user) {
+    user = responseData.data.user;
+    tokens = {
+      accessToken: responseData.data.accessToken,
+      refreshToken: responseData.data.refreshToken || '',
+    };
+  } else if (responseData?.success && responseData?.data?.tokens) {
+    user = responseData.data.user;
+    tokens = responseData.data.tokens;
+  } else if (responseData?.user && responseData?.tokens) {
+    user = responseData.user;
+    tokens = responseData.tokens;
+  } else if (responseData?.data?.user) {
+    user = responseData.data.user;
+    tokens = {
+      accessToken: responseData.data.token || responseData.data.accessToken,
+      refreshToken: responseData.data.refreshToken || '',
+    };
+  } else if (responseData?.token || responseData?.accessToken) {
+    tokens = {
+      accessToken: responseData.token || responseData.accessToken,
+      refreshToken: responseData.refreshToken || '',
+    };
+    user = {
+      id: responseData.id || responseData.userId || 'unknown',
+      email: responseData.email || emailFallback,
+      name: responseData.name || responseData.username || emailFallback.split('@')[0],
+      role: responseData.role || 'user',
+      avatar: responseData.avatar,
+    };
+  } else {
+    console.error('Unknown response format:', responseData);
+    throw new Error('Invalid response format from server');
+  }
+
+  if (!tokens?.accessToken) {
+    console.error('No access token in response:', responseData);
+    throw new Error('No access token received from server');
+  }
+
+  return { user, tokens };
+}
+
+function finalizeLoginSession(
+  user: User,
+  tokens: { accessToken: string; refreshToken: string },
+  rememberMe: boolean
+): User {
+  const normalizedUser: User = {
+    ...user,
+    customerId: user.customerId,
+    name: user.name || user.fullName || user.email.split('@')[0],
+    fullName: user.fullName || user.name || user.email.split('@')[0],
+    role: user.role || (user.roles && user.roles[0]) || 'Customer',
+    roles: user.roles || (user.role ? [user.role] : ['Customer']),
+  };
+
+  const storage = rememberMe ? localStorage : sessionStorage;
+
+  storage.setItem('accessToken', tokens.accessToken);
+  if (tokens.refreshToken) {
+    storage.setItem('refreshToken', tokens.refreshToken);
+  }
+  storage.setItem('userInfo', JSON.stringify(normalizedUser));
+
+  if (!rememberMe) {
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('userInfo');
+  }
+
+  setAuthCookie(tokens.accessToken, rememberMe);
+
+  console.log('Login successful, user:', normalizedUser);
+  return normalizedUser;
+}
+
 const authService = {
   // Check phone existence
   async checkPhone(phoneNumber: string): Promise<{ exists: boolean; name?: string }> {
@@ -108,13 +240,11 @@ const authService = {
   // Login with .NET Backend
   async login(credentials: LoginCredentials): Promise<User> {
     try {
-      // Call API login
       const response = await axiosInstance.post<any>(API_ROUTES.AUTH.LOGIN, {
         email: credentials.email,
         password: credentials.password,
       });
 
-      // Log response để debug
       console.log('Login API Response:', response.data);
       console.log('Response.data.data:', response.data?.data);
       console.log('Response.data keys:', Object.keys(response.data || {}));
@@ -122,132 +252,31 @@ const authService = {
         console.log('Response.data.data keys:', Object.keys(response.data.data || {}));
       }
 
-      // Xử lý các format response khác nhau từ backend
-      let user: User;
-      let tokens: { accessToken: string; refreshToken: string };
-
-      // Format 1: { success: true, data: { accessToken, refreshToken, user } } - .NET format
-      if (response.data?.success && response.data?.data?.accessToken && response.data?.data?.user) {
-        user = response.data.data.user;
-        tokens = {
-          accessToken: response.data.data.accessToken,
-          refreshToken: response.data.data.refreshToken || '',
-        };
-      }
-      // Format 2: { success: true, data: { user, tokens: { accessToken, refreshToken } } }
-      else if (response.data?.success && response.data?.data?.tokens) {
-        user = response.data.data.user;
-        tokens = response.data.data.tokens;
-      }
-      // Format 3: { user, tokens } trực tiếp
-      else if (response.data?.user && response.data?.tokens) {
-        user = response.data.user;
-        tokens = response.data.tokens;
-      }
-      // Format 4: { data: { user, token/accessToken } }
-      else if (response.data?.data?.user) {
-        user = response.data.data.user;
-        tokens = {
-          accessToken: response.data.data.token || response.data.data.accessToken,
-          refreshToken: response.data.data.refreshToken || '',
-        };
-      }
-      // Format 5: Chỉ có token ở top level
-      else if (response.data?.token || response.data?.accessToken) {
-        tokens = {
-          accessToken: response.data.token || response.data.accessToken,
-          refreshToken: response.data.refreshToken || '',
-        };
-        // Tạo user object từ response
-        user = {
-          id: response.data.id || response.data.userId || 'unknown',
-          email: credentials.email,
-          name: response.data.name || response.data.username || credentials.email.split('@')[0],
-          role: response.data.role || 'user',
-          avatar: response.data.avatar,
-        };
-      }
-      else {
-        console.error('Unknown response format:', response.data);
-        throw new Error('Invalid response format from server');
-      }
-
-      // Validate có tokens không
-      if (!tokens?.accessToken) {
-        console.error('No access token in response:', response.data);
-        throw new Error('No access token received from server');
-      }
-
-      // Normalize user data để có cả name và role cho frontend dễ dùng
-      const normalizedUser: User = {
-        ...user,
-        customerId: user.customerId,  // Preserve customerId from backend
-        name: user.name || user.fullName || user.email.split('@')[0],
-        fullName: user.fullName || user.name || user.email.split('@')[0],
-        role: user.role || (user.roles && user.roles[0]) || 'Customer',
-        roles: user.roles || (user.role ? [user.role] : ['Customer']),
-      };
-
-      const shouldRemember = !!credentials.rememberMe;
-      const storage = shouldRemember ? localStorage : sessionStorage;
-
-      // Lưu thông tin vào storage theo rememberMe
-      storage.setItem('accessToken', tokens.accessToken);
-      if (tokens.refreshToken) {
-        storage.setItem('refreshToken', tokens.refreshToken);
-      }
-      storage.setItem('userInfo', JSON.stringify(normalizedUser));
-
-      if (!shouldRemember) {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('userInfo');
-      }
-
-      // Lưu token vào cookie để middleware có thể đọc (server-side auth check)
-      setAuthCookie(tokens.accessToken, shouldRemember);
-
-      console.log('Login successful, user:', normalizedUser);
-      return normalizedUser;
-
+      const { user, tokens } = parseAuthLoginPayload(response.data, credentials.email);
+      return finalizeLoginSession(user, tokens, !!credentials.rememberMe);
     } catch (error: any) {
-      // Log error để debug
-      console.error('Login error:', error);
-      console.error('Error response:', error.response?.data);
+      throwNormalizedLoginError(error, 'password');
+    }
+  },
 
-      // Xử lý các loại lỗi khác nhau
+  /**
+   * Exchange Google credential JWT for app tokens.
+   * Backend: POST `{ googleToken }` to `/auth/google` (full URL: NEXT_PUBLIC_API_URL + path; or NEXT_PUBLIC_AUTH_GOOGLE_LOGIN_PATH).
+   * Response must match one of the same shapes as email `login`.
+   */
+  async loginWithGoogle(googleToken: string, rememberMe = true): Promise<User> {
+    const path =
+      (typeof process !== 'undefined' &&
+        process.env.NEXT_PUBLIC_AUTH_GOOGLE_LOGIN_PATH?.trim()) ||
+      API_ROUTES.AUTH.GOOGLE;
+    const emailFallback = decodeGoogleCredentialEmail(googleToken) || 'google@user.invalid';
 
-      // Lỗi từ backend (response error)
-      if (error.response?.data?.error) {
-        throw new Error(error.response.data.error);
-      }
-
-      if (error.response?.data?.message) {
-        throw new Error(error.response.data.message);
-      }
-
-      // Lỗi 401 - Unauthorized
-      if (error.response?.status === 401) {
-        throw new Error('Invalid email or password');
-      }
-
-      // Lỗi 400 - Bad Request
-      if (error.response?.status === 400) {
-        throw new Error('Invalid login credentials');
-      }
-
-      // Lỗi network
-      if (error.message === 'Network Error' || error.code === 'ERR_NETWORK') {
-        throw new Error('Cannot connect to server. Please check your internet connection.');
-      }
-
-      // Lỗi timeout
-      if (error.code === 'ECONNABORTED') {
-        throw new Error('Request timeout. Please try again.');
-      }
-
-      // Lỗi khác
-      throw error;
+    try {
+      const response = await axiosInstance.post<any>(path, { googleToken });
+      const { user, tokens } = parseAuthLoginPayload(response.data, emailFallback);
+      return finalizeLoginSession(user, tokens, !!rememberMe);
+    } catch (error: any) {
+      throwNormalizedLoginError(error, 'google');
     }
   },
 
