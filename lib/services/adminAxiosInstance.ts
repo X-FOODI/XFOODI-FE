@@ -9,9 +9,15 @@ const getAdminBaseUrl = (): string => {
     const hostWithoutPort = host.includes(':') ? host.split(':')[0] : host;
     const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || "xfoodi.website";
 
-    if (hostWithoutPort === 'localhost' ||
+    const isLocalNetwork =
+        hostWithoutPort === 'localhost' ||
         hostWithoutPort === '127.0.0.1' ||
-        hostWithoutPort.endsWith('.localhost')) {
+        hostWithoutPort.endsWith('.localhost') ||
+        /^192\.168\./.test(hostWithoutPort) ||
+        /^10\./.test(hostWithoutPort) ||
+        /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostWithoutPort);
+
+    if (isLocalNetwork) {
         return '/api/admin';
     }
 
