@@ -1,205 +1,130 @@
-# RestX Frontend Template
+<div align="center">
 
-Minimal template for RestX multi-tenant restaurant management system frontend.
+<img src="./logo.png" alt="FoodX Logo" width="200" />
 
-## Tech Stack
+# 🍔 FoodX Frontend
 
-- **Framework**: Next.js 15 (App Router)
-- **Language**: TypeScript
-- **UI Libraries**: Ant Design 6, Material-UI 7
-- **Styling**: Tailwind CSS 3
-- **State Management**: React Context API
-- **HTTP Client**: Axios
-- **Real-time**: SignalR (@microsoft/signalr)
-- **Animation**: Framer Motion
-- **Charts**: Recharts
-- **3D**: Three.js
-- **i18n**: react-i18next
-- **AI**: Google Gemini API
+**Next-Generation Multi-Tenant Restaurant Management System Frontend**
 
-## Project Structure
+[![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub_Actions-2088FF?style=flat-square&logo=githubactions)](#)
+[![Next.js](https://img.shields.io/badge/Next.js-15-black?style=flat-square&logo=next.js)](https://nextjs.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-20-green?style=flat-square&logo=node.js)](https://nodejs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-3-38B2AC?style=flat-square&logo=tailwind-css)](https://tailwindcss.com/)
+[![Ant Design](https://img.shields.io/badge/Ant_Design-6-0170FE?style=flat-square&logo=antdesign)](https://ant.design/)
+[![License: Private](https://img.shields.io/badge/License-Private-red?style=flat-square)](#)
 
-```
-RestX-FE/
-├── app/                      # Next.js App Router
-│   ├── layout.tsx           # Root layout
-│   ├── page.tsx             # Home page
-│   ├── globals.css          # Global styles
-│   ├── (admin)/             # Admin routes (TODO)
-│   ├── (marketing)/         # Marketing routes (TODO)
-│   ├── customer/            # Customer routes (TODO)
-│   ├── staff/               # Staff routes (TODO)
-│   └── api/                 # API routes (TODO)
-├── components/              # React components
-│   ├── ui/                  # UI components (Button, Card, etc.)
-│   └── layout/              # Layout components (Header, Footer, etc.)
-├── lib/                     # Utilities and helpers
-│   ├── services/            # API services
-│   ├── types/               # TypeScript types
-│   ├── hooks/               # Custom React hooks
-│   ├── contexts/            # React contexts
-│   └── utils/               # Utility functions
-├── public/                  # Static assets
-├── .env.example             # Environment variables template
-├── next.config.mjs          # Next.js configuration
-├── tailwind.config.ts       # Tailwind CSS configuration
-├── tsconfig.json            # TypeScript configuration
-└── package.json             # Dependencies
-```
+[🌐 Live Demo](http://localhost:3000) · [⚙️ Setup Phase](./docs/SETUP.md) · [🤝 Contribution Guidelines](./docs/CONTRIBUTING.md) · [🏗️ FE Architecture](./docs/ARCHITECTURE.md)
 
-## Getting Started
+</div>
 
-### 1. Install Dependencies
+---
+
+## ✨ Highlights
+
+- 🏢 **Multi-Tenant Routing System** — Intelligent routing supporting Super Admin (`admin.foodx`), Restaurant Admin (`{tenant}.foodx/admin`), Staff (`{tenant}.foodx/staff`), and Customers (`{tenant}.foodx/customer`).
+- 🌗 **Premium UI & Dual-Theme Support** — Stunning interfaces leveraging Tailwind CSS alongside Ant Design & MUI, featuring seamless **Dark and Light Mode** transitions globally.
+- ⚡ **Real-time Synchronicity** — Integrated SignalR (`@microsoft/signalr`) hooks for instant real-time order tracking, kitchen display updates, and live table status syncing.
+- 🎨 **Dynamic Interactions & 3D** — High-end animations via Framer Motion, insightful data visualization with Recharts, and interactive 3D table layouts powered by Three.js.
+- 🤖 **AI-Powered Capabilities** — Integrated Google Gemini API for smart menu descriptions, dynamic insights, and intelligent chatbot assistance directly on the frontend.
+- 🌍 **Internationalization (i18n)** — Native multi-language support seamlessly wired via `react-i18next` for scaling across diverse user bases.
+- 🛡️ **Robust Authentication Flow** — Complete context-based auth state management handling tenant redirects, token injection via Axios interceptors, and secure persistence.
+
+---
+
+## 💻 Tech Stack
+
+| Layer | Technologies |
+|---|---|
+| **Core Framework** | Next.js 15 (App Router), Node.js ≥ 20 |
+| **Language** | TypeScript 5 |
+| **UI Components** | Ant Design 6, Material-UI (MUI v7) |
+| **Styling** | Tailwind CSS 3 |
+| **Animations & 3D** | Framer Motion, Three.js |
+| **State Management**| React Context API |
+| **Data Fetching** | Axios Interceptors |
+| **Realtime** | SignalR Client (`@microsoft/signalr`) |
+| **AI Integration** | Google Gemini API (`@google/genai`) |
+| **Analytics/Charts** | Recharts |
+| **Localization** | i18next / react-i18next |
+
+---
+
+## 🚀 Quick Start
+
+> Minimum requirements: **Node.js ≥ 20**, **npm ≥ 9**
+
+### 1. Clone & Install
 
 ```bash
+# Clone the repository
+git clone <your-repo-url>
+cd XFoodi-FE
+
+# Install dependencies
 npm install
 ```
 
-### 2. Configure Environment Variables
+### 2. Environment Variables Configuration
 
-Copy `.env.example` to `.env.local` and update the values:
+Copy the example environment file to configure your local setup:
 
 ```bash
 cp .env.example .env.local
 ```
 
-### 3. Run Development Server
+Ensure API URLs proxy mappings are correctly set (e.g., `INTERNAL_API_URL`, `INTERNAL_ADMIN_API_URL`).
 
+### 3. Run Local Server
+
+Start the Next.js development server:
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open your browser and navigate to `http://localhost:3000`. 
+*(Note: Use appropriate subdomain testing tools if testing tenant logic locally).*
 
-### 4. Build for Production
+---
+
+## 🏗️ Architecture & Routing
+
+The application uses Next.js rewrites to elegantly proxy API requests and segregate interfaces:
+
+- `/api/admin/*` → Admin Backend API
+- `/api/*` → Tenant API
+- `/hubs/*` → SignalR real-time hubs
+
+Directory breakdown:
+- `app/`: Next.js 15 App Router pages (divided by tenant scope: admin, customer, staff).
+- `components/`: UI and Layout components.
+- `lib/services/`: Centralized API clients.
+- `lib/hooks/`: Custom hooks like `useSignalR`.
+
+---
+
+## 🤝 Rule of Thumb for Contributors
+
+To maintain a professional, bug-free codebase, run our comprehensive checks before making any commits:
 
 ```bash
-npm run build
-npm start
+# Run linting and TypeScript checks
+npm run check
 ```
 
-## Key Features (Template)
+**Critical Contribution Rules:**
+1. **Always Check Linter Errors**: Do not commit code with outstanding ESLint or TypeScript warnings. 
+2. **Support Dual Themes**: Whenever you create or modify a screen/component, you **MUST** add support for both **Dark** and **Light** themes. Hardcoding single-theme colors is strictly prohibited.
+3. **Branching**: Follow standard branch naming (`feature/<username>/<feature-name>`).
+4. **Committing**: Use conventional commits (`feat(ui): add 3d restaurant table mapping`).
 
-### API Client (`lib/services/api.ts`)
-- Axios-based HTTP client
-- Automatic token injection
-- Error handling with 401 redirect
-- Separate clients for tenant and admin APIs
+---
 
-### Authentication Context (`lib/contexts/AuthContext.tsx`)
-- User authentication state management
-- Login/logout functionality
-- Token persistence
+## 📄 License
 
-### SignalR Hook (`lib/hooks/useSignalR.ts`)
-- Real-time communication with backend
-- Automatic reconnection
-- Event subscription management
+This repository is strictly protected under Proprietary Private ownership designed entirely for the FoodX Platform.
 
-### Utility Functions (`lib/utils/index.ts`)
-- Currency formatting (VND)
-- Date/time formatting
-- Email/phone validation
-- QR code URL generation
-
-### UI Components (`components/ui/`)
-- Button component with variants
-- Card component with header/content
-- More components to be added
-
-## API Configuration
-
-The app uses Next.js rewrites to proxy API requests and avoid CORS issues:
-
-- `/api/admin/*` → Admin API
-- `/api/*` → Tenant API
-- `/hubs/*` → SignalR hubs
-
-Configure API URLs in `.env.local`:
-
-```env
-INTERNAL_ADMIN_API_URL=https://admin.restx.food/api
-INTERNAL_API_URL=https://demo.restx.food/api
-```
-
-## Multi-Tenancy
-
-The app supports multi-tenant architecture:
-
-- **Super Admin**: `admin.restx.food`
-- **Restaurant Admin**: `{tenant}.restx.food/admin/*`
-- **Staff**: `{tenant}.restx.food/staff/*`
-- **Customer**: `{tenant}.restx.food/customer/{tableId}`
-
-## Development Guidelines
-
-### Adding New Pages
-
-Create pages in the `app/` directory following Next.js App Router conventions:
-
-```tsx
-// app/menu/page.tsx
-export default function MenuPage() {
-  return <div>Menu Page</div>;
-}
-```
-
-### Adding New Components
-
-Create components in `components/` directory:
-
-```tsx
-// components/ui/Input.tsx
-export function Input({ ...props }) {
-  return <input {...props} />;
-}
-```
-
-### Adding New API Services
-
-Create service files in `lib/services/`:
-
-```tsx
-// lib/services/menuService.ts
-import { tenantApi } from './api';
-
-export const menuService = {
-  getCategories: () => tenantApi.get('/categories'),
-  getDishes: (categoryId: string) => tenantApi.get(`/dishes?categoryId=${categoryId}`),
-};
-```
-
-### Adding New Types
-
-Define types in `lib/types/index.ts`:
-
-```tsx
-export interface MenuItem {
-  id: string;
-  name: string;
-  price: number;
-}
-```
-
-## TODO
-
-This is a minimal template. The following features need to be implemented:
-
-- [ ] Complete authentication flow
-- [ ] Admin dashboard pages
-- [ ] Staff management pages
-- [ ] Customer ordering interface
-- [ ] Menu management
-- [ ] Order management
-- [ ] Reservation system
-- [ ] Table management with 3D layout
-- [ ] Real-time order updates (SignalR)
-- [ ] Internationalization (i18n)
-- [ ] Dark mode support
-- [ ] Responsive design
-- [ ] Unit tests
-- [ ] E2E tests
-
-## License
-
-Private - RestX Project
+<div align="center">
+  <br>
+  <sub>Built with ❤️ by the FoodX Frontend Team</sub>
+</div>
