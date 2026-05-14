@@ -23,8 +23,9 @@ const nextConfig = {
   ],
   // API rewrites for CORS bypass
   async rewrites() {
-    const adminApiUrl = process.env.NEXT_PUBLIC_ADMIN_API_URL || process.env.INTERNAL_ADMIN_API_URL || 'https://admin.restx.food/api';
-    const tenantApiUrl = process.env.NEXT_PUBLIC_API_URL || process.env.INTERNAL_API_URL || 'https://demo.restx.food/api';
+    const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'xfoodi.website';
+    const adminApiUrl = process.env.NEXT_PUBLIC_ADMIN_API_URL || process.env.INTERNAL_ADMIN_API_URL || `https://api.${BASE_DOMAIN}/api`;
+    const tenantApiUrl = process.env.NEXT_PUBLIC_API_URL || process.env.INTERNAL_API_URL || `https://api.${BASE_DOMAIN}/api`;
 
     return [
       {

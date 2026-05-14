@@ -75,12 +75,13 @@ export const TenantRequestForm: React.FC<TenantRequestFormProps> = ({
 
     try {
       const normalizedHostname = values.hostname?.trim().toLowerCase();
+      const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || "xfoodi.website";
       const requestData: TenantRequestInput = {
         ...values,
         hostname: normalizedHostname
-          ? normalizedHostname.endsWith(".restx.food")
+          ? normalizedHostname.endsWith(`.${BASE_DOMAIN}`)
             ? normalizedHostname
-            : `${normalizedHostname}.restx.food`
+            : `${normalizedHostname}.${BASE_DOMAIN}`
           : normalizedHostname,
       };
 
@@ -179,7 +180,7 @@ export const TenantRequestForm: React.FC<TenantRequestFormProps> = ({
                       setHostNameValue(value);
                     }}
                   />
-                  <span className="url-segment url-suffix">.restx.food</span>
+                  <span className="url-segment url-suffix">.{process.env.NEXT_PUBLIC_BASE_DOMAIN || "xfoodi.website"}</span>
                 </div>
               </Form.Item>
             </Col>

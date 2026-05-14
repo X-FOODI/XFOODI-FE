@@ -5,11 +5,13 @@ export function middleware(req: NextRequest) {
   const host = req.headers.get("host") || "";
   const pathname = req.nextUrl.pathname;
 
+  const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || "xfoodi.website";
+
   // Landing domains - serve public landing page
-  const LANDING_DOMAINS = new Set(["restx.food", "www.restx.food"]);
+  const LANDING_DOMAINS = new Set([BASE_DOMAIN, `www.${BASE_DOMAIN}`]);
 
   // Super Admin domain - serve /tenants (manage all tenants)
-  const ADMIN_DOMAIN = 'admin.restx.food';
+  const ADMIN_DOMAIN = `admin.${BASE_DOMAIN}`;
 
   // Standalone landing domains — served as dedicated pages, not tenant subdomains
   const STANDALONE_LANDING_DOMAINS: Record<string, string> = {
@@ -116,11 +118,11 @@ export function middleware(req: NextRequest) {
   }
 
   // Tenant domains:
-  // - Production: *.restx.food (excluding www, admin, root)
+  // - Production: *.[BASE_DOMAIN] (excluding www, admin, root)
   // - Development: *.localhost (e.g., demo.localhost:3000, excluding admin.localhost)
   const isTenantDomain =
     CUSTOM_TENANT_DOMAINS.has(hostWithoutPort) ||
-    (host.endsWith('.restx.food') &&
+    (host.endsWith(`.${BASE_DOMAIN}`) &&
       !LANDING_DOMAINS.has(host) &&
       host !== ADMIN_DOMAIN) ||
     (host.includes('.localhost') &&
