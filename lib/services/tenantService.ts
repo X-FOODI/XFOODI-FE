@@ -97,11 +97,12 @@ const mapApiResponseToTenant = (apiTenant: TenantApiResponse): ITenant => {
 // Helper function to convert frontend create input to API format
 const mapCreateInputToApi = (input: TenantCreateInput) => {
   const slug = input.hostName || "";
+  const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || "xfoodi.website";
   const fullHostname = input.isCustomDomain
     ? slug
-    : slug.endsWith(".restx.food")
+    : slug.endsWith(`.${BASE_DOMAIN}`)
       ? slug
-      : `${slug}.restx.food`;
+      : `${slug}.${BASE_DOMAIN}`;
 
   return {
     name: input.name,

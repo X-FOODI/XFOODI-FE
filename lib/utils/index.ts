@@ -54,7 +54,8 @@ export function debounce<T extends (...args: any[]) => any>(
  * Generate QR code URL for table
  */
 export function generateTableQRUrl(tenantSlug: string, tableId: string): string {
-  return `https://${tenantSlug}.restx.food/customer/${tableId}`;
+  const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || "xfoodi.website";
+  return `https://${tenantSlug}.${BASE_DOMAIN}/customer/${tableId}`;
 }
 
 /**
