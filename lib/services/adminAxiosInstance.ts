@@ -7,6 +7,7 @@ const getAdminBaseUrl = (): string => {
 
     const host = window.location.host;
     const hostWithoutPort = host.includes(':') ? host.split(':')[0] : host;
+    const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || "xfoodi.website";
 
     if (hostWithoutPort === 'localhost' ||
         hostWithoutPort === '127.0.0.1' ||
@@ -15,20 +16,20 @@ const getAdminBaseUrl = (): string => {
     }
 
     const parts = hostWithoutPort.split('.');
-    // Only build dynamic admin subdomain for *.restx.food domains.
+    // Only build dynamic admin subdomain for *.BASE_DOMAIN domains.
     // For custom domains (e.g. lebon.io.vn), always use the fixed admin backend.
     const isRestxDomain =
-        parts.length >= 2 && parts.slice(-2).join('.') === 'restx.food';
+        parts.length >= 2 && parts.slice(-2).join('.') === BASE_DOMAIN;
 
     if (isRestxDomain) {
-        // Always resolve to admin.restx.food regardless of subdomain depth:
-        // restx.food        → admin.restx.food
-        // www.restx.food    → admin.restx.food
-        // demo.restx.food   → admin.restx.food
-        return `${window.location.protocol}//admin.restx.food/api`;
+        // Always resolve to api.BASE_DOMAIN regardless of subdomain depth:
+        // xfoodi.website        → api.xfoodi.website
+        // www.xfoodi.website    → api.xfoodi.website
+        // demo.xfoodi.website   → api.xfoodi.website
+        return `${window.location.protocol}//api.${BASE_DOMAIN}/api`;
     } else {
-        // Custom domain — always route to the fixed admin backend
-        return 'https://admin.restx.food/api';
+        // Custom domain — always route to the fixed api backend
+        return `https://api.${BASE_DOMAIN}/api`;
     }
 };
 

@@ -21,9 +21,10 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
 
   const fetchTenant = async () => {
     const host = window.location.host; // e.g., demo.restx.food:3000
+    const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || "xfoodi.website";
 
     // 1. Check for Landing domains (Skip API call)
-    if (host === "restx.food" || host === "www.restx.food") {
+    if (host === BASE_DOMAIN || host === `www.${BASE_DOMAIN}`) {
       console.log(
         "[TenantContext] Landing domain detected, skipping tenant fetch",
       );
@@ -32,7 +33,7 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     }
 
     // 2. Check for Admin domain (Skip tenant fetch, admin has its own context)
-    if (host === "admin.restx.food" || host.startsWith("admin.")) {
+    if (host === `admin.${BASE_DOMAIN}` || host.startsWith("admin.")) {
       console.log(
         "[TenantContext] Admin domain detected, skipping tenant fetch",
       );
@@ -48,10 +49,10 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     // e.g., demo.localhost -> demo.restx.food
     if (hostname.endsWith(".localhost")) {
       const subdomain = hostname.replace(".localhost", "");
-      hostname = `${subdomain}.restx.food`;
+      hostname = `${subdomain}.${BASE_DOMAIN}`;
     } else if (hostname === "localhost" || hostname === "127.0.0.1") {
-      // Plain localhost without subdomain - default to demo.restx.food
-      hostname = "demo.restx.food";
+      // Plain localhost without subdomain - default to demo.BASE_DOMAIN
+      hostname = `demo.${BASE_DOMAIN}`;
     }
 
     try {
