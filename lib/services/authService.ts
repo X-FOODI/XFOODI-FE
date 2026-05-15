@@ -98,44 +98,60 @@ function decodeGoogleCredentialEmail(idToken: string): string | undefined {
   }
 }
 
+const GOOGLE_HTTP_STATUS_MESSAGES: Record<number, string> = {
+  400: 'Thông tin đăng nhập Google không hợp lệ',
+  401: 'Phiên Google đã hết hạn, vui lòng thử lại',
+  403: 'Email Google chưa được xác minh',
+  500: 'Lỗi máy chủ, vui lòng thử lại sau',
+  503: 'Tính năng đăng nhập Google tạm thời không khả dụng',
+};
+
+function readBackendErrorText(data: unknown): string | undefined {
+  if (!data || typeof data !== 'object') return undefined;
+  const payload = data as { message?: unknown; error?: unknown };
+  if (typeof payload.message === 'string' && payload.message.trim()) {
+    return payload.message.trim();
+  }
+  if (typeof payload.error === 'string' && payload.error.trim()) {
+    return payload.error.trim();
+  }
+  return undefined;
+}
+
 function throwNormalizedLoginError(error: any, mode: 'password' | 'google'): never {
   console.error('Login error:', error);
   console.error('Error response:', error.response?.data);
   console.error('Error status:', error.response?.status);
-  console.error('Full error:', JSON.stringify(error, null, 2));
 
-  if (error.response?.data?.error) {
-    throw new Error(error.response.data.error);
+  const status: number | undefined = error.response?.status;
+  const backendMessage = readBackendErrorText(error.response?.data);
+
+  if (backendMessage) {
+    throw new Error(backendMessage);
   }
 
-  if (error.response?.data?.message) {
-    throw new Error(error.response.data.message);
+  if (mode === 'google' && status !== undefined && GOOGLE_HTTP_STATUS_MESSAGES[status]) {
+    throw new Error(GOOGLE_HTTP_STATUS_MESSAGES[status]);
   }
 
-  if (error.response?.status === 500) {
-    throw new Error(
-      `Server error (500): Backend failed to process ${mode} login. Check server logs.`
-    );
+  if (status === 401) {
+    throw new Error('Invalid email or password');
   }
 
-  if (error.response?.status === 401) {
-    throw new Error(
-      mode === 'google'
-        ? 'Google sign-in failed or this account is not registered.'
-        : 'Invalid email or password'
-    );
-  }
-
-  if (error.response?.status === 400) {
-    throw new Error(mode === 'google' ? 'Invalid Google sign-in request.' : 'Invalid login credentials');
+  if (status === 400) {
+    throw new Error('Invalid login credentials');
   }
 
   if (error.message === 'Network Error' || error.code === 'ERR_NETWORK') {
-    throw new Error('Cannot connect to server. Please check your internet connection.');
+    throw new Error('Không thể kết nối máy chủ. Vui lòng kiểm tra mạng và thử lại.');
   }
 
   if (error.code === 'ECONNABORTED') {
-    throw new Error('Request timeout. Please try again.');
+    throw new Error('Hết thời gian chờ. Vui lòng thử lại.');
+  }
+
+  if (mode === 'google') {
+    throw new Error('Đăng nhập Google thất bại. Vui lòng thử lại.');
   }
 
   throw error;
@@ -281,10 +297,25 @@ const authService = {
 
     try {
       const response = await axiosInstance.post<any>(path, { googleToken });
-      const { user, tokens } = parseAuthLoginPayload(response.data, emailFallback);
-      return finalizeLoginSession(user, tokens, !!rememberMe);
-    } catch (error: any) {
-      throwNormalizedLoginError(error, 'google');
+
+      try {
+        const { user, tokens } = parseAuthLoginPayload(response.data, emailFallback);
+        return finalizeLoginSession(user, tokens, !!rememberMe);
+      } catch (sessionError) {
+        console.error(
+          '[loginWithGoogle] parseAuthLoginPayload / finalizeLoginSession failed:',
+          sessionError,
+          { responseData: response.data }
+        );
+        throw sessionError instanceof Error
+          ? sessionError
+          : new Error('Không thể hoàn tất đăng nhập Google. Vui lòng thử lại.');
+      }
+    } catch (error: unknown) {
+      if (error && typeof error === 'object' && 'response' in error && (error as { response?: unknown }).response) {
+        throwNormalizedLoginError(error, 'google');
+      }
+      throw error;
     }
   },
 

@@ -66,10 +66,13 @@ export function GoogleIdentityButton({
       );
       onAuthenticatedRef.current(user);
     } catch (err: unknown) {
+      const fallback =
+        t("login_email_page.google_login_error") ||
+        "Đăng nhập Google thất bại. Vui lòng thử lại.";
       const msg =
-        err instanceof Error
-          ? err.message
-          : t("login_email_page.google_login_error") || "Google sign-in failed.";
+        err instanceof Error && err.message.trim()
+          ? err.message.trim()
+          : fallback;
       message.error(msg);
       console.error("Google login error:", err);
     } finally {
