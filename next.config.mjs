@@ -27,18 +27,27 @@ const nextConfig = {
     const adminApiUrl = process.env.NEXT_PUBLIC_ADMIN_API_URL || process.env.INTERNAL_ADMIN_API_URL || `https://api.${BASE_DOMAIN}/api`;
     const tenantApiUrl = process.env.NEXT_PUBLIC_API_URL || process.env.INTERNAL_API_URL || `https://api.${BASE_DOMAIN}/api`;
 
+    // Strip trailing /api from tenantApiUrl to avoid double /api/api
+    const tenantBase = tenantApiUrl.replace(/\/api$/, '');
+    const adminBase = adminApiUrl.replace(/\/api$/, '');
+
+    console.log('[next.config] Rewrite destinations:');
+    console.log('  /api/admin/* ->', `${adminBase}/api/:path*`);
+    console.log('  /api/*       ->', `${tenantBase}/api/:path*`);
+    console.log('  /hubs/*      ->', `${tenantBase}/hubs/:path*`);
+
     return [
       {
         source: '/api/admin/:path*',
-        destination: `${adminApiUrl}/:path*`,
+        destination: `${adminBase}/api/:path*`,
       },
       {
         source: '/hubs/:path*',
-        destination: `${tenantApiUrl.replace(/\/api$/, '')}/hubs/:path*`,
+        destination: `${tenantBase}/hubs/:path*`,
       },
       {
         source: '/api/:path*',
-        destination: `${tenantApiUrl}/:path*`,
+        destination: `${tenantBase}/api/:path*`,
       },
     ];
   },

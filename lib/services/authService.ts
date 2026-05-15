@@ -101,6 +101,8 @@ function decodeGoogleCredentialEmail(idToken: string): string | undefined {
 function throwNormalizedLoginError(error: any, mode: 'password' | 'google'): never {
   console.error('Login error:', error);
   console.error('Error response:', error.response?.data);
+  console.error('Error status:', error.response?.status);
+  console.error('Full error:', JSON.stringify(error, null, 2));
 
   if (error.response?.data?.error) {
     throw new Error(error.response.data.error);
@@ -108,6 +110,12 @@ function throwNormalizedLoginError(error: any, mode: 'password' | 'google'): nev
 
   if (error.response?.data?.message) {
     throw new Error(error.response.data.message);
+  }
+
+  if (error.response?.status === 500) {
+    throw new Error(
+      `Server error (500): Backend failed to process ${mode} login. Check server logs.`
+    );
   }
 
   if (error.response?.status === 401) {

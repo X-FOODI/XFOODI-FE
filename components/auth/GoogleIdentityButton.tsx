@@ -3,7 +3,7 @@
 import { useAuth } from "@/lib/contexts/AuthContext";
 import type { User } from "@/lib/services/authService";
 import { GoogleLogin } from "@react-oauth/google";
-import { message } from "antd";
+import { App } from "antd";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -25,6 +25,7 @@ export function GoogleIdentityButton({
 }: GoogleIdentityButtonProps) {
   const { t } = useTranslation("auth");
   const { loginWithGoogle } = useAuth();
+  const { message } = App.useApp();
   const [busy, setBusy] = useState(false);
 
   const rememberRef = useRef(rememberMe);
