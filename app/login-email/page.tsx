@@ -1,9 +1,12 @@
 "use client";
 
+import { GoogleIdentityButton } from "@/components/auth/GoogleIdentityButton";
 import { HeroSection } from "@/components/auth/HeroSection";
 import RememberCheckbox from "@/components/auth/RememberCheckbox";
 import { GlassInput } from "@/components/ui/GlassInput";
+import { redirectAfterLogin } from "@/lib/auth/redirectAfterLogin";
 import { useAuth } from "@/lib/contexts/AuthContext";
+import type { User } from "@/lib/services/authService";
 import { useTenant } from "@/lib/contexts/TenantContext";
 import {
     EyeInvisibleOutlined,
@@ -47,6 +50,10 @@ function LoginEmailPageContent() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  const navigateAfterLogin = (user: User) => {
+    redirectAfterLogin(router, user, redirectPath);
+  };
 
   // Validation Logic
   const validateEmail = (email: string) => {
@@ -117,22 +124,7 @@ function LoginEmailPageContent() {
     setLoading(true);
     try {
       const user = await login({ email, password, rememberMe: remember });
-
-      // Check roles for redirection
-      const userRoles: string[] = user.roles || (user.role ? [user.role] : []);
-      const hasRole = (role: string) => userRoles.some(r => r.toLowerCase() === role.toLowerCase());
-
-      // If middleware saved a redirect path (e.g. /admin/tables), go there
-      if (redirectPath) {
-        router.push(redirectPath);
-      } else if (hasRole('System Admin') || hasRole('Admin')) {
-        router.push('/admin');
-      } else if (hasRole('Staff')) {
-        router.push('/staff');
-      } else {
-        router.push('/');
-      }
-
+      navigateAfterLogin(user);
     } catch (error: any) {
       const errorMessage = error.message || 'Login failed. Please try again.';
       message.error(errorMessage);
@@ -289,6 +281,12 @@ function LoginEmailPageContent() {
           </div>
 
           <div className="grid grid-cols-1 gap-3 mt-6">
+            <GoogleIdentityButton
+              rememberMe={remember}
+              disabled={loading}
+              onAuthenticated={navigateAfterLogin}
+            />
+
             <button
               type="button"
               onClick={() => router.push('/login')}
