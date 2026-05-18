@@ -3658,6 +3658,8 @@
       "sign_up_here": "Đăng ký tại đây",
       "or_login_with": "Hoặc đăng nhập bằng",
       "phone_number": "Số điện thoại",
+      "google_continue_service": "Tiếp tục sử dụng dịch vụ bằng Google",
+      "google_continue_service_signup": "Tiếp tục đăng ký bằng Google",
       "validation": {
         "required_email": "Vui lòng nhập địa chỉ email của bạn",
         "invalid_email": "Vui lòng nhập địa chỉ email hợp lệ",
