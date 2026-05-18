@@ -8,6 +8,7 @@ import { message } from "antd";
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useThemeMode } from "../theme/AutoDarkThemeProvider";
+import TurnstileWidget from "@/components/TurnstileWidget";
 import { useTenant } from "@/lib/contexts/TenantContext";
 
 const HERO_IMAGE_URL = "https://lh3.googleusercontent.com/aida-public/AB6AXuCQMVZhsaYs2Qw_8QN0YP6pUMn326Srs9wfsj18Q0patddJBVkz5g8pm0S3OhMz-nY-BrDmVA-ghfvRsndeKDyq7w68KAOVQDc5vQo71xWYxvYcQaEm4IFJ6BGYlfoaK6APcvIObkkPn9yvUiw6Iditv27W_j60EhvOhHb3Cwfupw1Ib5bCO6lO0NctemCVio6026jqjhbziRbrzl6OVbYkM0LUSLR_OV1pQf1oH1nNavimugtYDhjEH_oSrIweo29PEMjmlq80Ol4";
@@ -20,6 +21,7 @@ export default function ForgotPasswordPage() {
   const [emailError, setEmailError] = useState("");
   const [emailTouched, setEmailTouched] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
 
   useEffect(() => {
     setMounted(true);
@@ -147,6 +149,13 @@ export default function ForgotPasswordPage() {
                 <div className="text-red-400 text-xs mt-1 ml-1 font-medium">{emailError}</div>
               )}
             </div>
+
+            {/* Cloudflare Turnstile */}
+            <TurnstileWidget
+              onSuccess={(token) => setTurnstileToken(token)}
+              onExpire={() => setTurnstileToken("")}
+              onError={() => setTurnstileToken("")}
+            />
 
             <div>
               <button
