@@ -433,9 +433,29 @@ body {
   border-color: var(--primary-border);
 }
 
-/* Social auth (Google / phone) — shared with SocialAuthButton */
+/* Social auth (Google / phone) — force readable text on white (overrides dark theme inherit) */
+.social-auth-btn,
+.social-auth-btn .social-auth-btn__label {
+  color: #1f2937 !important;
+  background-color: #ffffff !important;
+}
+
+.social-auth-btn {
+  border-color: #dddddd !important;
+}
+
+.social-auth-btn:hover {
+  background-color: #f9fafb !important;
+  border-color: #d1d5db !important;
+}
+
 .google-oauth-btn-wrap [id^="container"] {
   width: 100% !important;
+}
+
+/* Hide native Google button paint; custom label layer stays visible */
+.google-oauth-btn-wrap iframe {
+  opacity: 0 !important;
 }
 
 /* Welcome success banner */

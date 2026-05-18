@@ -114,22 +114,25 @@ export function GoogleIdentityButton({
       : t("login_email_page.google_continue_service") ||
         "Tiếp tục sử dụng dịch vụ bằng Google";
 
-  const blocked = disabled || busy;
+  const inactive = disabled || busy;
 
   return (
     <div
       ref={containerRef}
-      className={clsx("relative w-full h-12 min-h-[3rem]", blocked && "opacity-60")}
-      aria-busy={busy}
+      className="google-oauth-btn-wrap relative w-full h-12 min-h-[3rem]"
+      aria-busy={busy || undefined}
+      aria-disabled={inactive || undefined}
     >
-      {/* Visual layer — matches phone button */}
       <div
-        className={clsx(socialAuthButtonClassName, "pointer-events-none relative z-0")}
+        className={clsx(
+          socialAuthButtonClassName,
+          "relative z-[1] pointer-events-none select-none"
+        )}
         aria-hidden
       >
         {busy ? (
           <span
-            className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700"
+            className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-gray-300 border-t-gray-800"
             aria-hidden
           />
         ) : (
@@ -137,13 +140,14 @@ export function GoogleIdentityButton({
             <GoogleIcon />
           </span>
         )}
-        <span className="truncate text-center">{label}</span>
+        <span className="social-auth-btn__label min-w-0 flex-1 truncate text-center text-sm font-medium text-gray-800">
+          {label}
+        </span>
       </div>
 
-      {/* Invisible Google button — receives clicks, same box size */}
-      {!blocked && (
+      {!inactive && (
         <div
-          className="absolute inset-0 z-10 overflow-hidden rounded-xl opacity-[0.01] cursor-pointer [&>div]:!h-full [&>div]:!w-full [&_iframe]:!h-12 [&_iframe]:!min-h-[3rem] [&_iframe]:!w-full"
+          className="absolute inset-0 z-[2] overflow-hidden rounded-xl opacity-0 cursor-pointer [&>div]:!h-full [&>div]:!w-full [&_iframe]:!h-12 [&_iframe]:!min-h-[3rem] [&_iframe]:!w-full"
           aria-label={label}
         >
           <GoogleLogin

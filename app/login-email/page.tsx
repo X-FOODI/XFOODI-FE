@@ -279,9 +279,10 @@ function LoginEmailPageContent() {
               variant="signin"
             />
             <SocialAuthButton
-              icon={<PhoneOutlined className="text-lg text-gray-600" />}
+              icon={<PhoneOutlined />}
               onClick={() => router.push('/login')}
-              disabled={loading}
+              loading={loading}
+              inactive={loading}
             >
               {t('login_email_page.phone_number')}
             </SocialAuthButton>
