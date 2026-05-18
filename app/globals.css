@@ -433,6 +433,11 @@ body {
   border-color: var(--primary-border);
 }
 
+/* Social auth (Google / phone) — shared with SocialAuthButton */
+.google-oauth-btn-wrap [id^="container"] {
+  width: 100% !important;
+}
+
 /* Welcome success banner */
 .auth-welcome-banner {
   background: var(--success-soft);

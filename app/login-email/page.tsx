@@ -2,6 +2,8 @@
 
 import { GoogleIdentityButton } from "@/components/auth/GoogleIdentityButton";
 import { HeroSection } from "@/components/auth/HeroSection";
+import { SocialAuthButton } from "@/components/auth/social/SocialAuthButton";
+import { SocialAuthMethods } from "@/components/auth/social/SocialAuthMethods";
 import RememberCheckbox from "@/components/auth/RememberCheckbox";
 import { GlassInput } from "@/components/ui/GlassInput";
 import { redirectAfterLogin } from "@/lib/auth/redirectAfterLogin";
@@ -269,33 +271,21 @@ function LoginEmailPageContent() {
             </div>
           </form>
 
-          <div className="relative mt-8">
-            <div className="absolute inset-0 flex items-center">
-              <div className="auth-divider w-full border-t"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="auth-divider-label">
-                {t('login_email_page.or_login_with')}
-              </span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 mt-6">
+          <SocialAuthMethods dividerLabel={t('login_email_page.or_login_with')}>
             <GoogleIdentityButton
               rememberMe={remember}
               disabled={loading}
               onAuthenticated={navigateAfterLogin}
+              variant="signin"
             />
-
-            <button
-              type="button"
+            <SocialAuthButton
+              icon={<PhoneOutlined className="text-lg text-gray-600" />}
               onClick={() => router.push('/login')}
-              className="auth-alt-btn w-full inline-flex justify-center items-center py-3 px-4 shadow-sm text-sm font-medium group"
+              disabled={loading}
             >
-              <PhoneOutlined className="auth-input-icon text-xl mr-3" />
-              <span>{t('login_email_page.phone_number')}</span>
-            </button>
-          </div>
+              {t('login_email_page.phone_number')}
+            </SocialAuthButton>
+          </SocialAuthMethods>
         </div>
 
         {/* Footer */}

@@ -2,6 +2,7 @@
 
 import { GoogleIdentityButton } from "@/components/auth/GoogleIdentityButton";
 import { HeroSection } from "@/components/auth/HeroSection";
+import { SocialAuthMethods } from "@/components/auth/social/SocialAuthMethods";
 import { GlassInput } from "@/components/ui/GlassInput";
 import { redirectAfterLogin } from "@/lib/auth/redirectAfterLogin";
 import { useTenant } from "@/lib/contexts/TenantContext";
@@ -423,25 +424,14 @@ export default function RegisterPage() {
               </button>
             </div>
 
-            <div className="relative mt-6">
-              <div className="absolute inset-0 flex items-center">
-                <div className="auth-divider w-full border-t"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="auth-divider-label">
-                  {t("login_email_page.or_login_with")}
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-6">
+            <SocialAuthMethods dividerLabel={t("login_email_page.or_login_with")}>
               <GoogleIdentityButton
                 rememberMe
                 disabled={loading}
                 onAuthenticated={navigateAfterGoogle}
                 variant="signup"
               />
-            </div>
+            </SocialAuthMethods>
 
             <div className="text-center text-sm mt-4 pt-4 border-t auth-divider">
               <span className="auth-text">{t('register_page.already_have_account')} </span>
