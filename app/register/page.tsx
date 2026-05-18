@@ -1,18 +1,27 @@
 "use client";
 
+import { GoogleIdentityButton } from "@/components/auth/GoogleIdentityButton";
 import { HeroSection } from "@/components/auth/HeroSection";
 import { GlassInput } from "@/components/ui/GlassInput";
+import { redirectAfterLogin } from "@/lib/auth/redirectAfterLogin";
+import { useTenant } from "@/lib/contexts/TenantContext";
+import type { User } from "@/lib/services/authService";
 import authService from "@/lib/services/authService";
 import { EyeInvisibleOutlined, EyeOutlined, LockOutlined, MailOutlined, PhoneOutlined, UserAddOutlined } from "@ant-design/icons";
 import { App } from "antd";
+import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useThemeMode } from "../theme/AutoDarkThemeProvider";
-import { useTenant } from "@/lib/contexts/TenantContext";
 
 const HERO_IMAGE_URL = "https://lh3.googleusercontent.com/aida-public/AB6AXuCQMVZhsaYs2Qw_8QN0YP6pUMn326Srs9wfsj18Q0patddJBVkz5g8pm0S3OhMz-nY-BrDmVA-ghfvRsndeKDyq7w68KAOVQDc5vQo71xWYxvYcQaEm4IFJ6BGYlfoaK6APcvIObkkPn9yvUiw6Iditv27W_j60EhvOhHb3Cwfupw1Ib5bCO6lO0NctemCVio6026jqjhbziRbrzl6OVbYkM0LUSLR_OV1pQf1oH1nNavimugtYDhjEH_oSrIweo29PEMjmlq80Ol4";
 
 export default function RegisterPage() {
+  const router = useRouter();
+  const navigateAfterGoogle = (user: User) => {
+    redirectAfterLogin(router, user, null);
+  };
+
   const { message } = App.useApp();
   const { t } = useTranslation('auth');
   const { mode } = useThemeMode();
@@ -412,6 +421,26 @@ export default function RegisterPage() {
                 </span>
                 {loading ? t('login_button.loading') : t('register_page.create_account_btn')}
               </button>
+            </div>
+
+            <div className="relative mt-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="auth-divider w-full border-t"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="auth-divider-label">
+                  {t("login_email_page.or_login_with")}
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <GoogleIdentityButton
+                rememberMe
+                disabled={loading}
+                onAuthenticated={navigateAfterGoogle}
+                variant="signup"
+              />
             </div>
 
             <div className="text-center text-sm mt-4 pt-4 border-t auth-divider">

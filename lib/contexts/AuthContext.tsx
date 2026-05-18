@@ -14,6 +14,7 @@ interface AuthContextType {
   loading: boolean;
   isAuthReady: boolean;
   login: (credentials: LoginCredentials) => Promise<User>;
+  loginWithGoogle: (googleToken: string, rememberMe?: boolean) => Promise<User>;
   logout: () => void;
 }
 
@@ -68,13 +69,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const loginWithGoogle = async (
+    googleToken: string,
+    rememberMe = true
+  ): Promise<User> => {
+    const data = await authService.loginWithGoogle(googleToken, rememberMe);
+    setUser(data);
+    return data;
+  };
+
   const logout = () => {
     authService.logout();
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, isAuthReady, login, logout }}>
+    <AuthContext.Provider
+      value={{ user, loading, isAuthReady, login, loginWithGoogle, logout }}
+    >
       {children}
     </AuthContext.Provider>
   );

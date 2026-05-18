@@ -1,6 +1,8 @@
 export const API_ROUTES = {
   AUTH: {
     LOGIN: '/auth/login',
+    /** POST `{ googleToken: string }` — Google credential JWT. Full URL = NEXT_PUBLIC_API_URL + path (e.g. …/api/auth/google). */
+    GOOGLE: '/auth/google',
     REGISTER: '/auth/register',
     CHECK_PHONE: '/auth/customer/check-phone',
     LOGOUT: '/auth/logout',
