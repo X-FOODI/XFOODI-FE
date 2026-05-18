@@ -1,4 +1,5 @@
 import I18nProvider from "@/components/I18nProvider";
+import { GoogleOAuthAppProvider } from "@/components/providers/GoogleOAuthAppProvider";
 import TenantFavicon from "@/components/TenantFavicon";
 import { AuthProvider } from "@/lib/contexts/AuthContext";
 // import { CartProvider } from "@/lib/contexts/CartContext"; // TODO: Re-enable when cart services are ready
@@ -140,15 +141,13 @@ export default function RootLayout({
         <I18nProvider>
           <TenantProvider>
             <TenantFavicon />
-            {/* Page transition loader removed per request */}
-            <AuthProvider>
-              {/* CartProvider removed temporarily - depends on services not yet ported */}
+            <GoogleOAuthAppProvider>
+              <AuthProvider>
                 <ToastProvider>
-                  <AntdProvider>
-                    {children}
-                  </AntdProvider>
+                  <AntdProvider>{children}</AntdProvider>
                 </ToastProvider>
-            </AuthProvider>
+              </AuthProvider>
+            </GoogleOAuthAppProvider>
           </TenantProvider>
         </I18nProvider>
       </body>
