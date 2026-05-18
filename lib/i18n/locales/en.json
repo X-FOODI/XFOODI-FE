@@ -3609,8 +3609,10 @@
       "privacy_policy": "Privacy Policy",
       "no_account": "Don't have an account?",
       "sign_up_here": "Sign up here",
-      "or_login_with": "Or login with",
+      "or_login_with": "Or sign in with",
       "phone_number": "Phone Number",
+      "google_continue_service": "Continue with Google",
+      "google_continue_service_signup": "Sign up with Google",
       "validation": {
         "required_email": "Please enter your email address",
         "invalid_email": "Please enter a valid email address",
