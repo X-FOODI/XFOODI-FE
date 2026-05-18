@@ -10,7 +10,7 @@ Thank you for deciding to contribute to the FoodX Frontend project. Please study
    - ⚠️ *Avoid Hardcoding static hex/rgb values directly* (`#FFFFFF`, `#000000`)
    - ✅ *Tailwind/AntD/MUI Tokens*: Prioritize semantic color palettes so components will seamlessly auto-adjust.
 2. **Type Safety & No Any**: Absolutely do not compromise code stability with TypeScript `any`. All function parameters and payloads fetching APIs need to be solidly typed.
-3. **Lint Verification**: Execute `npm run check` immediately prior to establishing a Pull Request to organically eradicate all Typescript Warnings.
+3. **Lint Verification**: Execute `pnpm run check` immediately prior to establishing a Pull Request to organically eradicate all Typescript Warnings.
 
 ---
 
@@ -51,3 +51,4 @@ FoodX aggressively implements the internationally recognized **[Conventional Com
 3. Always implement `rebase` to sequentially fetch the newest commits deployed in `develop` for inspection and to intercept any arising logical conflicts. Smoothly resolve out those conflicting errors securely prior to finally submitting.
 4. Each PR definitively requires at smallest **1 Core Head Member to explicitly Approve**.
 5. **ABSOLUTELY PROHIBITED: Implementing git push bypass flags or directly sending unreviewed explicit manual commits to the central `develop` alongside the absolute `main/master` branches.**
+
