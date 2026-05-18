@@ -52,7 +52,7 @@
 
 ## 🚀 Quick Start
 
-> Minimum requirements: **Node.js ≥ 20**, **npm ≥ 9**
+> Minimum requirements: **Node.js ≥ 20**, **pnpm ≥ 9**
 
 ### 1. Clone & Install
 
@@ -62,7 +62,7 @@ git clone <your-repo-url>
 cd XFoodi-FE
 
 # Install dependencies
-npm install
+pnpm install
 ```
 
 ### 2. Environment Variables Configuration
@@ -79,7 +79,7 @@ Ensure API URLs proxy mappings are correctly set (e.g., `INTERNAL_API_URL`, `INT
 
 Start the Next.js development server:
 ```bash
-npm run dev
+pnpm run dev
 ```
 
 Open your browser and navigate to `http://localhost:3000`. 
@@ -109,7 +109,7 @@ To maintain a professional, bug-free codebase, run our comprehensive checks befo
 
 ```bash
 # Run linting and TypeScript checks
-npm run check
+pnpm run check
 ```
 
 **Critical Contribution Rules:**
