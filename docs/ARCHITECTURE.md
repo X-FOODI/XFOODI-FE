@@ -23,3 +23,4 @@ FoodX uses a sophisticated rewrite strategy defined in `middleware.ts` and `next
 ## 4. State & Real-Time Management
 - Context API manages localized and global authentication states seamlessly across sub-domains.
 - SignalR clients continuously maintain alive connections with backend WebSockets ensuring minimal data latency for critical paths (e.g. Order Tracking).
+
