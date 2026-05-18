@@ -6,7 +6,6 @@ import { useAuth } from "@/lib/contexts/AuthContext";
 import type { User } from "@/lib/services/authService";
 import { GoogleLogin } from "@react-oauth/google";
 import { App } from "antd";
-import clsx from "clsx";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -124,10 +123,7 @@ export function GoogleIdentityButton({
       aria-disabled={inactive || undefined}
     >
       <div
-        className={clsx(
-          socialAuthButtonClassName,
-          "relative z-[1] pointer-events-none select-none"
-        )}
+        className={`${socialAuthButtonClassName} relative z-[1] pointer-events-none select-none`}
         aria-hidden
       >
         {busy ? (
