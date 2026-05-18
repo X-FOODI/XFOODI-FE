@@ -28,7 +28,7 @@ jobs:
       run: pnpm install --frozen-lockfile
       
     - name: Run linter
-      run: pnpm run lint --if-present
+      run: pnpm run lint
       
     - name: Build project
       run: pnpm run build
