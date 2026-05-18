@@ -12,7 +12,7 @@ const getInitialBaseUrl = (): string => {
 
   // Client-side: Always use relative path
   // The reverse proxy will route /api/* requests to the correct backend
-  // based on the Host header (e.g., demo.restx.food -> tenant backend)
+  // based on the Host header (e.g., demo.xfoodi.com -> tenant backend)
   return '/api';
 };
 

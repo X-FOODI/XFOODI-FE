@@ -1,23 +1,23 @@
 version: '3.8'
 
 services:
-  restx-frontend:
+  XFoodi-frontend:
     build:
       context: .
       dockerfile: dockerfile
-    container_name: restx-frontend
+    container_name: XFoodi-frontend
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-      - INTERNAL_ADMIN_API_URL=https://admin.restx.food/api
-      - INTERNAL_API_URL=https://demo.restx.food/api
-      - NEXT_PUBLIC_API_URL=https://demo.restx.food/api
-      - NEXT_PUBLIC_ADMIN_API_URL=https://admin.restx.food/api
+      - INTERNAL_ADMIN_API_URL=https://admin.xfoodi.com/api
+      - INTERNAL_API_URL=https://demo.xfoodi.com/api
+      - NEXT_PUBLIC_API_URL=https://demo.xfoodi.com/api
+      - NEXT_PUBLIC_ADMIN_API_URL=https://admin.xfoodi.com/api
     restart: unless-stopped
     networks:
-      - restx-network
+      - XFoodi-network
 
 networks:
-  restx-network:
+  XFoodi-network:
     driver: bridge

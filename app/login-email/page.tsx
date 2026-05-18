@@ -36,7 +36,7 @@ function LoginEmailPageContent() {
   const { mode } = useThemeMode();
   const { tenant } = useTenant();
   const tenantName = tenant?.businessName || tenant?.name;
-  const tenantLogoUrl = tenant?.logoUrl?.trim() || "/images/logo/restx-removebg-preview.png";
+  const tenantLogoUrl = tenant?.logoUrl?.trim() || "/images/logo/xfoodi-logo.png";
   const [mounted, setMounted] = useState(false);
 
   // State
@@ -173,7 +173,7 @@ function LoginEmailPageContent() {
                 alt={tenantName || "Restaurant Logo"}
                 className={`w-full h-full object-contain ${isDark ? 'filter invert hue-rotate-180 brightness-110' : ''}`}
                 onError={(e) => {
-                  e.currentTarget.src = "/images/logo/restx-removebg-preview.png";
+                  e.currentTarget.src = "/images/logo/xfoodi-logo.png";
                 }}
               />
             </div>

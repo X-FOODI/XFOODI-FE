@@ -2,7 +2,7 @@
 
 import { createTheme } from '@mui/material/styles';
 
-const restxTheme = createTheme({
+const XFoodiTheme = createTheme({
   palette: {
     primary: {
       main: '#FF380B',
@@ -165,5 +165,5 @@ const restxTheme = createTheme({
   },
 });
 
-export default restxTheme;
+export default XFoodiTheme;
 

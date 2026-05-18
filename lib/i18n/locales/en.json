@@ -3039,7 +3039,7 @@
     },
     "hero": {
       "tag": "All-in-one Restaurant Ops Platform",
-      "title": "Optimize restaurant operations with RestX",
+      "title": "Optimize restaurant operations with XFoodi",
       "description": "Manage tables, orders, kitchen, inventory and reports on a single platform.",
       "get_started": "Get Started",
       "watch_demo": "Watch Demo",
@@ -3455,13 +3455,13 @@
     }
   },
   "menu_page": {
-    "logo_title": "RESTX PREMIUM DINING",
+    "logo_title": "XFOODI PREMIUM DINING",
     "title": "Today's Menu",
     "loading": "Loading menu...",
     "retry": "Retry",
     "error_load": "Failed to load menu. Please try again later.",
     "items": "items",
-    "restx_menu": "RESTX MENU",
+    "XFoodi_menu": "XFOODI MENU",
     "search_placeholder": "Search items...",
     "viewing_category": "Viewing Category",
     "showing_items": "Showing {{count}} items",
@@ -4173,7 +4173,7 @@
       "light_mode": "Light Mode",
       "dark_mode": "Dark Mode",
       "general_profile": "General Profile",
-      "general_profile_desc": "Configure the core identity and contact parameters for this restaurant tenant. Changes propagate across the RestX infrastructure.",
+      "general_profile_desc": "Configure the core identity and contact parameters for this restaurant tenant. Changes propagate across the XFoodi infrastructure.",
       "active_tenant": "Active Tenant",
       "inactive_tenant": "Inactive Tenant",
       "view_details": "View Details"
