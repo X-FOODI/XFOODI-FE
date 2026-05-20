@@ -13,5 +13,9 @@ export const API_ROUTES = {
     CONFIRM_EMAIL: '/auth/confirm-email',
     RESEND_CONFIRMATION_EMAIL: '/auth/resend-confirmation-email',
     REFRESH_TOKEN: '/auth/refresh-token'
+  },
+  USERS: {
+    ME: '/users/me',
+    CHANGE_PASSWORD: '/users/change-password',
   }
 };
