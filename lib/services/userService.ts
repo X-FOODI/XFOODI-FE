@@ -8,6 +8,9 @@ export interface UpdateProfileRequest {
   fullName: string;
   phoneNumber?: string;
   avatarUrl?: string;
+  gender?: string;
+  dateOfBirth?: string; // ISO date string e.g. "1995-08-20"
+  address?: string;
 }
 
 export interface ChangePasswordRequest {

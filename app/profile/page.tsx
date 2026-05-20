@@ -64,6 +64,9 @@ export default function ProfilePage() {
         fullName: values.fullName,
         phoneNumber: values.phoneNumber || undefined,
         avatarUrl: user?.avatar,
+        gender: values.gender || undefined,
+        dateOfBirth: values.dateOfBirth || undefined,
+        address: values.address || undefined,
       });
 
       // Merge with current user to preserve fields the API might not return
