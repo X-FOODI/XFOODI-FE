@@ -47,7 +47,7 @@ export interface User {
   position?: string; // Staff position from auth response (e.g., 'Waiter', 'Kitchen', 'Kitchen Staff')
   phoneNumber?: string;
   avatar?: string;
-  gender?: 'Male' | 'Female' | 'Other' | string;
+  gender?: 'MALE' | 'FEMALE' | 'OTHER' | string;
   dateOfBirth?: string; // ISO date string e.g. "1995-08-20"
   address?: string;
 }

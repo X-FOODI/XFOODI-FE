@@ -68,9 +68,9 @@ interface ProfileInfoFormProps {
 
 const GENDER_OPTIONS = [
   { value: "", label: "Prefer not to say" },
-  { value: "Male", label: "Male" },
-  { value: "Female", label: "Female" },
-  { value: "Other", label: "Other" },
+  { value: "MALE", label: "Male" },
+  { value: "FEMALE", label: "Female" },
+  { value: "OTHER", label: "Other" },
 ];
 
 // ── Shared input style (uses CSS variables — works in both light & dark) ──────
