@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "check": "npm run lint && tsc --noEmit"
+    "check": "pnpm lint && tsc --noEmit"
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
