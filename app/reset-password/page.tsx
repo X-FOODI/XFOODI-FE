@@ -4,11 +4,11 @@ import { HeroSection } from "@/components/auth/HeroSection";
 import { GlassInput } from "@/components/ui/GlassInput";
 import authService from "@/lib/services/authService";
 import {
-    CheckCircleOutlined,
-    EyeInvisibleOutlined,
-    EyeOutlined,
-    KeyOutlined,
-    LockOutlined,
+  CheckCircleOutlined,
+  EyeInvisibleOutlined,
+  EyeOutlined,
+  KeyOutlined,
+  LockOutlined,
 } from "@ant-design/icons";
 import { message } from "antd";
 import { useSearchParams } from "next/navigation";

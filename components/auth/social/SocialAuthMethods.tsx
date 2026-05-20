@@ -1,6 +1,5 @@
 "use client";
 
-import clsx from "clsx";
 import type { ReactNode } from "react";
 import { SocialAuthDivider } from "./SocialAuthDivider";
 
@@ -17,7 +16,7 @@ export function SocialAuthMethods({
   className,
 }: SocialAuthMethodsProps) {
   return (
-    <section className={clsx("w-full", className)} aria-label={dividerLabel}>
+    <section className={`w-full ${className || ""}`.trim()} aria-label={dividerLabel}>
       <SocialAuthDivider label={dividerLabel} />
       <div className="flex w-full flex-col gap-3">{children}</div>
     </section>

@@ -1,21 +1,10 @@
 "use client";
 
-import clsx from "clsx";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 /** Shared layout + colors for Google / phone social login (always dark text on white). */
-export const socialAuthButtonClassName = clsx(
-  "social-auth-btn",
-  "relative w-full h-12 min-h-[3rem]",
-  "inline-flex items-center justify-center gap-3",
-  "rounded-xl border border-[#ddd] bg-white",
-  "px-4 py-3 text-sm font-medium leading-snug",
-  "text-gray-800 shadow-sm",
-  "transition-colors duration-200",
-  "hover:bg-gray-50 hover:border-gray-300 hover:shadow-md",
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/25",
-  "aria-[busy=true]:pointer-events-none aria-[busy=true]:cursor-wait"
-);
+export const socialAuthButtonClassName =
+  "social-auth-btn relative w-full h-12 min-h-[3rem] inline-flex items-center justify-center gap-3 rounded-xl border border-[#ddd] bg-white px-4 py-3 text-sm font-medium leading-snug text-gray-800 shadow-sm transition-colors duration-200 hover:bg-gray-50 hover:border-gray-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/25 aria-[busy=true]:pointer-events-none aria-[busy=true]:cursor-wait";
 
 export type SocialAuthButtonProps = Omit<
   ButtonHTMLAttributes<HTMLButtonElement>,
@@ -44,7 +33,7 @@ export function SocialAuthButton({
       type={type}
       aria-busy={loading || undefined}
       aria-disabled={isInactive || undefined}
-      className={clsx(socialAuthButtonClassName, className)}
+      className={`${socialAuthButtonClassName} ${className || ""}`.trim()}
       style={isInactive ? { pointerEvents: "none" } : undefined}
       {...rest}
     >
