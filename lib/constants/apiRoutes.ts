@@ -1,7 +1,6 @@
 export const API_ROUTES = {
   AUTH: {
     LOGIN: '/auth/login',
-    /** POST `{ googleToken: string }` — Google credential JWT. Full URL = NEXT_PUBLIC_API_URL + path (e.g. …/api/auth/google). */
     GOOGLE: '/auth/google',
     REGISTER: '/auth/register',
     CHECK_PHONE: '/auth/customer/check-phone',
@@ -17,5 +16,13 @@ export const API_ROUTES = {
   USERS: {
     ME: '/users/me',
     CHANGE_PASSWORD: '/users/change-password',
-  }
+  },
+  RESTAURANT_APPLICATIONS: {
+    CREATE: '/restaurant-applications',
+    MY: '/restaurant-applications/my',
+    LIST: '/restaurant-applications',
+    DETAIL: (id: string) => `/restaurant-applications/${id}`,
+    APPROVE: (id: string) => `/restaurant-applications/${id}/approve`,
+    REJECT: (id: string) => `/restaurant-applications/${id}/reject`,
+  },
 };

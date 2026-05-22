@@ -16,13 +16,18 @@ export function redirectAfterLogin(
     router.push(redirectPath);
     return;
   }
-  if (hasRole("System Admin") || hasRole("Admin")) {
-    router.push("/admin");
+  if (hasRole("System Admin") || hasRole("Admin") || hasRole("SuperAdmin")) {
+    router.push("/admin/dashboard");
+    return;
+  }
+  if (hasRole("Owner")) {
+    router.push("/restaurant/dashboard");
     return;
   }
   if (hasRole("Staff")) {
     router.push("/staff");
     return;
   }
+  // Customer / default
   router.push("/");
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import BestSellingDishesCard from "@/components/dashboard/BestSellingDishesCard";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
@@ -16,6 +18,7 @@ import {
 } from "@/lib/mock/dashboardMockData";
 import { formatVND } from "@/lib/utils/currency";
 import { useMemo, useState } from "react";
+import { useAuth } from "@/lib/contexts/AuthContext";
 
 type FilterOption = "day" | "week" | "month" | "year";
 
@@ -27,8 +30,33 @@ const FILTER_LABELS: Record<FilterOption, string> = {
 };
 
 export default function RestaurantDashboardPage() {
+  const { user, isAuthReady } = useAuth();
+  const router = useRouter();
   const [filter, setFilter] = useState<FilterOption>("week");
   const summary = MOCK_RESTAURANT_SUMMARY;
+
+  // Auth + role guard
+  useEffect(() => {
+    if (!isAuthReady) return;
+    if (!user) {
+      router.replace("/login-email?redirect=/restaurant/dashboard");
+      return;
+    }
+    const roles: string[] = user.roles || (user.role ? [user.role] : []);
+    if (!roles.includes("Owner") && !roles.includes("Admin") && !roles.includes("SuperAdmin")) {
+      // User is logged in but not an Owner — redirect to registration
+      router.replace("/register-restaurant");
+    }
+  }, [isAuthReady, user, router]);
+
+  if (!isAuthReady || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--bg-base)" }}>
+        <div className="w-8 h-8 rounded-full border-2 animate-spin"
+          style={{ borderColor: "var(--border)", borderTopColor: "var(--primary)" }} />
+      </div>
+    );
+  }
 
   // Scale mock data slightly per filter for demo effect
   const scale = filter === "day" ? 0.14 : filter === "week" ? 1 : filter === "month" ? 4.3 : 52;

@@ -1,7 +1,7 @@
 "use client";
 
-import DashboardHeader from "@/components/dashboard/DashboardHeader";
-import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import KPICard from "@/components/dashboard/KPICard";
 import OrdersBarChart from "@/components/dashboard/OrdersBarChart";
 import RevenueChart from "@/components/dashboard/RevenueChart";
@@ -9,11 +9,12 @@ import {
   MOCK_ADMIN_ORDER_TREND,
   MOCK_ADMIN_REVENUE_TREND,
   MOCK_ADMIN_SUMMARY,
-  MOCK_RECENT_TENANT_REQUESTS,
   MOCK_TOP_RESTAURANTS,
 } from "@/lib/mock/dashboardMockData";
 import { formatVND } from "@/lib/utils/currency";
-import { useMemo, useState } from "react";
+import restaurantApplicationService, {
+  RestaurantApplication,
+} from "@/lib/services/restaurantApplicationService";
 
 type FilterOption = "day" | "week" | "month" | "year";
 
@@ -29,15 +30,31 @@ const STATUS_MAP = {
   inactive: { label: "Tạm ngưng", bg: "var(--warning-soft)", color: "#b45309", border: "var(--warning-border)" },
 };
 
-const REQUEST_STATUS_MAP = {
-  pending: { label: "Chờ duyệt", bg: "var(--warning-soft)", color: "#b45309", border: "var(--warning-border)" },
-  approved: { label: "Đã duyệt", bg: "var(--success-soft)", color: "var(--success)", border: "var(--success-border)" },
-  rejected: { label: "Từ chối", bg: "var(--danger-soft)", color: "var(--danger)", border: "var(--danger-border)" },
+const STATUS_BADGE: Record<string, { label: string; bg: string; color: string; border: string }> = {
+  PENDING: { label: "Chờ duyệt", bg: "var(--warning-soft)", color: "#b45309", border: "var(--warning-border)" },
+  APPROVED: { label: "Đã duyệt", bg: "var(--success-soft)", color: "var(--success)", border: "var(--success-border)" },
+  REJECTED: { label: "Từ chối", bg: "var(--danger-soft)", color: "var(--danger)", border: "var(--danger-border)" },
 };
 
 export default function AdminDashboardPage() {
   const [filter, setFilter] = useState<FilterOption>("week");
   const summary = MOCK_ADMIN_SUMMARY;
+
+  // Real data: danh sách đơn đăng ký mới nhất
+  const [recentApps, setRecentApps] = useState<RestaurantApplication[]>([]);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [appsLoading, setAppsLoading] = useState(true);
+
+  useEffect(() => {
+    restaurantApplicationService
+      .list({ status: undefined, page: 1, limit: 5 })
+      .then((data) => {
+        setRecentApps(data.items);
+        setPendingCount(data.items.filter((a) => a.status === "PENDING").length);
+      })
+      .catch(console.error)
+      .finally(() => setAppsLoading(false));
+  }, []);
 
   const scale = filter === "day" ? 0.14 : filter === "week" ? 1 : filter === "month" ? 4.3 : 52;
   const scaledSummary = useMemo(() => ({
@@ -51,23 +68,8 @@ export default function AdminDashboardPage() {
   const totalOrders = MOCK_ADMIN_ORDER_TREND.reduce((s, p) => s + p.total, 0);
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden" style={{ background: "var(--bg-base)" }}>
-      <DashboardHeader
-        role="admin"
-        userName="Super Admin"
-        title="XFoodi Platform"
-      />
-
-      <div className="flex flex-1 overflow-hidden">
-        <DashboardSidebar
-          role="admin"
-          userName="Super Admin"
-          userEmail="admin@xfoodi.com"
-        />
-
-        {/* Main content */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8" style={{ background: "var(--bg-base)" }}>
-          <div className="space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div className="space-y-6">
             {/* Page title + filters */}
             <div className="flex items-start justify-between flex-wrap gap-4">
               <div>
@@ -254,7 +256,7 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
-              {/* Pending Tenant Requests */}
+              {/* Pending Restaurant Applications — Dữ liệu thật */}
               <div className="dashboard-data-card">
                 <div className="dashboard-data-card-header">
                   <h3 className="dashboard-data-card-title">Yêu cầu đăng ký nhà hàng</h3>
@@ -262,79 +264,72 @@ export default function AdminDashboardPage() {
                     className="dashboard-data-card-badge"
                     style={{ background: "var(--warning-soft)", color: "#b45309", border: "1px solid var(--warning-border)" }}
                   >
-                    {MOCK_RECENT_TENANT_REQUESTS.filter((r) => r.status === "pending").length} chờ duyệt
+                    {pendingCount} chờ duyệt
                   </span>
                 </div>
 
-                <div className="space-y-2">
-                  {MOCK_RECENT_TENANT_REQUESTS.map((req) => {
-                    const st = REQUEST_STATUS_MAP[req.status];
-                    const now = new Date();
-                    const created = new Date(req.requestedAt);
-                    const diffMs = now.getTime() - created.getTime();
-                    const diffHours = Math.floor(diffMs / 3600000);
-                    const diffDays = Math.floor(diffHours / 24);
-                    const timeAgo = diffHours < 24 ? `${diffHours} giờ trước` : `${diffDays} ngày trước`;
+                {appsLoading ? (
+                  <div className="flex items-center justify-center h-24">
+                    <div className="w-6 h-6 rounded-full border-2 animate-spin"
+                      style={{ borderColor: "var(--border)", borderTopColor: "var(--primary)" }} />
+                  </div>
+                ) : recentApps.length === 0 ? (
+                  <p className="text-sm text-center py-6" style={{ color: "var(--text-muted)" }}>Chưa có đơn nào</p>
+                ) : (
+                  <div className="space-y-2">
+                    {recentApps.map((app) => {
+                      const st = STATUS_BADGE[app.status] ?? STATUS_BADGE.PENDING;
+                      const now = new Date();
+                      const created = new Date(app.createdAt);
+                      const diffMs = now.getTime() - created.getTime();
+                      const diffHours = Math.floor(diffMs / 3600000);
+                      const diffDays = Math.floor(diffHours / 24);
+                      const timeAgo = diffHours < 1
+                        ? "Vừa xong"
+                        : diffHours < 24
+                        ? `${diffHours} giờ trước`
+                        : `${diffDays} ngày trước`;
 
-                    return (
-                      <div key={req.id} className="dashboard-data-card-item">
-                        <div className="flex items-start gap-3">
-                          <div
-                            className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold"
-                            style={{ background: "var(--surface)", color: "var(--text-muted)", border: "1px solid var(--border)" }}
-                          >
-                            {req.restaurantName[0]}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-2 mb-0.5">
-                              <p className="text-sm font-semibold truncate" style={{ color: "var(--text)" }}>
-                                {req.restaurantName}
-                              </p>
-                              <span
-                                className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0"
-                                style={{ background: st.bg, color: st.color, border: `1px solid ${st.border}` }}
-                              >
-                                {st.label}
-                              </span>
+                      return (
+                        <Link
+                          key={app.id}
+                          href={`/admin/applications/${app.id}`}
+                          className="dashboard-data-card-item block hover:bg-[var(--surface)] transition-colors rounded-xl"
+                        >
+                          <div className="flex items-start gap-3">
+                            <div
+                              className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold text-white"
+                              style={{ background: "var(--primary)" }}
+                            >
+                              {app.restaurantName?.[0]?.toUpperCase() ?? "?"}
                             </div>
-                            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                              {req.ownerName} · {req.phone}
-                            </p>
-                            <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)", opacity: 0.7 }}>{timeAgo}</p>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2 mb-0.5">
+                                <p className="text-sm font-semibold truncate" style={{ color: "var(--text)" }}>
+                                  {app.restaurantName}
+                                </p>
+                                <span
+                                  className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0"
+                                  style={{ background: st.bg, color: st.color, border: `1px solid ${st.border}` }}
+                                >
+                                  {st.label}
+                                </span>
+                              </div>
+                              <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                                {app.user?.fullName ?? "—"} · {app.phone}
+                              </p>
+                              <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)", opacity: 0.7 }}>{timeAgo}</p>
+                            </div>
                           </div>
-                        </div>
-                        {req.status === "pending" && (
-                          <div className="flex gap-2 mt-2">
-                            <button
-                              className="flex-1 py-1 text-xs font-semibold rounded-lg transition-colors"
-                              style={{
-                                background: "var(--success-soft)",
-                                color: "var(--success)",
-                                border: "1px solid var(--success-border)",
-                              }}
-                            >
-                              Duyệt
-                            </button>
-                            <button
-                              className="flex-1 py-1 text-xs font-semibold rounded-lg transition-colors"
-                              style={{
-                                background: "var(--danger-soft)",
-                                color: "var(--danger)",
-                                border: "1px solid var(--danger-border)",
-                              }}
-                            >
-                              Từ chối
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
 
                 <div className="mt-3 pt-3" style={{ borderTop: "1px solid var(--border)" }}>
                   <a
-                    href="/admin/tenant-requests"
+                    href="/admin/applications"
                     className="text-xs font-medium hover:underline transition-colors"
                     style={{ color: "var(--primary)" }}
                   >
@@ -343,8 +338,6 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
             </section>
-          </div>
-        </main>
       </div>
     </div>
   );
