@@ -16,6 +16,8 @@ interface AuthContextType {
   login: (credentials: LoginCredentials) => Promise<User>;
   loginWithGoogle: (googleToken: string, rememberMe?: boolean) => Promise<User>;
   logout: () => void;
+  /** Update the in-memory user state and persist to storage after a profile update. */
+  updateUser: (updated: User) => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -83,9 +85,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
   };
 
+  const updateUser = (updated: User) => {
+    setUser(updated);
+    // Persist to whichever storage the session is using
+    const serialized = JSON.stringify(updated);
+    if (localStorage.getItem('accessToken')) {
+      localStorage.setItem('userInfo', serialized);
+    } else {
+      sessionStorage.setItem('userInfo', serialized);
+    }
+  };
+
   return (
     <AuthContext.Provider
-      value={{ user, loading, isAuthReady, login, loginWithGoogle, logout }}
+      value={{ user, loading, isAuthReady, login, loginWithGoogle, logout, updateUser }}
     >
       {children}
     </AuthContext.Provider>

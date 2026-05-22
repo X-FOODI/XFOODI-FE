@@ -1,6 +1,5 @@
 "use client";
 
-import clsx from "clsx";
 
 export type SocialAuthDividerProps = {
   label: string;
@@ -11,7 +10,7 @@ export type SocialAuthDividerProps = {
 export function SocialAuthDivider({ label, className }: SocialAuthDividerProps) {
   return (
     <div
-      className={clsx("relative w-full py-1 my-6 sm:my-8", className)}
+      className={`relative w-full py-1 my-6 sm:my-8 ${className || ""}`.trim()}
       role="separator"
       aria-label={label}
     >
