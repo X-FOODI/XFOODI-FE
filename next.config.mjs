@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: "standalone",
+  // output: "standalone", // Bỏ comment khi deploy lên Linux/Docker — Windows không hỗ trợ symlink
   reactStrictMode: false,
   transpilePackages: [
     'antd',

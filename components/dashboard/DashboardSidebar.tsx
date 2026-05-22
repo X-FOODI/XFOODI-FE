@@ -77,7 +77,7 @@ export default function DashboardSidebar({
         {
           id: "tenant-requests",
           label: "Yêu cầu đăng ký",
-          path: "/admin/tenant-requests",
+          path: "/admin/applications",
           badge: 2,
           icon: (
             <svg className="dashboard-sidebar-item-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -258,7 +258,7 @@ export default function DashboardSidebar({
     <aside className="dashboard-sidebar" style={{ width: collapsed ? "5rem" : "16rem" }}>
       {/* Logo / Brand */}
       <div className="dashboard-sidebar-brand" style={{ padding: collapsed ? "1rem 0.75rem" : "1rem 1.25rem" }}>
-        <div className="flex items-center gap-2.5">
+        <Link href="/" className="flex items-center gap-2.5" style={{ textDecoration: "none" }}>
           <div
             style={{
               width: "2rem",
@@ -283,7 +283,7 @@ export default function DashboardSidebar({
               </p>
             </div>
           )}
-        </div>
+        </Link>
       </div>
 
       {/* Restaurant name banner (only for restaurant role) */}

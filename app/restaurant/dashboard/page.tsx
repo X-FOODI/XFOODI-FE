@@ -1,5 +1,7 @@
-"use client";
+﻿"use client";
 
+import { useEffect, useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import BestSellingDishesCard from "@/components/dashboard/BestSellingDishesCard";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
@@ -15,7 +17,8 @@ import {
   MOCK_TOP_DISHES,
 } from "@/lib/mock/dashboardMockData";
 import { formatVND } from "@/lib/utils/currency";
-import { useMemo, useState } from "react";
+import { useAuth } from "@/lib/contexts/AuthContext";
+import axiosInstance from "@/lib/services/axiosInstance";
 
 type FilterOption = "day" | "week" | "month" | "year";
 
@@ -26,12 +29,34 @@ const FILTER_LABELS: Record<FilterOption, string> = {
   year: "Năm nay",
 };
 
+interface RestaurantInfo {
+  id: string;
+  name: string;
+  slug: string;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  logoUrl: string | null;
+  owner: {
+    id: string;
+    fullName: string | null;
+    email: string | null;
+    avatarUrl: string | null;
+  };
+}
+
 export default function RestaurantDashboardPage() {
+  const { user, isAuthReady } = useAuth();
+  const router = useRouter();
   const [filter, setFilter] = useState<FilterOption>("week");
   const summary = MOCK_RESTAURANT_SUMMARY;
 
-  // Scale mock data slightly per filter for demo effect
-  const scale = filter === "day" ? 0.14 : filter === "week" ? 1 : filter === "month" ? 4.3 : 52;
+  // Dữ liệu thật: thông tin nhà hàng
+  const [restaurantInfo, setRestaurantInfo] = useState<RestaurantInfo | null>(null);
+
+  // Scale mock data (hooks phải luôn ở trên early return)
+  const filterKey = filter as FilterOption; // explicit typed alias — fix implicit-any index
+  const scale = filterKey === "day" ? 0.14 : filterKey === "week" ? 1 : filterKey === "month" ? 4.3 : 52;
   const scaledSummary = useMemo(() => ({
     ...summary,
     revenue: { ...summary.revenue, total: Math.round(summary.revenue.total * scale) },
@@ -43,20 +68,51 @@ export default function RestaurantDashboardPage() {
   const totalRevenue = MOCK_RESTAURANT_REVENUE_TREND.reduce((sum, p) => sum + p.value, 0);
   const totalOrders = MOCK_RESTAURANT_ORDER_TREND.reduce((sum, p) => sum + p.total, 0);
 
+  // Auth + role guard
+  useEffect(() => {
+    if (!isAuthReady) return;
+    if (!user) {
+      router.replace("/login-email?redirect=/restaurant/dashboard");
+      return;
+    }
+    const roles: string[] = user.roles || (user.role ? [user.role] : []);
+    if (!roles.includes("Owner") && !roles.includes("Admin") && !roles.includes("SuperAdmin")) {
+      router.replace("/register-restaurant");
+      return;
+    }
+    // Fetch thông tin nhà hàng thật
+    axiosInstance
+      .get<{ success: boolean; data: RestaurantInfo }>("/api/restaurants/me")
+      .then((res: { data: { success: boolean; data: RestaurantInfo } }) =>
+        setRestaurantInfo(res.data.data)
+      )
+      .catch(console.error);
+  }, [isAuthReady, user, router]);
+
+  if (!isAuthReady || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--bg-base)" }}>
+        <div className="w-8 h-8 rounded-full border-2 animate-spin"
+          style={{ borderColor: "var(--border)", borderTopColor: "var(--primary)" }} />
+      </div>
+    );
+  }
+
+
   return (
     <div className="flex flex-col h-screen overflow-hidden" style={{ background: "var(--bg-base)" }}>
       <DashboardHeader
         role="restaurant"
-        restaurantName="Phở Hà Nội - Chi nhánh 1"
-        userName="Nguyễn Văn Thành"
+        restaurantName={restaurantInfo?.name ?? ""}
+        userName={restaurantInfo?.owner?.fullName ?? user?.fullName ?? user?.name ?? ""}
       />
 
       <div className="flex flex-1 overflow-hidden">
         <DashboardSidebar
           role="restaurant"
-          restaurantName="Phở Hà Nội - Chi nhánh 1"
-          userName="Nguyễn Văn Thành"
-          userEmail="thanh.nv@restaurant.com"
+          restaurantName={restaurantInfo?.name ?? user?.name ?? "đang tải..."}
+          userName={restaurantInfo?.owner?.fullName ?? user?.fullName ?? user?.name ?? ""}
+          userEmail={restaurantInfo?.owner?.email ?? user?.email ?? ""}
         />
 
         {/* Main content */}
@@ -69,7 +125,7 @@ export default function RestaurantDashboardPage() {
                   Tổng quan nhà hàng
                 </h1>
                 <p className="text-sm mt-0.5" style={{ color: "var(--text-muted)" }}>
-                  Phở Hà Nội · Cập nhật lần cuối: {new Date().toLocaleString("vi-VN")}
+                  {restaurantInfo?.name ?? ""} · Cập nhật lần cuối: {new Date().toLocaleString("vi-VN")}
                 </p>
               </div>
 
@@ -96,7 +152,7 @@ export default function RestaurantDashboardPage() {
             <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="dashboard-animate-in dashboard-animate-in-delay-1 h-full">
                 <KPICard
-                  title={`Doanh thu ${FILTER_LABELS[filter].toLowerCase()}`}
+                  title={`Doanh thu ${FILTER_LABELS[filter as FilterOption].toLowerCase()}`}
                   value={formatVND(scaledSummary.revenue.total)}
                   subtitle={`${summary.fromDate?.slice(0, 10)} - ${summary.toDate?.slice(0, 10)}`}
                   trend={{ value: summary.revenue.changePercent, isPositive: summary.revenue.changePercent >= 0 }}
@@ -114,7 +170,7 @@ export default function RestaurantDashboardPage() {
 
               <div className="dashboard-animate-in dashboard-animate-in-delay-2 h-full">
                 <KPICard
-                  title={`Đơn hàng ${FILTER_LABELS[filter].toLowerCase()}`}
+                  title={`Đơn hàng ${FILTER_LABELS[filterKey].toLowerCase()}`}
                   value={scaledSummary.orders.total}
                   subtitle={`${scaledSummary.orders.completed} hoàn thành · ${summary.orders.liveProcessing} đang xử lý`}
                   iconBg="var(--primary-soft)"
@@ -131,7 +187,7 @@ export default function RestaurantDashboardPage() {
 
               <div className="dashboard-animate-in dashboard-animate-in-delay-3 h-full">
                 <KPICard
-                  title={`Đặt bàn ${FILTER_LABELS[filter].toLowerCase()}`}
+                  title={`Đặt bàn ${FILTER_LABELS[filterKey].toLowerCase()}`}
                   value={scaledSummary.reservations.total}
                   subtitle={`${summary.reservations.pending} chờ xác nhận`}
                   iconBg="rgba(59, 130, 246, 0.1)"
@@ -148,7 +204,7 @@ export default function RestaurantDashboardPage() {
 
               <div className="dashboard-animate-in dashboard-animate-in-delay-4 h-full">
                 <KPICard
-                  title={`Khách mới ${FILTER_LABELS[filter].toLowerCase()}`}
+                  title={`Khách mới ${FILTER_LABELS[filterKey].toLowerCase()}`}
                   value={scaledSummary.newCustomers.total}
                   subtitle={`${summary.fromDate?.slice(0, 10)} - ${summary.toDate?.slice(0, 10)}`}
                   trend={{ value: summary.newCustomers.changePercent, isPositive: summary.newCustomers.changePercent >= 0 }}
