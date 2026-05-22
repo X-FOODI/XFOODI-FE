@@ -2,6 +2,8 @@
 
 import { GoogleIdentityButton } from "@/components/auth/GoogleIdentityButton";
 import { HeroSection } from "@/components/auth/HeroSection";
+import { SocialAuthButton } from "@/components/auth/social/SocialAuthButton";
+import { SocialAuthMethods } from "@/components/auth/social/SocialAuthMethods";
 import RememberCheckbox from "@/components/auth/RememberCheckbox";
 import { GlassInput } from "@/components/ui/GlassInput";
 import { redirectAfterLogin } from "@/lib/auth/redirectAfterLogin";
@@ -21,6 +23,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import React, { Suspense, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useThemeMode } from "../theme/AntdProvider";
+import TurnstileWidget from "@/components/TurnstileWidget";
 
 const HERO_IMAGE_URL = "https://lh3.googleusercontent.com/aida-public/AB6AXuCQMVZhsaYs2Qw_8QN0YP6pUMn326Srs9wfsj18Q0patddJBVkz5g8pm0S3OhMz-nY-BrDmVA-ghfvRsndeKDyq7w68KAOVQDc5vQo71xWYxvYcQaEm4IFJ6BGYlfoaK6APcvIObkkPn9yvUiw6Iditv27W_j60EhvOhHb3Cwfupw1Ib5bCO6lO0NctemCVio6026jqjhbziRbrzl6OVbYkM0LUSLR_OV1pQf1oH1nNavimugtYDhjEH_oSrIweo29PEMjmlq80Ol4";
 
@@ -33,7 +36,7 @@ function LoginEmailPageContent() {
   const { mode } = useThemeMode();
   const { tenant } = useTenant();
   const tenantName = tenant?.businessName || tenant?.name;
-  const tenantLogoUrl = tenant?.logoUrl?.trim() || "/images/logo/restx-removebg-preview.png";
+  const tenantLogoUrl = tenant?.logoUrl?.trim() || "/images/logo/xfoodi-logo.png";
   const [mounted, setMounted] = useState(false);
 
   // State
@@ -46,6 +49,7 @@ function LoginEmailPageContent() {
   const [passwordTouched, setPasswordTouched] = useState(false);
   const [emailError, setEmailError] = useState("");
   const [emailTouched, setEmailTouched] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
 
   useEffect(() => {
     setMounted(true);
@@ -123,7 +127,7 @@ function LoginEmailPageContent() {
 
     setLoading(true);
     try {
-      const user = await login({ email, password, rememberMe: remember });
+      const user = await login({ email, password, rememberMe: remember, turnstileToken });
       navigateAfterLogin(user);
     } catch (error: any) {
       const errorMessage = error.message || 'Login failed. Please try again.';
@@ -169,7 +173,7 @@ function LoginEmailPageContent() {
                 alt={tenantName || "Restaurant Logo"}
                 className={`w-full h-full object-contain ${isDark ? 'filter invert hue-rotate-180 brightness-110' : ''}`}
                 onError={(e) => {
-                  e.currentTarget.src = "/images/logo/restx-removebg-preview.png";
+                  e.currentTarget.src = "/images/logo/xfoodi-logo.png";
                 }}
               />
             </div>
@@ -240,6 +244,13 @@ function LoginEmailPageContent() {
               <RememberCheckbox checked={remember} onChange={setRemember} />
             </div>
 
+            {/* Cloudflare Turnstile */}
+            <TurnstileWidget
+              onSuccess={(token) => setTurnstileToken(token)}
+              onExpire={() => setTurnstileToken("")}
+              onError={() => setTurnstileToken("")}
+            />
+
             <div>
               <button
                 type="submit"
@@ -269,33 +280,22 @@ function LoginEmailPageContent() {
             </div>
           </form>
 
-          <div className="relative mt-8">
-            <div className="absolute inset-0 flex items-center">
-              <div className="auth-divider w-full border-t"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="auth-divider-label">
-                {t('login_email_page.or_login_with')}
-              </span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 mt-6">
+          <SocialAuthMethods dividerLabel={t('login_email_page.or_login_with')}>
             <GoogleIdentityButton
               rememberMe={remember}
               disabled={loading}
               onAuthenticated={navigateAfterLogin}
+              variant="signin"
             />
-
-            <button
-              type="button"
+            <SocialAuthButton
+              icon={<PhoneOutlined />}
               onClick={() => router.push('/login')}
-              className="auth-alt-btn w-full inline-flex justify-center items-center py-3 px-4 shadow-sm text-sm font-medium group"
+              loading={loading}
+              inactive={loading}
             >
-              <PhoneOutlined className="auth-input-icon text-xl mr-3" />
-              <span>{t('login_email_page.phone_number')}</span>
-            </button>
-          </div>
+              {t('login_email_page.phone_number')}
+            </SocialAuthButton>
+          </SocialAuthMethods>
         </div>
 
         {/* Footer */}

@@ -2,6 +2,7 @@
 
 import { GoogleIdentityButton } from "@/components/auth/GoogleIdentityButton";
 import { HeroSection } from "@/components/auth/HeroSection";
+import { SocialAuthMethods } from "@/components/auth/social/SocialAuthMethods";
 import { GlassInput } from "@/components/ui/GlassInput";
 import { redirectAfterLogin } from "@/lib/auth/redirectAfterLogin";
 import { useTenant } from "@/lib/contexts/TenantContext";
@@ -13,6 +14,7 @@ import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useThemeMode } from "../theme/AutoDarkThemeProvider";
+import TurnstileWidget from "@/components/TurnstileWidget";
 
 const HERO_IMAGE_URL = "https://lh3.googleusercontent.com/aida-public/AB6AXuCQMVZhsaYs2Qw_8QN0YP6pUMn326Srs9wfsj18Q0patddJBVkz5g8pm0S3OhMz-nY-BrDmVA-ghfvRsndeKDyq7w68KAOVQDc5vQo71xWYxvYcQaEm4IFJ6BGYlfoaK6APcvIObkkPn9yvUiw6Iditv27W_j60EhvOhHb3Cwfupw1Ib5bCO6lO0NctemCVio6026jqjhbziRbrzl6OVbYkM0LUSLR_OV1pQf1oH1nNavimugtYDhjEH_oSrIweo29PEMjmlq80Ol4";
 
@@ -27,7 +29,7 @@ export default function RegisterPage() {
   const { mode } = useThemeMode();
   const { tenant } = useTenant();
   const tenantName = tenant?.businessName || tenant?.name;
-  const tenantLogoUrl = tenant?.logoUrl?.trim() || "/images/logo/restx-removebg-preview.png";
+  const tenantLogoUrl = tenant?.logoUrl?.trim() || "/images/logo/xfoodi-logo.png";
   const isDark = mode === 'dark';
   const [mounted, setMounted] = useState(false);
 
@@ -47,6 +49,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
 
   // Error states
   const [errors, setErrors] = useState({
@@ -174,7 +177,8 @@ export default function RegisterPage() {
         email: formData.email,
         password: formData.password,
         phoneNumber: formData.phone,
-        fullName: `${formData.firstName} ${formData.lastName}`
+        fullName: `${formData.firstName} ${formData.lastName}`,
+        turnstileToken,
       });
 
       // Handle email confirmation flow
@@ -242,7 +246,7 @@ export default function RegisterPage() {
                 alt={tenantName || "Restaurant Logo"}
                 className={`w-full h-full object-contain ${isDark ? 'filter invert hue-rotate-180 brightness-110' : ''}`}
                 onError={(e) => {
-                  e.currentTarget.src = "/images/logo/restx-removebg-preview.png";
+                  e.currentTarget.src = "/images/logo/xfoodi-logo.png";
                 }}
               />
             </div>
@@ -404,6 +408,13 @@ export default function RegisterPage() {
               </label>
             </div>
 
+            {/* Cloudflare Turnstile */}
+            <TurnstileWidget
+              onSuccess={(token) => setTurnstileToken(token)}
+              onExpire={() => setTurnstileToken("")}
+              onError={() => setTurnstileToken("")}
+            />
+
             <div>
               <button
                 type="submit"
@@ -423,25 +434,14 @@ export default function RegisterPage() {
               </button>
             </div>
 
-            <div className="relative mt-6">
-              <div className="absolute inset-0 flex items-center">
-                <div className="auth-divider w-full border-t"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="auth-divider-label">
-                  {t("login_email_page.or_login_with")}
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-6">
+            <SocialAuthMethods dividerLabel={t("login_email_page.or_login_with")}>
               <GoogleIdentityButton
                 rememberMe
                 disabled={loading}
                 onAuthenticated={navigateAfterGoogle}
                 variant="signup"
               />
-            </div>
+            </SocialAuthMethods>
 
             <div className="text-center text-sm mt-4 pt-4 border-t auth-divider">
               <span className="auth-text">{t('register_page.already_have_account')} </span>

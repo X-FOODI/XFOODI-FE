@@ -3,7 +3,7 @@
 import React from 'react';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
-import restxTheme from './restxTheme';
+import xfoodiTheme from './xfoodiTheme';
 
 export default function ThemeRegistry({
   children,
@@ -11,7 +11,7 @@ export default function ThemeRegistry({
   children: React.ReactNode;
 }) {
   return (
-    <ThemeProvider theme={restxTheme}>
+    <ThemeProvider theme={xfoodiTheme}>
       <CssBaseline />
       {children}
     </ThemeProvider>

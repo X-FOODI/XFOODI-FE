@@ -3,11 +3,12 @@
 import { HeroSection } from "@/components/auth/HeroSection";
 import { GlassInput } from "@/components/ui/GlassInput";
 import authService from "@/lib/services/authService";
-import { MailOutlined, SendOutlined } from "@ant-design/icons";
+import { MailOutlined, SendOutlined, CheckCircleOutlined } from "@ant-design/icons";
 import { message } from "antd";
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useThemeMode } from "../theme/AutoDarkThemeProvider";
+import TurnstileWidget from "@/components/TurnstileWidget";
 import { useTenant } from "@/lib/contexts/TenantContext";
 
 const HERO_IMAGE_URL = "https://lh3.googleusercontent.com/aida-public/AB6AXuCQMVZhsaYs2Qw_8QN0YP6pUMn326Srs9wfsj18Q0patddJBVkz5g8pm0S3OhMz-nY-BrDmVA-ghfvRsndeKDyq7w68KAOVQDc5vQo71xWYxvYcQaEm4IFJ6BGYlfoaK6APcvIObkkPn9yvUiw6Iditv27W_j60EhvOhHb3Cwfupw1Ib5bCO6lO0NctemCVio6026jqjhbziRbrzl6OVbYkM0LUSLR_OV1pQf1oH1nNavimugtYDhjEH_oSrIweo29PEMjmlq80Ol4";
@@ -20,6 +21,7 @@ export default function ForgotPasswordPage() {
   const [emailError, setEmailError] = useState("");
   const [emailTouched, setEmailTouched] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
 
   useEffect(() => {
     setMounted(true);
@@ -79,7 +81,7 @@ export default function ForgotPasswordPage() {
   const { mode } = useThemeMode();
   const { tenant } = useTenant();
   const tenantName = tenant?.businessName || tenant?.name;
-  const tenantLogoUrl = tenant?.logoUrl?.trim() || "/images/logo/restx-removebg-preview.png";
+  const tenantLogoUrl = tenant?.logoUrl?.trim() || "/images/logo/xfoodi-logo.png";
   const isDark = mode === 'dark';
 
   return (
@@ -115,7 +117,7 @@ export default function ForgotPasswordPage() {
                 alt={tenantName || "Restaurant Logo"}
                 className={`w-full h-full object-contain ${isDark ? 'filter invert hue-rotate-180 brightness-110' : ''}`}
                 onError={(e) => {
-                  e.currentTarget.src = "/images/logo/restx-removebg-preview.png";
+                  e.currentTarget.src = "/images/logo/xfoodi-logo.png";
                 }}
               />
             </div>
@@ -124,56 +126,76 @@ export default function ForgotPasswordPage() {
             </span>
           </div>
 
-          <div className="text-center md:text-left mb-8">
-            <h1 className="auth-heading text-3xl font-bold tracking-tight drop-shadow-sm transition-colors">
-              {t('forgot_password_page.title')}
-            </h1>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="relative">
-              <GlassInput
-                id="email"
-                label={t('forgot_password_page.email_label')}
-                icon={<MailOutlined />}
-                type="email"
-                required
-                value={email}
-                onChange={handleEmailChange}
-                onBlur={() => setEmailTouched(true)}
-                disabled={loading}
-              />
-              {(emailTouched && emailError) && (
-                <div className="text-red-400 text-xs mt-1 ml-1 font-medium">{emailError}</div>
-              )}
+          {!success && (
+            <div className="text-center md:text-left mb-8">
+              <h1 className="auth-heading text-3xl font-bold tracking-tight drop-shadow-sm transition-colors">
+                {t('forgot_password_page.title')}
+              </h1>
             </div>
+          )}
 
-            <div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="group relative w-full flex justify-center py-3.5 px-4 border border-transparent text-sm font-bold rounded-xl text-white bg-[var(--primary)] hover:bg-[#ff5722] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#1a100e] focus:ring-[var(--primary)] transition-all duration-300 shadow-[0_4px_14px_0_rgba(255,56,11,0.39)] hover:shadow-[0_6px_20px_rgba(255,56,11,0.23)] hover:-translate-y-0.5 disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:transform-none"
-              >
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3">
-                  {loading ? (
-                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-b-0 border-white ml-1"></div>
-                  ) : (
-                    <span className="material-icons text-white/50 group-hover:text-white transition-colors text-lg">
-                      <SendOutlined />
-                    </span>
-                  )}
-                </span>
-                {loading ? t('login_button.loading', { defaultValue: 'Sending...' }) : t('forgot_password_page.send_btn')}
-              </button>
+          {success ? (
+            <div className="text-center space-y-6 py-8">
+              <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-green-500/30">
+                <CheckCircleOutlined className="text-4xl text-green-500" />
+              </div>
+              <h2 className="text-2xl font-bold auth-heading">{t('forgot_password_page.success_title', { defaultValue: 'Check your email' })}</h2>
+              <p className="text-gray-400">
+                {t('forgot_password_page.success_message', { defaultValue: 'We have sent a password reset link to' })} <span className="font-bold text-[var(--foreground)]">{email}</span>.
+              </p>
+              <div className="pt-6">
+                <a href="/login" className="auth-terms-link text-sm font-semibold transition-colors inline-flex items-center hover:underline">
+                  <span className="mr-2">←</span>
+                  {t('forgot_password_page.back_to_login')}
+                </a>
+              </div>
             </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="relative">
+                <GlassInput
+                  id="email"
+                  label={t('forgot_password_page.email_label')}
+                  icon={<MailOutlined />}
+                  type="email"
+                  required
+                  value={email}
+                  onChange={handleEmailChange}
+                  onBlur={() => setEmailTouched(true)}
+                  disabled={loading}
+                />
+                {(emailTouched && emailError) && (
+                  <div className="text-red-400 text-xs mt-1 ml-1 font-medium">{emailError}</div>
+                )}
+              </div>
 
-            <div className="text-center pt-4 border-t auth-divider">
-              <a href="/login" className="auth-terms-link text-sm font-semibold transition-colors inline-flex items-center hover:underline">
-                <span className="mr-2">←</span>
-                {t('forgot_password_page.back_to_login')}
-              </a>
-            </div>
-          </form>
+              <div>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="group relative w-full flex justify-center py-3.5 px-4 border border-transparent text-sm font-bold rounded-xl text-white bg-[var(--primary)] hover:bg-[#ff5722] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#1a100e] focus:ring-[var(--primary)] transition-all duration-300 shadow-[0_4px_14px_0_rgba(255,56,11,0.39)] hover:shadow-[0_6px_20px_rgba(255,56,11,0.23)] hover:-translate-y-0.5 disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:transform-none"
+                >
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3">
+                    {loading ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-b-0 border-white ml-1"></div>
+                    ) : (
+                      <span className="material-icons text-white/50 group-hover:text-white transition-colors text-lg">
+                        <SendOutlined />
+                      </span>
+                    )}
+                  </span>
+                  {loading ? t('login_button.loading', { defaultValue: 'Sending...' }) : t('forgot_password_page.send_btn')}
+                </button>
+              </div>
+
+              <div className="text-center pt-4 border-t auth-divider">
+                <a href="/login" className="auth-terms-link text-sm font-semibold transition-colors inline-flex items-center hover:underline">
+                  <span className="mr-2">←</span>
+                  {t('forgot_password_page.back_to_login')}
+                </a>
+              </div>
+            </form>
+          )}
         </div>
 
         {/* Footer */}

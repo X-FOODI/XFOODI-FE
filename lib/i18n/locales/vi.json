@@ -3086,7 +3086,7 @@
     },
     "hero": {
       "tag": "Nền tảng vận hành nhà hàng toàn diện",
-      "title": "Tối ưu vận hành nhà hàng với RestX",
+      "title": "Tối ưu vận hành nhà hàng với XFoodi",
       "description": "Quản lý đặt bàn, order, bếp, kho và báo cáo trên một nền tảng duy nhất.",
       "get_started": "Bắt đầu ngay",
       "watch_demo": "Xem Demo",
@@ -3502,13 +3502,13 @@
     }
   },
   "menu_page": {
-    "logo_title": "RESTX PREMIUM DINING",
+    "logo_title": "XFOODI PREMIUM DINING",
     "title": "Thực đơn hôm nay",
     "loading": "Đang tải thực đơn...",
     "retry": "Thử lại",
     "error_load": "Không thể tải thực đơn. Vui lòng thử lại sau.",
     "items": "món",
-    "restx_menu": "RESTX MENU",
+    "XFoodi_menu": "XFOODI MENU",
     "search_placeholder": "Tìm món...",
     "viewing_category": "Đang xem danh mục",
     "showing_items": "Hiển thị {{count}} món ăn",
@@ -3658,6 +3658,8 @@
       "sign_up_here": "Đăng ký tại đây",
       "or_login_with": "Hoặc đăng nhập bằng",
       "phone_number": "Số điện thoại",
+      "google_continue_service": "Tiếp tục sử dụng dịch vụ bằng Google",
+      "google_continue_service_signup": "Tiếp tục đăng ký bằng Google",
       "validation": {
         "required_email": "Vui lòng nhập địa chỉ email của bạn",
         "invalid_email": "Vui lòng nhập địa chỉ email hợp lệ",
@@ -4218,7 +4220,7 @@
       "light_mode": "Giao diện sáng",
       "dark_mode": "Giao diện tối",
       "general_profile": "Hồ sơ chung",
-      "general_profile_desc": "Cấu hình danh tính và thông tin liên hệ cốt lõi cho nhà hàng này. Các thay đổi sẽ được áp dụng trên toàn bộ hệ thống RestX.",
+      "general_profile_desc": "Cấu hình danh tính và thông tin liên hệ cốt lõi cho nhà hàng này. Các thay đổi sẽ được áp dụng trên toàn bộ hệ thống XFoodi.",
       "active_tenant": "Hoạt động",
       "inactive_tenant": "Không hoạt động",
       "view_details": "Xem chi tiết"

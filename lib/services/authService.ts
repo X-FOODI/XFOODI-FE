@@ -7,6 +7,7 @@ export interface LoginCredentials {
   email: string;
   password: string;
   rememberMe?: boolean;
+  turnstileToken?: string;
 }
 
 export interface ChangePasswordRequest {
@@ -27,6 +28,7 @@ export interface RegisterRequest {
   password?: string;
   phoneNumber: string;
   fullName: string;
+  turnstileToken?: string;
 }
 
 export interface RegisterResponse {
@@ -47,6 +49,9 @@ export interface User {
   position?: string; // Staff position from auth response (e.g., 'Waiter', 'Kitchen', 'Kitchen Staff')
   phoneNumber?: string;
   avatar?: string;
+  gender?: 'MALE' | 'FEMALE' | 'OTHER' | string;
+  dateOfBirth?: string; // ISO date string e.g. "1995-08-20"
+  address?: string;
 }
 
 export interface AuthResponse {
@@ -267,6 +272,7 @@ const authService = {
       const response = await axiosInstance.post<any>(API_ROUTES.AUTH.LOGIN, {
         email: credentials.email,
         password: credentials.password,
+        turnstileToken: credentials.turnstileToken,
       });
 
       console.log('Login API Response:', response.data);
