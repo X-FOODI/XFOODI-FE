@@ -1,5 +1,5 @@
 /**
- * Utility functions for RestX Frontend
+ * Utility functions for XFoodi Frontend
  */
 
 /**

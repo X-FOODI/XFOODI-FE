@@ -54,7 +54,7 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // Landing domains (restx.food, www.restx.food)
+  // Landing domains (xfoodi.com, www.xfoodi.com)
   if (LANDING_DOMAINS.has(host)) {
     return NextResponse.next();
   }
@@ -79,7 +79,7 @@ export function middleware(req: NextRequest) {
   const adminAccessToken = req.cookies.get('adminAccessToken')?.value;
   const hasAdminAuthToken = !!adminAccessToken;
 
-  // Super Admin domain (admin.restx.food or admin.localhost)
+  // Super Admin domain (admin.xfoodi.com or admin.localhost)
   if (isAdminDomain) {
     // Canonical login path: /login (rewrite to admin login page)
     if (pathname === '/login') {

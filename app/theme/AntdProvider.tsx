@@ -11,7 +11,7 @@ import React, {
 import { darkTheme, lightTheme, ThemeMode } from "./themeConfig";
 
 const { darkAlgorithm, defaultAlgorithm } = theme;
-const STORAGE_KEY = "restx-theme-mode";
+const STORAGE_KEY = "xfoodi-theme-mode";
 
 type ThemeContextValue = {
   mode: ThemeMode;

@@ -20,7 +20,7 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   const fetchTenant = async () => {
-    const host = window.location.host; // e.g., demo.restx.food:3000
+    const host = window.location.host; // e.g., demo.xfoodi.com:3000
     const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || "xfoodi.website";
 
     // 1. Check for Landing domains (Skip API call)
@@ -46,7 +46,7 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     let hostname = hostWithoutPort;
 
     // For *.localhost in development, convert to equivalent production hostname
-    // e.g., demo.localhost -> demo.restx.food
+    // e.g., demo.localhost -> demo.xfoodi.com
     if (hostname.endsWith(".localhost")) {
       const subdomain = hostname.replace(".localhost", "");
       hostname = `${subdomain}.${BASE_DOMAIN}`;

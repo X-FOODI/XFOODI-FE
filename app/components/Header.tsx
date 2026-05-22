@@ -20,9 +20,9 @@ const Header: React.FC = () => {
   const { t } = useTranslation();
   const { tenant } = useTenant();
 
-  const tenantName = "RestX";
+  const tenantName = "XFoodi";
   const tenantLogoUrl =
-    tenant?.logoUrl?.trim() || "/images/logo/restx-removebg-preview.png";
+    tenant?.logoUrl?.trim() || "/images/logo/xfoodi-logo.png";
 
   const navItems = [
     {
@@ -234,7 +234,7 @@ const Header: React.FC = () => {
                 style={{ width: "100%", height: "100%", objectFit: "contain" }}
                 onError={(e) => {
                   e.currentTarget.src =
-                    "/images/logo/restx-removebg-preview.png";
+                    "/images/logo/xfoodi-logo.png";
                 }}
               />
             </div>
@@ -358,7 +358,7 @@ const Header: React.FC = () => {
                 }}
                 onError={(e) => {
                   e.currentTarget.src =
-                    "/images/logo/restx-removebg-preview.png";
+                    "/images/logo/xfoodi-logo.png";
                 }}
               />
             </div>

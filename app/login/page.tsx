@@ -20,9 +20,10 @@ import {
 } from "@ant-design/icons";
 import { message } from "antd";
 import { useRouter, useSearchParams } from "next/navigation";
-import React, { Suspense, useEffect, useState } from "react";
+import React, { Suspense, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useThemeMode } from "../theme/AntdProvider";
+import TurnstileWidget, { type TurnstileInstance } from "@/components/TurnstileWidget";
 
 const HERO_IMAGE_URL = "https://lh3.googleusercontent.com/aida-public/AB6AXuCQMVZhsaYs2Qw_8QN0YP6pUMn326Srs9wfsj18Q0patddJBVkz5g8pm0S3OhMz-nY-BrDmVA-ghfvRsndeKDyq7w68KAOVQDc5vQo71xWYxvYcQaEm4IFJ6BGYlfoaK6APcvIObkkPn9yvUiw6Iditv27W_j60EhvOhHb3Cwfupw1Ib5bCO6lO0NctemCVio6026jqjhbziRbrzl6OVbYkM0LUSLR_OV1pQf1oH1nNavimugtYDhjEH_oSrIweo29PEMjmlq80Ol4";
 
@@ -35,7 +36,7 @@ function LoginEmailPageContent() {
   const { mode } = useThemeMode();
   const { tenant } = useTenant();
   const tenantName = tenant?.businessName || tenant?.name;
-  const tenantLogoUrl = tenant?.logoUrl?.trim() || "/images/logo/restx-removebg-preview.png";
+  const tenantLogoUrl = tenant?.logoUrl?.trim() || "/images/logo/xfoodi-logo.png";
   const [mounted, setMounted] = useState(false);
 
   // State
@@ -48,6 +49,8 @@ function LoginEmailPageContent() {
   const [passwordTouched, setPasswordTouched] = useState(false);
   const [emailError, setEmailError] = useState("");
   const [emailTouched, setEmailTouched] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const turnstileRef = useRef<TurnstileInstance | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -125,11 +128,14 @@ function LoginEmailPageContent() {
 
     setLoading(true);
     try {
-      const user = await login({ email, password, rememberMe: remember });
+      const user = await login({ email, password, rememberMe: remember, turnstileToken });
       navigateAfterLogin(user);
     } catch (error: any) {
       const errorMessage = error.message || 'Login failed. Please try again.';
       message.error(errorMessage);
+      // Reset Turnstile after any login failure — token is now consumed/invalid
+      turnstileRef.current?.reset();
+      setTurnstileToken("");
       console.error('Login error:', error);
     } finally {
       setLoading(false);
@@ -171,7 +177,7 @@ function LoginEmailPageContent() {
                 alt={tenantName || "Restaurant Logo"}
                 className={`w-full h-full object-contain ${isDark ? 'filter invert hue-rotate-180 brightness-110' : ''}`}
                 onError={(e) => {
-                  e.currentTarget.src = "/images/logo/restx-removebg-preview.png";
+                  e.currentTarget.src = "/images/logo/xfoodi-logo.png";
                 }}
               />
             </div>
@@ -241,6 +247,14 @@ function LoginEmailPageContent() {
             <div className="flex items-center">
               <RememberCheckbox checked={remember} onChange={setRemember} />
             </div>
+
+            {/* Cloudflare Turnstile */}
+            <TurnstileWidget
+              ref={turnstileRef}
+              onSuccess={(token) => setTurnstileToken(token)}
+              onExpire={() => setTurnstileToken("")}
+              onError={() => setTurnstileToken("")}
+            />
 
             <div>
               <button

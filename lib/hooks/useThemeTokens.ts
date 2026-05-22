@@ -133,7 +133,7 @@ export function injectTenantBranding(config: TenantBrandConfig) {
 
   // Cache to localStorage for FOUC prevention
   try {
-    localStorage.setItem("restx-tenant-colors", JSON.stringify(config));
+    localStorage.setItem("XFoodi-tenant-colors", JSON.stringify(config));
   } catch {
     // localStorage may be unavailable
   }

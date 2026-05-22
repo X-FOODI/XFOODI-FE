@@ -30,7 +30,7 @@ export default function NotFound() {
         if (themeAttr === 'dark' || themeAttr === 'light') {
           return themeAttr;
         }
-        const stored = localStorage.getItem('restx-theme-mode');
+        const stored = localStorage.getItem('xfoodi-theme-mode');
         if (stored === 'dark' || stored === 'light') {
           return stored;
         }
