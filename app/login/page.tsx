@@ -20,10 +20,10 @@ import {
 } from "@ant-design/icons";
 import { message } from "antd";
 import { useRouter, useSearchParams } from "next/navigation";
-import React, { Suspense, useEffect, useState } from "react";
+import React, { Suspense, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useThemeMode } from "../theme/AntdProvider";
-import TurnstileWidget from "@/components/TurnstileWidget";
+import TurnstileWidget, { type TurnstileInstance } from "@/components/TurnstileWidget";
 
 const HERO_IMAGE_URL = "https://lh3.googleusercontent.com/aida-public/AB6AXuCQMVZhsaYs2Qw_8QN0YP6pUMn326Srs9wfsj18Q0patddJBVkz5g8pm0S3OhMz-nY-BrDmVA-ghfvRsndeKDyq7w68KAOVQDc5vQo71xWYxvYcQaEm4IFJ6BGYlfoaK6APcvIObkkPn9yvUiw6Iditv27W_j60EhvOhHb3Cwfupw1Ib5bCO6lO0NctemCVio6026jqjhbziRbrzl6OVbYkM0LUSLR_OV1pQf1oH1nNavimugtYDhjEH_oSrIweo29PEMjmlq80Ol4";
 
@@ -50,6 +50,7 @@ function LoginEmailPageContent() {
   const [emailError, setEmailError] = useState("");
   const [emailTouched, setEmailTouched] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState("");
+  const turnstileRef = useRef<TurnstileInstance | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -132,6 +133,9 @@ function LoginEmailPageContent() {
     } catch (error: any) {
       const errorMessage = error.message || 'Login failed. Please try again.';
       message.error(errorMessage);
+      // Reset Turnstile after any login failure — token is now consumed/invalid
+      turnstileRef.current?.reset();
+      setTurnstileToken("");
       console.error('Login error:', error);
     } finally {
       setLoading(false);
@@ -246,6 +250,7 @@ function LoginEmailPageContent() {
 
             {/* Cloudflare Turnstile */}
             <TurnstileWidget
+              ref={turnstileRef}
               onSuccess={(token) => setTurnstileToken(token)}
               onExpire={() => setTurnstileToken("")}
               onError={() => setTurnstileToken("")}

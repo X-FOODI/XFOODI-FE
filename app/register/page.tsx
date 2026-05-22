@@ -11,10 +11,10 @@ import authService from "@/lib/services/authService";
 import { EyeInvisibleOutlined, EyeOutlined, LockOutlined, MailOutlined, PhoneOutlined, UserAddOutlined } from "@ant-design/icons";
 import { App } from "antd";
 import { useRouter } from "next/navigation";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useThemeMode } from "../theme/AutoDarkThemeProvider";
-import TurnstileWidget from "@/components/TurnstileWidget";
+import TurnstileWidget, { type TurnstileInstance } from "@/components/TurnstileWidget";
 
 const HERO_IMAGE_URL = "https://lh3.googleusercontent.com/aida-public/AB6AXuCQMVZhsaYs2Qw_8QN0YP6pUMn326Srs9wfsj18Q0patddJBVkz5g8pm0S3OhMz-nY-BrDmVA-ghfvRsndeKDyq7w68KAOVQDc5vQo71xWYxvYcQaEm4IFJ6BGYlfoaK6APcvIObkkPn9yvUiw6Iditv27W_j60EhvOhHb3Cwfupw1Ib5bCO6lO0NctemCVio6026jqjhbziRbrzl6OVbYkM0LUSLR_OV1pQf1oH1nNavimugtYDhjEH_oSrIweo29PEMjmlq80Ol4";
 
@@ -50,6 +50,7 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState("");
+  const turnstileRef = useRef<TurnstileInstance | null>(null);
 
   // Error states
   const [errors, setErrors] = useState({
@@ -164,7 +165,12 @@ export default function RegisterPage() {
       newErrors.password.length > 0 ||
       newErrors.confirmPassword;
 
-    if (hasErrors) return;
+    if (hasErrors) {
+      // Reset Turnstile so user gets a fresh token on retry
+      turnstileRef.current?.reset();
+      setTurnstileToken("");
+      return;
+    }
 
     if (!acceptTerms) {
       message.warning(t('register_page.alerts.accept_terms'));
@@ -209,6 +215,9 @@ export default function RegisterPage() {
       } else {
         message.error(errorMessage);
       }
+      // Reset Turnstile after any API failure — token is now consumed/invalid
+      turnstileRef.current?.reset();
+      setTurnstileToken("");
       console.warn('Registration error:', error);
     } finally {
       setLoading(false);
@@ -410,6 +419,7 @@ export default function RegisterPage() {
 
             {/* Cloudflare Turnstile */}
             <TurnstileWidget
+              ref={turnstileRef}
               onSuccess={(token) => setTurnstileToken(token)}
               onExpire={() => setTurnstileToken("")}
               onError={() => setTurnstileToken("")}
