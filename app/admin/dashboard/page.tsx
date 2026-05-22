@@ -328,13 +328,13 @@ export default function AdminDashboardPage() {
                 )}
 
                 <div className="mt-3 pt-3" style={{ borderTop: "1px solid var(--border)" }}>
-                  <a
+                  <Link
                     href="/admin/applications"
                     className="text-xs font-medium hover:underline transition-colors"
                     style={{ color: "var(--primary)" }}
                   >
                     Xem tất cả yêu cầu →
-                  </a>
+                  </Link>
                 </div>
               </div>
             </section>
