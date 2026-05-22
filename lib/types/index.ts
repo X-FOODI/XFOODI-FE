@@ -1,5 +1,5 @@
 /**
- * Common types for RestX Frontend
+ * Common types for XFoodi Frontend
  */
 
 // User types

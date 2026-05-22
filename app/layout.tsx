@@ -33,8 +33,8 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
-                var STORAGE_KEY = 'restx-theme-mode';
-                var TENANT_COLORS_KEY = 'restx-tenant-colors';
+                var STORAGE_KEY = 'xfoodi-theme-mode';
+                var TENANT_COLORS_KEY = 'xfoodi-tenant-colors';
                 try {
                   // 1. Apply theme mode (dark/light) immediately
                   var stored = localStorage.getItem(STORAGE_KEY);

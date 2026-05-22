@@ -56,14 +56,14 @@ Mở [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
 ```
 http://localhost:3000
 https://yourdomain.com
-https://demo.restx.food
+https://demo.xfoodi.com
 ```
 
 **Authorized redirect URIs:**
 ```
 http://localhost:3000
 https://yourdomain.com
-https://demo.restx.food
+https://demo.xfoodi.com
 ```
 
 #### Bước 4: Copy Client ID

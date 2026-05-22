@@ -17,10 +17,10 @@ const LoginHeader: React.FC<LoginHeaderProps> = ({ title }) => {
       <div className="flex items-center gap-3 mb-6">
         <div className="w-12 h-12 flex items-center justify-center overflow-hidden">
           <img
-            src={tenant?.logoUrl?.trim() || "/images/logo/restx-removebg-preview.png"}
+            src={tenant?.logoUrl?.trim() || "/images/logo/xfoodi-logo.png"}
             alt={restaurantName || "Restaurant Logo"}
             className="w-full h-full object-contain app-logo-img"
-            onError={(e) => { e.currentTarget.src = "/images/logo/restx-removebg-preview.png" }}
+            onError={(e) => { e.currentTarget.src = "/images/logo/xfoodi-logo.png" }}
           />
         </div>
         <div>

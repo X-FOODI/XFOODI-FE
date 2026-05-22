@@ -2,7 +2,7 @@ export type SupportedLocale = "vi" | "en";
 
 type TranslationMap = Record<string, { vi?: string; en?: string }>;
 
-const STORAGE_KEY = "restx:ingredient-type-translations";
+const STORAGE_KEY = "XFoodi:ingredient-type-translations";
 
 const normalizeCode = (code?: string | null) => (code || "").trim().toLowerCase();
 

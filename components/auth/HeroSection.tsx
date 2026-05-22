@@ -14,7 +14,7 @@ export const HeroSection: React.FC = () => {
     }, []);
 
     const restaurantName = tenant?.businessName || tenant?.name;
-    const logoUrl = tenant?.logoUrl?.trim() || "/images/logo/restx-removebg-preview.png";
+    const logoUrl = tenant?.logoUrl?.trim() || "/images/logo/xfoodi-logo.png";
 
     return (
         <div className="hidden md:block md:w-1/2 relative overflow-hidden auth-hero-panel z-10 h-full min-h-screen">

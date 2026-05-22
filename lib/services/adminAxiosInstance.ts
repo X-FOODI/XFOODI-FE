@@ -24,10 +24,10 @@ const getAdminBaseUrl = (): string => {
     const parts = hostWithoutPort.split('.');
     // Only build dynamic admin subdomain for *.BASE_DOMAIN domains.
     // For custom domains (e.g. lebon.io.vn), always use the fixed admin backend.
-    const isRestxDomain =
+    const isXFoodiDomain =
         parts.length >= 2 && parts.slice(-2).join('.') === BASE_DOMAIN;
 
-    if (isRestxDomain) {
+    if (isXFoodiDomain) {
         // Always resolve to api.BASE_DOMAIN regardless of subdomain depth:
         // xfoodi.website        → api.xfoodi.website
         // www.xfoodi.website    → api.xfoodi.website
@@ -48,7 +48,7 @@ const adminAxiosInstance = axios.create({
 
 // Recalculate baseURL on every request so it always reflects the current
 // window.location (important for custom domains like lebon.io.vn that must
-// always hit admin.restx.food regardless of when the module was first loaded).
+// always hit admin.xfoodi.com regardless of when the module was first loaded).
 adminAxiosInstance.interceptors.request.use(
     (config) => {
         if (typeof window !== 'undefined') {

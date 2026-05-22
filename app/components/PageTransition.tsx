@@ -28,7 +28,7 @@ const PageTransition: React.FC<PageTransitionProps> = ({
 
   useEffect(() => {
     // Check if this is a return navigation (skip loading screen if already loaded once)
-    const isReturning = typeof window !== 'undefined' && sessionStorage.getItem('restx-has-loaded');
+    const isReturning = typeof window !== 'undefined' && sessionStorage.getItem('XFoodi-has-loaded');
     
     if (isReturning && document.readyState === 'complete') {
       // Skip loading screen on return navigation
@@ -43,7 +43,7 @@ const PageTransition: React.FC<PageTransitionProps> = ({
     const checkAndFinish = () => {
       if (minTimeReached && pageLoaded) {
         setIsLoading(false);
-        sessionStorage.setItem('restx-has-loaded', 'true');
+        sessionStorage.setItem('XFoodi-has-loaded', 'true');
       }
     };
 
