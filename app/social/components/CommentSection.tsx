@@ -8,6 +8,7 @@ import { formatRelativeTime, getAvatarUrl, getDisplayName } from '../utils/socia
 interface CommentSectionProps {
   postId: string;
   comments: SocialComment[];
+  loading?: boolean;
   disabled?: boolean;
   currentUserId?: string;
   onAddComment: (content: string, parentId?: string) => Promise<void>;
@@ -110,6 +111,7 @@ function CommentItem({
 
 export default function CommentSection({
   comments,
+  loading,
   disabled,
   currentUserId,
   onAddComment,
@@ -135,6 +137,12 @@ export default function CommentSection({
 
   return (
     <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="border-t border-[var(--border)] pt-3">
+      {loading && (
+        <p className="py-2 text-center text-sm text-[var(--text-muted)]">Đang tải bình luận...</p>
+      )}
+      {!loading && comments.length === 0 && (
+        <p className="py-2 text-center text-sm text-[var(--text-muted)]">Chưa có bình luận</p>
+      )}
       {comments.map((c) => (
         <CommentItem
           key={c.id}

@@ -1,4 +1,5 @@
 import axiosInstance from './axiosInstance';
+import userService from './userService';
 import type {
   CreatePostPayload,
   EditPostPayload,
@@ -13,12 +14,17 @@ import type {
 
 const SOCIAL_BASE = '/social';
 
+const API_REACTIONS = ['LIKE', 'LOVE', 'HAHA', 'WOW', 'SAD'] as const;
+type ApiReactionType = (typeof API_REACTIONS)[number];
+
 interface ApiResponse<T> {
   success?: boolean;
   data?: T;
   message?: string;
-  error?: string;
 }
+
+/** Cursor stack per feed key for page-based infinite scroll */
+const feedCursorStacks = new Map<string, (string | null)[]>();
 
 function unwrap<T>(response: { data: ApiResponse<T> | T }): T {
   const body = response.data as ApiResponse<T>;
@@ -37,11 +43,54 @@ function extractError(error: unknown, fallback: string): never {
   throw new Error(msg || fallback);
 }
 
-function normalizeUser(raw: Partial<SocialUser> | Record<string, unknown>): SocialUser {
+function toApiReaction(reaction: ReactionType): ApiReactionType {
+  return reaction.toUpperCase() as ApiReactionType;
+}
+
+function fromApiReaction(type: string | null | undefined): ReactionType | null {
+  if (!type) return null;
+  const lower = type.toLowerCase() as ReactionType;
+  return ['like', 'love', 'haha', 'wow', 'sad'].includes(lower) ? lower : null;
+}
+
+function feedCacheKey(feed: FeedFilter, authorId?: string): string {
+  return `${feed}:${authorId ?? ''}`;
+}
+
+async function uploadPostImage(file: File): Promise<string> {
+  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+  const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+
+  if (!cloudName || !uploadPreset) {
+    throw new Error(
+      'Chưa cấu hình Cloudinary. Thêm NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME và NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET.'
+    );
+  }
+
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('upload_preset', uploadPreset);
+  formData.append('folder', 'xfoodi/posts');
+
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!res.ok) {
+    throw new Error('Không thể tải ảnh lên. Vui lòng thử lại.');
+  }
+
+  const json = (await res.json()) as { secure_url: string };
+  return json.secure_url;
+}
+
+export function normalizeUser(raw: Partial<SocialUser> | Record<string, unknown>): SocialUser {
   const r = raw as Record<string, unknown>;
+  const userName = r.userName ?? r.username;
   return {
     id: String(r.id ?? ''),
-    username: String(r.username ?? r.fullName ?? r.name ?? 'user'),
+    username: String(userName ?? r.fullName ?? r.name ?? 'user'),
     fullName: (r.fullName ?? r.name) as string | undefined,
     name: r.name as string | undefined,
     avatarUrl: (r.avatarUrl ?? r.avatar) as string | undefined,
@@ -52,78 +101,125 @@ function normalizeUser(raw: Partial<SocialUser> | Record<string, unknown>): Soci
   };
 }
 
-function normalizeReactions(
-  raw: Partial<SocialPost['reactions']> | Record<string, unknown> = {}
-): SocialPost['reactions'] {
-  const r = raw as Record<string, unknown>;
+function normalizeReactionsFromPost(raw: Record<string, unknown>): SocialPost['reactions'] {
+  const stats = (raw.stats ?? {}) as Record<string, unknown>;
+  const counts = (stats.reactionCounts ?? raw.reactions ?? {}) as Record<string, unknown>;
+  const viewer = (raw.viewer ?? {}) as Record<string, unknown>;
+  const viewerReaction = (viewer.reaction as { type?: string } | undefined)?.type;
+
+  const like = Number(counts.LIKE ?? counts.like ?? 0);
+  const love = Number(counts.LOVE ?? counts.love ?? 0);
+  const haha = Number(counts.HAHA ?? counts.haha ?? 0);
+  const wow = Number(counts.WOW ?? counts.wow ?? 0);
+  const sad = Number(counts.SAD ?? counts.sad ?? 0);
+
   return {
-    like: Number(r.like ?? 0),
-    love: Number(r.love ?? 0),
-    haha: Number(r.haha ?? 0),
-    wow: Number(r.wow ?? 0),
-    sad: Number(r.sad ?? 0),
-    total: Number(r.total ?? 0),
-    userReaction: (r.userReaction as ReactionType | null) ?? null,
+    like,
+    love,
+    haha,
+    wow,
+    sad,
+    total: Number(stats.reactionCount ?? like + love + haha + wow + sad),
+    userReaction: fromApiReaction(viewerReaction ?? (raw.userReaction as string)),
   };
 }
 
-export function normalizePost(raw: Record<string, unknown>): SocialPost {
+function normalizeImages(raw: Record<string, unknown>): string[] {
+  if (Array.isArray(raw.images)) {
+    return (raw.images as unknown[]).map((img) => {
+      if (typeof img === 'string') return img;
+      if (img && typeof img === 'object' && 'imageUrl' in img) {
+        return String((img as { imageUrl: string }).imageUrl);
+      }
+      return '';
+    }).filter(Boolean);
+  }
+  if (Array.isArray(raw.imageUrls)) {
+    return raw.imageUrls as string[];
+  }
+  return [];
+}
+
+export function normalizePost(raw: Record<string, unknown>, currentUserId?: string): SocialPost {
   const author = normalizeUser((raw.author ?? raw.user ?? {}) as Record<string, unknown>);
-  const images = Array.isArray(raw.images)
-    ? (raw.images as string[])
-    : Array.isArray(raw.imageUrls)
-      ? (raw.imageUrls as string[])
-      : [];
+  const stats = (raw.stats ?? {}) as Record<string, unknown>;
+  const viewer = (raw.viewer ?? {}) as Record<string, unknown>;
 
   return {
     id: String(raw.id ?? ''),
     author,
     content: String(raw.content ?? ''),
-    images,
+    images: normalizeImages(raw),
     hashtags: (raw.hashtags as string[]) ?? [],
     mentions: (raw.mentions as string[]) ?? [],
-    reactions: normalizeReactions((raw.reactions ?? {}) as SocialPost['reactions']),
-    commentsCount: Number(raw.commentsCount ?? raw.commentCount ?? 0),
-    shareCount: Number(raw.shareCount ?? 0),
+    reactions: normalizeReactionsFromPost(raw),
+    commentsCount: Number(raw.commentsCount ?? stats.commentCount ?? 0),
+    shareCount: Number(raw.shareCount ?? stats.shareCount ?? 0),
     savesCount: Number(raw.savesCount ?? 0),
-    isSaved: Boolean(raw.isSaved),
-    isOwner: Boolean(raw.isOwner),
-    comments: (raw.comments as SocialComment[]) ?? undefined,
+    isSaved: Boolean(raw.isSaved ?? viewer.saved ?? false),
+    isOwner: Boolean(
+      raw.isOwner ?? (currentUserId && String(raw.authorId ?? author.id) === currentUserId)
+    ),
+    comments: raw.comments as SocialComment[] | undefined,
     createdAt: String(raw.createdAt ?? new Date().toISOString()),
     updatedAt: raw.updatedAt as string | undefined,
   };
 }
 
-function normalizePaginated(raw: Record<string, unknown>): PaginatedPosts {
-  const itemsRaw = (raw.items ?? raw.posts ?? raw.data ?? []) as Record<string, unknown>[];
-  const items = Array.isArray(itemsRaw) ? itemsRaw.map((p) => normalizePost(p)) : [];
-  const page = Number(raw.page ?? raw.currentPage ?? 1);
-  const totalPages = Number(raw.totalPages ?? raw.totalPage ?? 1);
-  const totalCount = Number(raw.totalCount ?? raw.total ?? items.length);
-  const hasMore =
-    typeof raw.hasMore === 'boolean'
-      ? raw.hasMore
-      : page < totalPages;
+function normalizeComment(raw: Record<string, unknown>): SocialComment {
+  const user = (raw.user ?? raw.author ?? {}) as Record<string, unknown>;
+  return {
+    id: String(raw.id ?? ''),
+    postId: String(raw.postId ?? ''),
+    userId: String(raw.userId ?? user.id ?? ''),
+    author: normalizeUser(user),
+    content: String(raw.content ?? ''),
+    parentId: (raw.parentId as string | null) ?? null,
+    createdAt: String(raw.createdAt ?? new Date().toISOString()),
+    updatedAt: raw.updatedAt as string | undefined,
+    replies: Array.isArray(raw.replies)
+      ? (raw.replies as Record<string, unknown>[]).map((r) => normalizeComment(r))
+      : undefined,
+  };
+}
 
-  return { items, page, totalPages, totalCount, hasMore };
+function normalizePaginated(
+  raw: Record<string, unknown>,
+  page: number,
+  currentUserId?: string
+): PaginatedPosts {
+  const itemsRaw = (raw.items ?? raw.posts ?? []) as Record<string, unknown>[];
+  const items = Array.isArray(itemsRaw)
+    ? itemsRaw.map((p) => normalizePost(p, currentUserId))
+    : [];
+  const pagination = (raw.pagination ?? {}) as Record<string, unknown>;
+  const hasMore =
+    typeof pagination.hasMore === 'boolean'
+      ? pagination.hasMore
+      : Boolean(raw.hasMore);
+
+  return {
+    items,
+    page,
+    totalPages: hasMore ? page + 1 : page,
+    totalCount: items.length,
+    hasMore,
+  };
 }
 
 const socialService = {
   async createPost(payload: CreatePostPayload): Promise<SocialPost> {
     try {
-      const formData = new FormData();
-      formData.append('content', payload.content);
-      if (payload.hashtags?.length) {
-        formData.append('hashtags', JSON.stringify(payload.hashtags));
+      const imageUrls: string[] = [];
+      if (payload.images?.length) {
+        for (const file of payload.images) {
+          imageUrls.push(await uploadPostImage(file));
+        }
       }
-      if (payload.mentions?.length) {
-        formData.append('mentions', JSON.stringify(payload.mentions));
-      }
-      payload.images?.forEach((file) => formData.append('images', file));
 
       const response = await axiosInstance.post<ApiResponse<Record<string, unknown>>>(
         `${SOCIAL_BASE}/posts`,
-        formData
+        { content: payload.content, imageUrls }
       );
       return normalizePost(unwrap(response) as Record<string, unknown>);
     } catch (error) {
@@ -135,13 +231,49 @@ const socialService = {
     page?: number;
     limit?: number;
     feed?: FeedFilter;
+    authorId?: string;
+    hashtag?: string;
   }): Promise<PaginatedPosts> {
     try {
-      const response = await axiosInstance.get<ApiResponse<Record<string, unknown>>>(
-        `${SOCIAL_BASE}/posts`,
-        { params: { page: params?.page ?? 1, limit: params?.limit ?? 10, feed: params?.feed ?? 'news' } }
-      );
-      return normalizePaginated(unwrap(response) as Record<string, unknown>);
+      const page = params?.page ?? 1;
+      const limit = params?.limit ?? 10;
+      const feed = params?.feed ?? 'news';
+      const cacheKey = feedCacheKey(feed, params?.authorId);
+
+      if (page === 1) {
+        feedCursorStacks.set(cacheKey, [null]);
+      }
+
+      const stack = feedCursorStacks.get(cacheKey) ?? [null];
+      const cursor = stack[page - 1] ?? null;
+
+      let url = `${SOCIAL_BASE}/posts`;
+      const query: Record<string, string | number> = { limit };
+
+      if (feed === 'saved') {
+        url = `${SOCIAL_BASE}/saved`;
+      } else {
+        if (cursor) query.cursor = cursor;
+        if (params?.authorId) query.authorId = params.authorId;
+        if (params?.hashtag) query.hashtag = params.hashtag;
+        if (feed === 'trending') query.hashtag = params?.hashtag ?? 'xfoodi';
+      }
+
+      if (feed === 'saved' && cursor) query.cursor = cursor;
+
+      const response = await axiosInstance.get<ApiResponse<Record<string, unknown>>>(url, {
+        params: query,
+      });
+
+      const data = unwrap(response) as Record<string, unknown>;
+      const result = normalizePaginated(data, page, params?.authorId);
+
+      const nextCursor = (data.pagination as { nextCursor?: string | null })?.nextCursor ?? null;
+      const nextStack = [...stack];
+      nextStack[page] = nextCursor;
+      feedCursorStacks.set(cacheKey, nextStack);
+
+      return result;
     } catch (error) {
       extractError(error, 'Không thể tải bài viết');
     }
@@ -160,14 +292,18 @@ const socialService = {
 
   async reactPost(id: string, reaction: ReactionType): Promise<SocialPost> {
     try {
-      const response = await axiosInstance.post<ApiResponse<Record<string, unknown>>>(
-        `${SOCIAL_BASE}/posts/${id}/react`,
-        { reaction }
-      );
-      return normalizePost(unwrap(response) as Record<string, unknown>);
+      await axiosInstance.post(`${SOCIAL_BASE}/reactions`, {
+        postId: id,
+        type: toApiReaction(reaction),
+      });
+      return this.getPostById(id);
     } catch (error) {
       extractError(error, 'Không thể phản ứng bài viết');
     }
+  },
+
+  async clearReaction(postId: string, currentReaction: ReactionType): Promise<SocialPost> {
+    return this.reactPost(postId, currentReaction);
   },
 
   async commentPost(
@@ -176,11 +312,11 @@ const socialService = {
     parentId?: string
   ): Promise<SocialComment> {
     try {
-      const response = await axiosInstance.post<ApiResponse<SocialComment>>(
-        `${SOCIAL_BASE}/posts/${postId}/comments`,
-        { content, parentId }
+      const response = await axiosInstance.post<ApiResponse<Record<string, unknown>>>(
+        `${SOCIAL_BASE}/comments`,
+        { postId, content, parentId }
       );
-      return unwrap(response);
+      return normalizeComment(unwrap(response) as Record<string, unknown>);
     } catch (error) {
       extractError(error, 'Không thể bình luận');
     }
@@ -188,11 +324,11 @@ const socialService = {
 
   async editComment(commentId: string, content: string): Promise<SocialComment> {
     try {
-      const response = await axiosInstance.put<ApiResponse<SocialComment>>(
+      const response = await axiosInstance.patch<ApiResponse<Record<string, unknown>>>(
         `${SOCIAL_BASE}/comments/${commentId}`,
         { content }
       );
-      return unwrap(response);
+      return normalizeComment(unwrap(response) as Record<string, unknown>);
     } catch (error) {
       extractError(error, 'Không thể sửa bình luận');
     }
@@ -208,22 +344,21 @@ const socialService = {
 
   async sharePost(id: string): Promise<{ shareCount: number }> {
     try {
-      const response = await axiosInstance.post<ApiResponse<{ shareCount: number }>>(
-        `${SOCIAL_BASE}/posts/${id}/share`
-      );
-      return unwrap(response);
+      await axiosInstance.post(`${SOCIAL_BASE}/share/${id}`);
+      const post = await this.getPostById(id);
+      return { shareCount: post.shareCount };
     } catch (error) {
       extractError(error, 'Không thể chia sẻ bài viết');
     }
   },
 
-  async savePost(id: string, saved: boolean): Promise<{ isSaved: boolean }> {
+  async savePost(id: string, _saved?: boolean): Promise<{ isSaved: boolean }> {
     try {
-      const response = await axiosInstance.post<ApiResponse<{ isSaved: boolean }>>(
-        `${SOCIAL_BASE}/posts/${id}/save`,
-        { saved }
+      const response = await axiosInstance.post<ApiResponse<{ saved: boolean }>>(
+        `${SOCIAL_BASE}/save/${id}`
       );
-      return unwrap(response);
+      const data = unwrap(response);
+      return { isSaved: data.saved };
     } catch (error) {
       extractError(error, 'Không thể lưu bài viết');
     }
@@ -231,9 +366,9 @@ const socialService = {
 
   async editPost(id: string, payload: EditPostPayload): Promise<SocialPost> {
     try {
-      const response = await axiosInstance.put<ApiResponse<Record<string, unknown>>>(
+      const response = await axiosInstance.patch<ApiResponse<Record<string, unknown>>>(
         `${SOCIAL_BASE}/posts/${id}`,
-        payload
+        { content: payload.content }
       );
       return normalizePost(unwrap(response) as Record<string, unknown>);
     } catch (error) {
@@ -250,37 +385,27 @@ const socialService = {
   },
 
   async getSidebar(): Promise<SocialSidebarData> {
-    try {
-      const response = await axiosInstance.get<ApiResponse<SocialSidebarData>>(
-        `${SOCIAL_BASE}/sidebar`
-      );
-      const data = unwrap(response);
-      return {
-        trendingHashtags: data.trendingHashtags ?? [],
-        topCreators: (data.topCreators ?? []).map((u) => normalizeUser(u)),
-        suggestedUsers: (data.suggestedUsers ?? []).map((u) => normalizeUser(u)),
-        recentActivity: data.recentActivity ?? [],
-      };
-    } catch {
-      return {
-        trendingHashtags: [
-          { tag: 'xfoodi', count: 128 },
-          { tag: 'monngon', count: 96 },
-          { tag: 'nauan', count: 74 },
-        ],
-        topCreators: [],
-        suggestedUsers: [],
-        recentActivity: [],
-      };
-    }
+    return {
+      trendingHashtags: [
+        { tag: 'xfoodi', count: 128 },
+        { tag: 'monngon', count: 96 },
+        { tag: 'nauan', count: 74 },
+      ],
+      topCreators: [],
+      suggestedUsers: [],
+      recentActivity: [],
+    };
   },
 
   async getProfile(): Promise<SocialUser> {
     try {
-      const response = await axiosInstance.get<ApiResponse<Record<string, unknown>>>(
-        `${SOCIAL_BASE}/profile`
-      );
-      return normalizeUser(unwrap(response) as Record<string, unknown>);
+      const user = await userService.getMe();
+      return normalizeUser({
+        id: user.id,
+        userName: user.email?.split('@')[0],
+        fullName: user.fullName || user.name,
+        avatarUrl: user.avatar,
+      });
     } catch {
       return { id: '', username: 'guest', followersCount: 0, followingCount: 0, postsCount: 0 };
     }
@@ -288,10 +413,13 @@ const socialService = {
 
   async getComments(postId: string): Promise<SocialComment[]> {
     try {
-      const response = await axiosInstance.get<ApiResponse<SocialComment[]>>(
-        `${SOCIAL_BASE}/posts/${postId}/comments`
+      const response = await axiosInstance.get<ApiResponse<Record<string, unknown>>>(
+        `${SOCIAL_BASE}/posts/${postId}/comments`,
+        { params: { limit: 50 } }
       );
-      return unwrap(response) ?? [];
+      const data = unwrap(response) as Record<string, unknown>;
+      const items = (data.items ?? data) as Record<string, unknown>[];
+      return Array.isArray(items) ? items.map((c) => normalizeComment(c)) : [];
     } catch (error) {
       extractError(error, 'Không thể tải bình luận');
     }

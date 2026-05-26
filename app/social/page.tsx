@@ -83,7 +83,18 @@ export default function SocialPage() {
       if (pageNum === 1) setLoading(true);
       else setLoadingMore(true);
       try {
-        const result = await socialService.getPosts({ page: pageNum, limit: 10, feed });
+        if (feed === 'saved' && !user?.id) {
+          setPosts([]);
+          setHasMore(false);
+          setPage(1);
+          return;
+        }
+        const result = await socialService.getPosts({
+          page: pageNum,
+          limit: 10,
+          feed,
+          authorId: feed === 'my' ? user?.id : undefined,
+        });
         setPosts((prev) => (append ? [...prev, ...result.items] : result.items));
         setHasMore(result.hasMore);
         setPage(pageNum);
@@ -95,7 +106,7 @@ export default function SocialPage() {
         setLoadingMore(false);
       }
     },
-    [showToast]
+    [showToast, user?.id]
   );
 
   useEffect(() => {
@@ -163,11 +174,15 @@ export default function SocialPage() {
   const handleReact = async (postId: string, reaction: ReactionType) => {
     const prev = posts.find((p) => p.id === postId);
     if (!prev) return;
+    const old = prev.reactions.userReaction;
+    if (old === reaction) {
+      await handleClearReaction(postId);
+      return;
+    }
     updatePost(postId, (p) => {
-      const old = p.reactions.userReaction;
       const next = { ...p.reactions };
-      if (old && old !== reaction) next[old] = Math.max(0, next[old] - 1);
-      if (old !== reaction) next[reaction] = (next[reaction] ?? 0) + 1;
+      if (old) next[old] = Math.max(0, next[old] - 1);
+      next[reaction] = (next[reaction] ?? 0) + 1;
       next.userReaction = reaction;
       return { ...p, reactions: next };
     });
@@ -181,7 +196,22 @@ export default function SocialPage() {
   };
 
   const handleClearReaction = async (postId: string) => {
-    await handleReact(postId, 'like');
+    const prev = posts.find((p) => p.id === postId);
+    const current = prev?.reactions.userReaction;
+    if (!prev || !current) return;
+    updatePost(postId, (p) => {
+      const next = { ...p.reactions };
+      next[current] = Math.max(0, (next[current] ?? 0) - 1);
+      next.userReaction = null;
+      return { ...p, reactions: next };
+    });
+    try {
+      const updated = await socialService.clearReaction(postId, current);
+      updatePost(postId, () => updated);
+    } catch (e) {
+      updatePost(postId, () => prev);
+      showToast('error', 'Lỗi', e instanceof Error ? e.message : 'Không thể bỏ phản ứng');
+    }
   };
 
   const handleComment = async (postId: string, content: string, parentId?: string) => {

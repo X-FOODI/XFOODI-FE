@@ -2,7 +2,8 @@
 
 import type { ReactionType, SocialComment, SocialPost } from '@/lib/types/social';
 import { motion } from 'framer-motion';
-import { useState } from 'react';
+import socialService from '@/lib/services/socialService';
+import { useEffect, useState } from 'react';
 import { formatRelativeTime, getAvatarUrl, getDisplayName, REACTION_EMOJI } from '../utils/socialHelpers';
 import CommentSection from './CommentSection';
 import ImageGallery from './ImageGallery';
@@ -53,8 +54,32 @@ export default function PostCard({
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(post.content);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [comments, setComments] = useState<SocialComment[]>(post.comments ?? []);
+  const [loadingComments, setLoadingComments] = useState(false);
 
-  const comments: SocialComment[] = post.comments ?? [];
+  useEffect(() => {
+    setComments(post.comments ?? []);
+  }, [post.comments, post.id]);
+
+  useEffect(() => {
+    if (!showComments || comments.length > 0 || loadingComments) return;
+    let cancelled = false;
+    setLoadingComments(true);
+    socialService
+      .getComments(post.id)
+      .then((list) => {
+        if (!cancelled) setComments(list);
+      })
+      .catch(() => {
+        if (!cancelled) setComments([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingComments(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [showComments, post.id, comments.length, loadingComments]);
   const totalReactions = reactionTotal(post.reactions);
   const shareUrl =
     typeof window !== 'undefined'
@@ -221,6 +246,7 @@ export default function PostCard({
         <CommentSection
           postId={post.id}
           comments={comments}
+          loading={loadingComments}
           disabled={disabled}
           currentUserId={currentUserId}
           onAddComment={(content, parentId) => onComment(post.id, content, parentId)}
