@@ -4,6 +4,7 @@ import { CloseOutlined, MenuOutlined, LogoutOutlined, ProfileOutlined, UserOutli
 import { Button, Divider, Drawer, Layout, Menu, Space, Dropdown } from "antd";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import LanguageSwitcher from "../../components/LanguageSwitcher";
 import { useTenant } from "../../lib/contexts/TenantContext";
@@ -19,6 +20,8 @@ import authService from "../../lib/services/authService";
 const Header: React.FC = () => {
   const { t } = useTranslation();
   const { tenant } = useTenant();
+  const pathname = usePathname();
+  const isSocialActive = pathname === "/social" || pathname?.startsWith("/social/");
 
   const tenantName = "XFoodi";
   const tenantLogoUrl =
@@ -44,6 +47,20 @@ const Header: React.FC = () => {
     {
       key: "contact",
       label: <a href="#footer">{t("homepage.header.contact")}</a>,
+    },
+    {
+      key: "social",
+      label: (
+        <Link
+          href="/social"
+          style={{
+            color: isSocialActive ? "var(--primary)" : undefined,
+            fontWeight: isSocialActive ? 600 : undefined,
+          }}
+        >
+          Mạng xã hội
+        </Link>
+      ),
     },
   ];
 
