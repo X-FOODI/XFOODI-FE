@@ -8,11 +8,16 @@ import type {
   ReactionType,
   SocialComment,
   SocialPost,
+  SocialProfile,
   SocialSidebarData,
   SocialUser,
 } from '../types/social';
 
 const SOCIAL_BASE = '/social';
+
+function isOptimisticPostId(postId: string): boolean {
+  return postId.startsWith('temp-');
+}
 
 const API_REACTIONS = ['LIKE', 'LOVE', 'HAHA', 'WOW', 'SAD'] as const;
 type ApiReactionType = (typeof API_REACTIONS)[number];
@@ -280,6 +285,9 @@ const socialService = {
   },
 
   async getPostById(id: string): Promise<SocialPost> {
+    if (isOptimisticPostId(id)) {
+      throw new Error('Bài viết chưa được lưu trên máy chủ');
+    }
     try {
       const response = await axiosInstance.get<ApiResponse<Record<string, unknown>>>(
         `${SOCIAL_BASE}/posts/${id}`
@@ -291,6 +299,9 @@ const socialService = {
   },
 
   async reactPost(id: string, reaction: ReactionType): Promise<SocialPost> {
+    if (isOptimisticPostId(id)) {
+      throw new Error('Bài viết chưa được lưu trên máy chủ');
+    }
     try {
       await axiosInstance.post(`${SOCIAL_BASE}/reactions`, {
         postId: id,
@@ -311,6 +322,9 @@ const socialService = {
     content: string,
     parentId?: string
   ): Promise<SocialComment> {
+    if (isOptimisticPostId(postId)) {
+      throw new Error('Bài viết chưa được lưu trên máy chủ');
+    }
     try {
       const response = await axiosInstance.post<ApiResponse<Record<string, unknown>>>(
         `${SOCIAL_BASE}/comments`,
@@ -343,6 +357,9 @@ const socialService = {
   },
 
   async sharePost(id: string): Promise<{ shareCount: number }> {
+    if (isOptimisticPostId(id)) {
+      return { shareCount: 0 };
+    }
     try {
       await axiosInstance.post(`${SOCIAL_BASE}/share/${id}`);
       const post = await this.getPostById(id);
@@ -353,6 +370,9 @@ const socialService = {
   },
 
   async savePost(id: string, _saved?: boolean): Promise<{ isSaved: boolean }> {
+    if (isOptimisticPostId(id)) {
+      return { isSaved: !!_saved };
+    }
     try {
       const response = await axiosInstance.post<ApiResponse<{ saved: boolean }>>(
         `${SOCIAL_BASE}/save/${id}`
@@ -412,6 +432,7 @@ const socialService = {
   },
 
   async getComments(postId: string): Promise<SocialComment[]> {
+    if (isOptimisticPostId(postId)) return [];
     try {
       const response = await axiosInstance.get<ApiResponse<Record<string, unknown>>>(
         `${SOCIAL_BASE}/posts/${postId}/comments`,
@@ -423,6 +444,38 @@ const socialService = {
     } catch (error) {
       extractError(error, 'Không thể tải bình luận');
     }
+  },
+
+  async getUserProfile(userId: string, currentUserId?: string): Promise<SocialProfile> {
+    try {
+      const response = await axiosInstance.get<ApiResponse<Record<string, unknown>>>(
+        `${SOCIAL_BASE}/users/${userId}`
+      );
+      const raw = unwrap(response) as Record<string, unknown>;
+      const user = normalizeUser(raw);
+      return {
+        ...user,
+        bio: raw.bio as string | undefined,
+        coverUrl: (raw.coverUrl ?? raw.coverImage) as string | undefined,
+        isFollowing: Boolean(
+          raw.isFollowing ??
+            (raw.viewer as Record<string, unknown> | undefined)?.isFollowing
+        ),
+        isSelf: currentUserId ? user.id === currentUserId : false,
+      };
+    } catch (error) {
+      extractError(error, 'Không thể tải hồ sơ');
+    }
+  },
+
+  async getPostsByHashtag(tag: string, params?: { page?: number; limit?: number }): Promise<PaginatedPosts> {
+    const normalized = tag.replace(/^#/, '');
+    return this.getPosts({
+      page: params?.page ?? 1,
+      limit: params?.limit ?? 10,
+      feed: 'news',
+      hashtag: normalized,
+    });
   },
 };
 

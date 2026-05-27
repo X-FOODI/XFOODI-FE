@@ -90,3 +90,31 @@ export interface EditPostPayload {
   hashtags?: string[];
   mentions?: string[];
 }
+
+export type NotificationType = 'like' | 'comment' | 'follow' | 'mention' | 'share';
+
+export interface SocialNotification {
+  id: string;
+  type: NotificationType;
+  actor: SocialUser;
+  postId?: string;
+  commentId?: string;
+  message: string;
+  read: boolean;
+  createdAt: string;
+}
+
+export interface SocialProfile extends SocialUser {
+  bio?: string;
+  coverUrl?: string;
+  isFollowing?: boolean;
+  isSelf?: boolean;
+}
+
+export type ProfileTab = 'posts' | 'media' | 'saved';
+
+export interface SearchResults {
+  users: SocialUser[];
+  posts: SocialPost[];
+  hashtags: TrendingHashtag[];
+}

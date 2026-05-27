@@ -1,3 +1,8 @@
+/** Client-only optimistic ids — not persisted on the server yet */
+export function isOptimisticId(id: string): boolean {
+  return id.startsWith('temp-');
+}
+
 export function parseHashtags(text: string): string[] {
   const matches = text.match(/#[\w\u00C0-\u024F\u1E00-\u1EFF]+/g);
   return matches ? [...new Set(matches.map((t) => t.slice(1).toLowerCase()))] : [];

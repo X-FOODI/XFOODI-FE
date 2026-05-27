@@ -1,6 +1,5 @@
 'use client';
 
-import Header from '@/app/components/Header';
 import CreatePost from '@/app/social/components/CreatePost';
 import EmptyFeed from '@/app/social/components/EmptyFeed';
 import LeftSidebar from '@/app/social/components/LeftSidebar';
@@ -18,7 +17,18 @@ import type {
   SocialSidebarData,
   SocialUser,
 } from '@/lib/types/social';
+import { useSocialStore } from '@/store/social';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { isOptimisticId } from './utils/socialHelpers';
+
+function dedupePostsById(posts: SocialPost[]): SocialPost[] {
+  const seen = new Set<string>();
+  return posts.filter((p) => {
+    if (seen.has(p.id)) return false;
+    seen.add(p.id);
+    return true;
+  });
+}
 
 function mergeCommentTree(comments: SocialComment[], newComment: SocialComment): SocialComment[] {
   if (!newComment.parentId) return [...comments, newComment];
@@ -56,6 +66,8 @@ function removeCommentFromTree(comments: SocialComment[], id: string): SocialCom
 export default function SocialPage() {
   const { user, isAuthReady } = useAuth();
   const { showToast } = useToast();
+  const { createPostOpen, setCreatePostOpen } = useSocialStore();
+  const createPostRef = useRef<HTMLDivElement>(null);
   const isLoggedIn = !!user;
 
   const [posts, setPosts] = useState<SocialPost[]>([]);
@@ -67,6 +79,20 @@ export default function SocialPage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (createPostOpen && createPostRef.current) {
+      createPostRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setCreatePostOpen(false);
+    }
+  }, [createPostOpen, setCreatePostOpen]);
+  const fetchLockRef = useRef(false);
+  const loadFailedRef = useRef(false);
+  const postsErrorToastRef = useRef(false);
+  const userIdRef = useRef(user?.id);
+  const activeFeedRef = useRef(activeFeed);
+  userIdRef.current = user?.id;
+  activeFeedRef.current = activeFeed;
 
   const profileFromAuth: SocialUser = profile ?? {
     id: user?.id ?? '',
@@ -80,37 +106,61 @@ export default function SocialPage() {
 
   const loadPosts = useCallback(
     async (pageNum: number, feed: FeedFilter, append = false) => {
+      if (fetchLockRef.current) return;
+      fetchLockRef.current = true;
+
       if (pageNum === 1) setLoading(true);
       else setLoadingMore(true);
       try {
-        if (feed === 'saved' && !user?.id) {
+        if (feed === 'saved' && !userIdRef.current) {
           setPosts([]);
           setHasMore(false);
           setPage(1);
+          loadFailedRef.current = false;
           return;
         }
         const result = await socialService.getPosts({
           page: pageNum,
           limit: 10,
           feed,
-          authorId: feed === 'my' ? user?.id : undefined,
+          authorId: feed === 'my' ? userIdRef.current : undefined,
         });
-        setPosts((prev) => (append ? [...prev, ...result.items] : result.items));
+        if (feed !== activeFeedRef.current) return;
+        setPosts((prev) =>
+          append
+            ? dedupePostsById([...prev, ...result.items])
+            : dedupePostsById(result.items)
+        );
         setHasMore(result.hasMore);
         setPage(pageNum);
+        loadFailedRef.current = false;
       } catch (e) {
-        showToast('error', 'Lỗi', e instanceof Error ? e.message : 'Không tải được bài viết');
-        if (!append) setPosts([]);
+        if (feed !== activeFeedRef.current) return;
+        if (!postsErrorToastRef.current) {
+          postsErrorToastRef.current = true;
+          showToast('error', 'Lỗi', e instanceof Error ? e.message : 'Không tải được bài viết');
+        }
+        if (!append) {
+          setPosts([]);
+          setHasMore(false);
+          loadFailedRef.current = true;
+        }
       } finally {
+        fetchLockRef.current = false;
         setLoading(false);
         setLoadingMore(false);
       }
     },
-    [showToast, user?.id]
+    [showToast]
   );
 
   useEffect(() => {
     if (!isAuthReady) return;
+    fetchLockRef.current = false;
+    postsErrorToastRef.current = false;
+    loadFailedRef.current = false;
+    setPage(1);
+    setHasMore(true);
     loadPosts(1, activeFeed, false);
   }, [activeFeed, isAuthReady, loadPosts]);
 
@@ -123,10 +173,16 @@ export default function SocialPage() {
 
   useEffect(() => {
     const el = loadMoreRef.current;
-    if (!el || !hasMore || loading || loadingMore) return;
+    if (!el || !hasMore || loading || loadingMore || loadFailedRef.current) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting && hasMore && !loadingMore) {
+        if (
+          entries[0]?.isIntersecting &&
+          hasMore &&
+          !loadingMore &&
+          !fetchLockRef.current &&
+          !loadFailedRef.current
+        ) {
           loadPosts(page + 1, activeFeed, true);
         }
       },
@@ -162,7 +218,9 @@ export default function SocialPage() {
     setPosts((prev) => [optimistic, ...prev]);
     try {
       const created = await socialService.createPost(data);
-      setPosts((prev) => prev.map((p) => (p.id === optimistic.id ? created : p)));
+      setPosts((prev) =>
+        dedupePostsById(prev.map((p) => (p.id === optimistic.id ? created : p)))
+      );
       showToast('success', 'Đã đăng bài', 'Bài viết của bạn đã được chia sẻ');
     } catch (e) {
       setPosts((prev) => prev.filter((p) => p.id !== optimistic.id));
@@ -186,6 +244,7 @@ export default function SocialPage() {
       next.userReaction = reaction;
       return { ...p, reactions: next };
     });
+    if (isOptimisticId(postId)) return;
     try {
       const updated = await socialService.reactPost(postId, reaction);
       updatePost(postId, () => updated);
@@ -205,6 +264,7 @@ export default function SocialPage() {
       next.userReaction = null;
       return { ...p, reactions: next };
     });
+    if (isOptimisticId(postId)) return;
     try {
       const updated = await socialService.clearReaction(postId, current);
       updatePost(postId, () => updated);
@@ -229,6 +289,7 @@ export default function SocialPage() {
       commentsCount: p.commentsCount + 1,
       comments: mergeCommentTree(p.comments ?? [], tempComment),
     }));
+    if (isOptimisticId(postId)) return;
     try {
       const created = await socialService.commentPost(postId, content, parentId);
       updatePost(postId, (p) => ({
@@ -279,6 +340,7 @@ export default function SocialPage() {
 
   const handleSave = async (postId: string, saved: boolean) => {
     updatePost(postId, (p) => ({ ...p, isSaved: saved }));
+    if (isOptimisticId(postId)) return;
     try {
       await socialService.savePost(postId, saved);
       showToast('success', saved ? 'Đã lưu' : 'Đã bỏ lưu');
@@ -290,6 +352,7 @@ export default function SocialPage() {
 
   const handleShare = async (postId: string) => {
     updatePost(postId, (p) => ({ ...p, shareCount: p.shareCount + 1 }));
+    if (isOptimisticId(postId)) return;
     try {
       const res = await socialService.sharePost(postId);
       updatePost(postId, (p) => ({ ...p, shareCount: res.shareCount }));
@@ -333,9 +396,8 @@ export default function SocialPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--bg-base)]">
-      <Header />
-      <main className="mx-auto max-w-7xl px-4 pb-16 pt-28 sm:px-6">
+    <>
+      <main className="w-full">
         <div className="mb-4 lg:hidden">
           <select
             value={activeFeed}
@@ -359,11 +421,13 @@ export default function SocialPage() {
           </div>
 
           <div className="space-y-4 lg:col-span-6">
-            <CreatePost
-              user={user}
-              disabled={!isLoggedIn}
-              onSubmit={handleCreatePost}
-            />
+            <div ref={createPostRef}>
+              <CreatePost
+                user={user}
+                disabled={!isLoggedIn}
+                onSubmit={handleCreatePost}
+              />
+            </div>
 
             {loading ? (
               <>
@@ -401,6 +465,6 @@ export default function SocialPage() {
           </div>
         </div>
       </main>
-    </div>
+    </>
   );
 }

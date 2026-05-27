@@ -11,6 +11,7 @@ import { useTenant } from "../../lib/contexts/TenantContext";
 import { useThemeMode } from "../theme/AntdProvider";
 import { usePageTransition } from "./PageTransition";
 import ThemeToggle from "./ThemeToggle";
+import SocialHeaderExtras from "@/components/social/SocialHeaderExtras";
 
 const { Header: AntHeader } = Layout;
 
@@ -246,6 +247,7 @@ const Header: React.FC = () => {
           {/* Desktop Buttons */}
           {!isMobile && (
             <Space size={12}>
+              <SocialHeaderExtras />
               {isAuthenticated ? (
                 <Dropdown menu={{ items: userMenuItems }} placement="bottomRight" trigger={['click']}>
                   <Button type="primary" shape="round" style={{ fontWeight: 600 }}>

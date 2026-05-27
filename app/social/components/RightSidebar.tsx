@@ -2,6 +2,7 @@
 
 import type { SocialSidebarData } from '@/lib/types/social';
 import { motion } from 'framer-motion';
+import Link from 'next/link';
 import { formatRelativeTime, getAvatarUrl, getDisplayName } from '../utils/socialHelpers';
 
 interface RightSidebarProps {
@@ -20,7 +21,12 @@ export default function RightSidebar({ data }: RightSidebarProps) {
         <ul className="space-y-2">
           {data.trendingHashtags.map((h) => (
             <li key={h.tag} className="flex justify-between text-sm">
-              <span className="font-medium text-[var(--primary)]">#{h.tag}</span>
+              <Link
+                href={`/social/hashtag/${h.tag}`}
+                className="font-medium text-[var(--primary)] hover:underline"
+              >
+                #{h.tag}
+              </Link>
               <span className="text-[var(--text-muted)]">{h.count} posts</span>
             </li>
           ))}
@@ -32,13 +38,15 @@ export default function RightSidebar({ data }: RightSidebarProps) {
           <h3 className="mb-3 font-semibold text-[var(--text)]">⭐ Top creators</h3>
           <ul className="space-y-3">
             {data.topCreators.map((u) => (
-              <li key={u.id} className="flex items-center gap-2">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={getAvatarUrl(u)} alt="" className="h-9 w-9 rounded-full object-cover" />
-                <div>
-                  <p className="text-sm font-medium text-[var(--text)]">{getDisplayName(u)}</p>
-                  <p className="text-xs text-[var(--text-muted)]">@{u.username}</p>
-                </div>
+              <li key={u.id}>
+                <Link href={`/social/profile/${u.id}`} className="flex items-center gap-2 hover:opacity-90">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={getAvatarUrl(u)} alt="" className="h-9 w-9 rounded-full object-cover" />
+                  <div>
+                    <p className="text-sm font-medium text-[var(--text)]">{getDisplayName(u)}</p>
+                    <p className="text-xs text-[var(--text-muted)]">@{u.username}</p>
+                  </div>
+                </Link>
               </li>
             ))}
           </ul>
@@ -51,14 +59,14 @@ export default function RightSidebar({ data }: RightSidebarProps) {
           <ul className="space-y-3">
             {data.suggestedUsers.map((u) => (
               <li key={u.id} className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
+                <Link href={`/social/profile/${u.id}`} className="flex items-center gap-2 hover:opacity-90">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={getAvatarUrl(u)} alt="" className="h-9 w-9 rounded-full object-cover" />
                   <div>
                     <p className="text-sm font-medium text-[var(--text)]">{getDisplayName(u)}</p>
                     <p className="text-xs text-[var(--text-muted)]">@{u.username}</p>
                   </div>
-                </div>
+                </Link>
                 <button
                   type="button"
                   className="rounded-full bg-[var(--primary-soft)] px-3 py-1 text-xs font-semibold text-[var(--primary)]"

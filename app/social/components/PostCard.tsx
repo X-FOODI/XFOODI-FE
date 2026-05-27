@@ -4,7 +4,13 @@ import type { ReactionType, SocialComment, SocialPost } from '@/lib/types/social
 import { motion } from 'framer-motion';
 import socialService from '@/lib/services/socialService';
 import { useEffect, useState } from 'react';
-import { formatRelativeTime, getAvatarUrl, getDisplayName, REACTION_EMOJI } from '../utils/socialHelpers';
+import {
+  formatRelativeTime,
+  getAvatarUrl,
+  getDisplayName,
+  isOptimisticId,
+  REACTION_EMOJI,
+} from '../utils/socialHelpers';
 import CommentSection from './CommentSection';
 import ImageGallery from './ImageGallery';
 import ReactionPicker from './ReactionPicker';
@@ -63,6 +69,7 @@ export default function PostCard({
 
   useEffect(() => {
     if (!showComments || comments.length > 0 || loadingComments) return;
+    if (isOptimisticId(post.id)) return;
     let cancelled = false;
     setLoadingComments(true);
     socialService
