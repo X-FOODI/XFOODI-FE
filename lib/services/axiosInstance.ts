@@ -44,6 +44,11 @@ axiosInstance.interceptors.request.use(
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
+
+      // Add tenant domain header
+      const host = window.location.host;
+      const hostWithoutPort = host.includes(':') ? host.split(':')[0] : host;
+      config.headers['X-Tenant-Domain'] = hostWithoutPort;
     }
     // When sending FormData, do not set Content-Type so the browser/axios can set
     // multipart/form-data with the correct boundary. Otherwise server gets

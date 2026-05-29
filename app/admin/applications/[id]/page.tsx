@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/contexts/AuthContext";
 import restaurantApplicationService, {
   RestaurantApplication,
 } from "@/lib/services/restaurantApplicationService";
+import { CheckCircle as CheckCircleIcon, Cancel as CancelIcon, TaskAlt as TaskAltIcon } from "@mui/icons-material";
 
 export default function AdminApplicationDetailPage() {
   const { user } = useAuth();
@@ -43,7 +44,7 @@ export default function AdminApplicationDetailPage() {
     setError("");
     try {
       await restaurantApplicationService.approve(id);
-      setSuccessMsg("✅ Đã duyệt thành công. Email thông báo đã được gửi đến người dùng.");
+      setSuccessMsg("Đã duyệt thành công. Email thông báo đã được gửi đến người dùng.");
       fetchDetail();
     } catch (err: any) {
       setError(err?.response?.data?.message || "Đã có lỗi xảy ra");
@@ -59,7 +60,7 @@ export default function AdminApplicationDetailPage() {
     setError("");
     try {
       await restaurantApplicationService.reject(id, rejectReason.trim());
-      setSuccessMsg("✅ Đã từ chối đơn. Email thông báo đã được gửi đến người dùng.");
+      setSuccessMsg("Đã từ chối đơn. Email thông báo đã được gửi đến người dùng.");
       setShowRejectForm(false);
       fetchDetail();
     } catch (err: any) {
@@ -127,6 +128,7 @@ export default function AdminApplicationDetailPage() {
         {successMsg && (
           <div className="flex items-center gap-2 p-4 rounded-xl mb-4 text-sm"
             style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.3)", color: "#22c55e" }}>
+            <TaskAltIcon sx={{ fontSize: 18 }} />
             {successMsg}
           </div>
         )}
@@ -231,14 +233,14 @@ export default function AdminApplicationDetailPage() {
                     className="flex-1 py-3 rounded-xl font-semibold text-sm text-white transition-all hover:opacity-90 disabled:opacity-60 flex items-center justify-center gap-2"
                     style={{ background: "#22c55e" }}>
                     {actionLoading && <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />}
-                    ✓ Phê duyệt
+                    <CheckCircleIcon sx={{ fontSize: 18 }} /> Phê duyệt
                   </button>
                   <button
                     onClick={() => setShowRejectForm(true)}
                     disabled={actionLoading}
                     className="flex-1 py-3 rounded-xl font-semibold text-sm transition-all hover:opacity-90 disabled:opacity-60"
                     style={{ border: "2px solid #ef4444", color: "#ef4444", background: "transparent" }}>
-                    ✗ Từ chối
+                    <CancelIcon sx={{ fontSize: 18, verticalAlign: 'middle', marginRight: '6px' }} /> Từ chối
                   </button>
                 </div>
               ) : (

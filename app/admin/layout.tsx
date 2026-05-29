@@ -13,9 +13,29 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // Auth guard — chỉ Admin / SuperAdmin mới vào được
   useEffect(() => {
     if (!isAuthReady) return;
-    const roles: string[] = user?.roles || (user?.role ? [user.role] : []);
-    if (!user || (!roles.includes("Admin") && !roles.includes("SuperAdmin") && !roles.includes("System Admin"))) {
+    if (!user) {
       router.replace("/login-email?redirect=/admin/dashboard");
+      return;
+    }
+    const roles: string[] = user?.roles || (user?.role ? [user.role] : []);
+    if (!roles.includes("Admin") && !roles.includes("SuperAdmin") && !roles.includes("System Admin")) {
+      router.replace("/login-email?redirect=/admin/dashboard");
+      return;
+    }
+
+    // Enforce admin subdomain!
+    if (typeof window !== "undefined") {
+      const host = window.location.host;
+      const protocol = window.location.protocol;
+      const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || "xfoodi.website";
+      const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1");
+      const targetAdminSubdomain = isLocalhost ? "admin.localhost" : `admin.${BASE_DOMAIN}`;
+      
+      const hostWithoutPort = host.includes(":") ? host.split(":")[0] : host;
+      if (hostWithoutPort !== targetAdminSubdomain) {
+        const port = host.includes(":") ? `:${host.split(":")[1]}` : "";
+        window.location.href = `${protocol}//${targetAdminSubdomain}${port}/admin/dashboard`;
+      }
     }
   }, [isAuthReady, user, router]);
 

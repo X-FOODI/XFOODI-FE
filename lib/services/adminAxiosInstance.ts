@@ -53,6 +53,11 @@ adminAxiosInstance.interceptors.request.use(
     (config) => {
         if (typeof window !== 'undefined') {
             config.baseURL = getAdminBaseUrl();
+
+            // Add tenant domain header
+            const host = window.location.host;
+            const hostWithoutPort = host.includes(':') ? host.split(':')[0] : host;
+            config.headers['X-Tenant-Domain'] = hostWithoutPort;
         }
 
         // Doc adminAccessToken tu ca hai storage (rememberMe=true -> localStorage, rememberMe=false -> sessionStorage)

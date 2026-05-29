@@ -10,6 +10,7 @@ import { useTenant } from "../../lib/contexts/TenantContext";
 import { useThemeMode } from "../theme/AntdProvider";
 import { usePageTransition } from "./PageTransition";
 import ThemeToggle from "./ThemeToggle";
+import { Security as SecurityIcon, Storefront as StorefrontIcon } from "@mui/icons-material";
 
 const { Header: AntHeader } = Layout;
 
@@ -20,7 +21,7 @@ const Header: React.FC = () => {
   const { t } = useTranslation();
   const { tenant } = useTenant();
 
-  const tenantName = "XFoodi";
+  const tenantName = tenant?.name || "XFoodi";
   const tenantLogoUrl =
     tenant?.logoUrl?.trim() || "/images/logo/xfoodi-logo.png";
 
@@ -32,6 +33,10 @@ const Header: React.FC = () => {
     {
       key: "workflow",
       label: <a href="#workflow">{t("homepage.header.workflow")}</a>,
+    },
+    {
+      key: "restaurants",
+      label: <a href="#restaurants">Nhà hàng</a>,
     },
     {
       key: "about",
@@ -128,7 +133,7 @@ const Header: React.FC = () => {
             d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
         </svg>
       ),
-      label: <Link href="/admin/dashboard">🛡️ Admin Dashboard</Link>,
+      label: <Link href="/admin/dashboard"><span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><SecurityIcon sx={{ fontSize: 14 }} /> Admin Dashboard</span></Link>,
     }] : []),
     // Restaurant Dashboard — chỉ hiện cho Owner
     ...(isOwner ? [{
@@ -139,7 +144,7 @@ const Header: React.FC = () => {
             d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
         </svg>
       ),
-      label: <Link href="/restaurant/dashboard">🏪 Dashboard Nhà Hàng</Link>,
+      label: <Link href="/restaurant/dashboard">Dashboard Nhà Hàng</Link>,
     }] : []),
     // Nếu là Customer và chưa có nhà hàng — hiện link đăng ký
     ...(!isAdmin && !isOwner ? [{
@@ -416,15 +421,15 @@ const Header: React.FC = () => {
               </Link>
               {isAdmin && (
                 <Link href="/admin/dashboard" style={{ width: '100%' }}>
-                  <Button block size="large" icon={<UserOutlined />} style={{ fontWeight: 500 }}>
-                    🛡️ Admin Dashboard
+                  <Button block size="large" icon={<SecurityIcon sx={{ fontSize: 14 }} />} style={{ fontWeight: 500 }}>
+                    Admin Dashboard
                   </Button>
                 </Link>
               )}
               {isOwner && (
                 <Link href="/restaurant/dashboard" style={{ width: '100%' }}>
                   <Button type="primary" block size="large" style={{ fontWeight: 600 }}>
-                    🏪 Dashboard Nhà Hàng
+                    Dashboard Nhà Hàng
                   </Button>
                 </Link>
               )}
