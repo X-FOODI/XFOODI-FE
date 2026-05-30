@@ -293,7 +293,6 @@ export default function AdminApplicationDetailPage() {
       {/* Confirm Dialog */}
       <ConfirmDialog
         open={dialog.open}
-        type={dialog.type}
         loading={actionLoading}
         title={dialog.type === "approve" ? "Xác nhận phê duyệt" : "Xác nhận từ chối"}
         description={
