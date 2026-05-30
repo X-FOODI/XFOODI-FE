@@ -2,6 +2,9 @@
 const nextConfig = {
   // output: "standalone", // Bỏ comment khi deploy lên Linux/Docker — Windows không hỗ trợ symlink
   reactStrictMode: false,
+  experimental: {
+    middlewareClientMaxBodySize: 100 * 1024 * 1024, // 100MB
+  },
   transpilePackages: [
     'antd',
     '@ant-design',
@@ -19,7 +22,8 @@ const nextConfig = {
     '@rc-component/mini-decimal',
     'rc-drawer',
     'rc-dialog',
-    'rc-resize-observer'
+    'rc-resize-observer',
+    'mapbox-gl',
   ],
   // API rewrites for CORS bypass
   // IMPORTANT: rewrites run server-side, so we MUST use the internal/private URL

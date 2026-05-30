@@ -11,6 +11,7 @@ export interface RestaurantApplication {
   address: string;
   phone: string;
   email: string;
+  logoUrl?: string;
   status: ApplicationStatus;
   reviewNote?: string;
   reviewedAt?: string;
@@ -41,6 +42,10 @@ export interface CreateApplicationData {
   address: string;
   phone: string;
   email: string;
+  restaurantImage?: File; // Ảnh nhà hàng (hiển thị trên homepage)
+  latitude?: number;      // Vĩ độ
+  longitude?: number;     // Kinh độ
+  cuisineType?: string;   // Loại ẩm thực
   businessLicense?: File;
   ownershipProof?: File;
   nationalId?: File;       // CCCD mặt trước
@@ -65,6 +70,10 @@ const restaurantApplicationService = {
     formData.append('phone', data.phone);
     formData.append('email', data.email);
     if (data.description) formData.append('description', data.description);
+    if (data.restaurantImage) formData.append('restaurantImage', data.restaurantImage);
+    if (data.latitude  != null) formData.append('latitude',    String(data.latitude));
+    if (data.longitude != null) formData.append('longitude',   String(data.longitude));
+    if (data.cuisineType)       formData.append('cuisineType', data.cuisineType);
     if (data.businessLicense) formData.append('businessLicense', data.businessLicense);
     if (data.ownershipProof) formData.append('ownershipProof', data.ownershipProof);
     if (data.nationalId) formData.append('nationalId', data.nationalId);

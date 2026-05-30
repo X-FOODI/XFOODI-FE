@@ -47,6 +47,7 @@ export interface User {
   role?: string;  // Primary role from backend (e.g., 'Admin', 'Staff', 'Customer', 'System Admin')
   roles?: string[];
   restaurantId?: string | null; // Set when user is Owner
+  restaurantSlug?: string | null;
   position?: string; // Staff position from auth response (e.g., 'Waiter', 'Kitchen', 'Kitchen Staff')
   phoneNumber?: string;
   avatar?: string;
@@ -226,6 +227,7 @@ function finalizeLoginSession(
     role: user.role || (user.roles && user.roles[0]) || 'Customer',
     roles: user.roles || (user.role ? [user.role] : ['Customer']),
     restaurantId: user.restaurantId ?? null,
+    restaurantSlug: user.restaurantSlug ?? null,
   };
 
   const storage = rememberMe ? localStorage : sessionStorage;

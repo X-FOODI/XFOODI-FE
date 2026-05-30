@@ -97,7 +97,7 @@ export default function RegisterRestaurantPendingPage() {
           </div>
 
           <h1 className="text-xl font-bold mb-2" style={{ color: "var(--text)" }}>
-            {isApproved ? "🎉 Chúc mừng!" : isRejected ? "Đơn chưa được duyệt" : "Đơn đang được xét duyệt"}
+            {isApproved ? "Chúc mừng!" : isRejected ? "Đơn chưa được duyệt" : "Đơn đang được xét duyệt"}
           </h1>
 
           <p className="text-sm mb-6" style={{ color: "var(--text-muted)" }}>
