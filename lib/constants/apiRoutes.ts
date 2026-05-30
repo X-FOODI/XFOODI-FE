@@ -11,7 +11,12 @@ export const API_ROUTES = {
     FORGOT_PASSWORD: '/auth/forgot-password',
     CONFIRM_EMAIL: '/auth/confirm-email',
     RESEND_CONFIRMATION_EMAIL: '/auth/resend-confirmation-email',
-    REFRESH_TOKEN: '/auth/refresh-token'
+    REFRESH_TOKEN: '/auth/refresh-token',
+    TWO_FACTOR_SETUP: '/auth/2fa/setup',
+    TWO_FACTOR_ENABLE: '/auth/2fa/enable',
+    TWO_FACTOR_DISABLE: '/auth/2fa/disable',
+    TWO_FACTOR_STATUS: '/auth/2fa/status',
+    TWO_FACTOR_VALIDATE: '/auth/2fa/validate',
   },
   USERS: {
     ME: '/users/me',

@@ -75,7 +75,7 @@ export default function RestaurantDashboardPage() {
   useEffect(() => {
     if (!isAuthReady || tenantLoading) return;
     if (!user) {
-      router.replace("/login-email?redirect=/restaurant/dashboard");
+      router.replace("/login?redirect=/restaurant/dashboard");
       return;
     }
     const roles: string[] = user.roles || (user.role ? [user.role] : []);

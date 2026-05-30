@@ -8,7 +8,7 @@ import RememberCheckbox from "@/components/auth/RememberCheckbox";
 import { GlassInput } from "@/components/ui/GlassInput";
 import { redirectAfterLogin } from "@/lib/auth/redirectAfterLogin";
 import { useAuth } from "@/lib/contexts/AuthContext";
-import type { User } from "@/lib/services/authService";
+import authService, { type User } from "@/lib/services/authService";
 import { useTenant } from "@/lib/contexts/TenantContext";
 import {
     EyeInvisibleOutlined,
@@ -17,6 +17,9 @@ import {
     LoginOutlined,
     MailOutlined,
     PhoneOutlined,
+    SafetyCertificateOutlined,
+    ArrowLeftOutlined,
+    KeyOutlined,
 } from "@ant-design/icons";
 import { message } from "antd";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -32,7 +35,7 @@ function LoginEmailPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectPath = searchParams.get('redirect');
-  const { login } = useAuth();
+  const { login, updateUser } = useAuth();
   const { mode } = useThemeMode();
   const { tenant } = useTenant();
   const tenantName = tenant?.businessName || tenant?.name;
@@ -52,9 +55,38 @@ function LoginEmailPageContent() {
   const [turnstileToken, setTurnstileToken] = useState("");
   const turnstileRef = useRef<TurnstileInstance | null>(null);
 
+  // 2FA States
+  const [requires2FA, setRequires2FA] = useState(false);
+  const [tempToken, setTempToken] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [useBackupCode, setUseBackupCode] = useState(false);
+  const [countdown, setCountdown] = useState(300); // 5 minutes
+
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (requires2FA && countdown > 0) {
+      timer = setInterval(() => {
+        setCountdown((prev) => prev - 1);
+      }, 1000);
+    } else if (requires2FA && countdown === 0) {
+      message.error("Phiên xác thực đã hết hạn. Vui lòng đăng nhập lại.");
+      setRequires2FA(false);
+      setTempToken("");
+      setCountdown(300);
+      setOtpCode("");
+    }
+    return () => clearInterval(timer);
+  }, [requires2FA, countdown]);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
 
   const navigateAfterLogin = (user: User) => {
     redirectAfterLogin(router, user, redirectPath);
@@ -128,8 +160,16 @@ function LoginEmailPageContent() {
 
     setLoading(true);
     try {
-      const user = await login({ email, password, rememberMe: remember, turnstileToken });
-      navigateAfterLogin(user);
+      const res = await login({ email, password, rememberMe: remember, turnstileToken });
+      if (res && 'requires2FA' in res) {
+        setRequires2FA(true);
+        setTempToken(res.tempToken);
+        setCountdown(300);
+        setOtpCode("");
+        message.info("Vui lòng nhập mã xác thực 2FA để hoàn tất đăng nhập.");
+        return;
+      }
+      navigateAfterLogin(res as User);
     } catch (error: any) {
       const errorMessage = error.message || 'Login failed. Please try again.';
       message.error(errorMessage);
@@ -137,6 +177,27 @@ function LoginEmailPageContent() {
       turnstileRef.current?.reset();
       setTurnstileToken("");
       console.error('Login error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handle2FASubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!otpCode || !otpCode.trim()) {
+      message.error("Vui lòng nhập mã xác thực.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const user = await authService.validate2FA(tempToken, otpCode.trim(), remember);
+      updateUser(user);
+      message.success("Xác thực 2FA thành công!");
+      navigateAfterLogin(user);
+    } catch (error: any) {
+      const errorMessage = error.message || 'Mã xác thực 2FA không hợp lệ hoặc đã hết hạn.';
+      message.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -188,119 +249,205 @@ function LoginEmailPageContent() {
 
           <div className="text-center md:text-left mb-8">
             <h1 className="auth-heading text-3xl font-bold tracking-tight drop-shadow-sm transition-colors">
-              {t('login_email_page.title')}
+              {requires2FA ? "Xác thực 2 lớp (2FA)" : t('login_email_page.title')}
             </h1>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-4">
-              <div className="relative">
-                <GlassInput
-                  id="email"
-                  label={t('login_email_page.email_label')}
-                  icon={<MailOutlined />}
-                  type="email"
-                  required
-                  value={email}
-                  onChange={handleEmailChange}
-                  onBlur={() => setEmailTouched(true)}
-                  disabled={loading}
-                />
-                {(emailTouched && emailError) && (
-                  <div className="text-red-400 text-xs mt-1 ml-1 font-medium">{emailError}</div>
-                )}
+          {requires2FA ? (
+            <form onSubmit={handle2FASubmit} className="space-y-6">
+              <div className="text-center space-y-4">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[var(--primary)]/10 text-[var(--primary)] border border-[var(--primary)]/20 animate-pulse">
+                  <SafetyCertificateOutlined className="text-3xl" />
+                </div>
+                <p className="text-sm auth-text leading-relaxed">
+                  {useBackupCode 
+                    ? "Nhập mã khôi phục dự phòng để hoàn tất đăng nhập quản trị."
+                    : "Tài khoản quản trị được bảo vệ bằng Google Authenticator. Nhập mã OTP 6 số để tiếp tục."}
+                </p>
               </div>
 
               <div className="relative">
                 <GlassInput
-                  id="password"
-                  label={t('login_email_page.password_label')}
-                  icon={<LockOutlined />}
-                  type={showPassword ? "text" : "password"}
+                  id="otpCode"
+                  label={useBackupCode ? "Mã dự phòng khôi phục" : "Mã OTP 2FA (6 chữ số)"}
+                  icon={useBackupCode ? <KeyOutlined /> : <SafetyCertificateOutlined />}
+                  type="text"
                   required
-                  value={password}
-                  onChange={handlePasswordChange}
-                  onBlur={() => setPasswordTouched(true)}
+                  value={otpCode}
+                  maxLength={useBackupCode ? 16 : 6}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (useBackupCode) {
+                      setOtpCode(val);
+                    } else {
+                      if (/^\d*$/.test(val)) {
+                        setOtpCode(val);
+                      }
+                    }
+                  }}
                   disabled={loading}
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-9 text-gray-400 hover:text-white transition-colors"
-                >
-                  {showPassword ? <EyeInvisibleOutlined className="text-lg" /> : <EyeOutlined className="text-lg" />}
-                </button>
-                {(passwordTouched && passwordError) && (
-                  <div className="text-red-400 text-xs mt-1 ml-1 font-medium">{passwordError}</div>
-                )}
-                <div className="text-right mt-1">
-                  <a
-                    href="/forgot-password"
-                    className="text-xs text-[var(--primary)] hover:text-[#ff5c35] hover:underline"
+                
+                <div className="flex justify-between items-center mt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUseBackupCode(!useBackupCode);
+                      setOtpCode("");
+                    }}
+                    className="text-xs text-[var(--primary)] hover:text-[#ff5c35] hover:underline transition-colors bg-transparent border-none cursor-pointer outline-none p-0"
                   >
-                    {t('login_email_page.forgot_password')}
-                  </a>
+                    {useBackupCode ? "Sử dụng mã OTP chuẩn" : "Sử dụng mã dự phòng khôi phục"}
+                  </button>
+                  
+                  <span className="text-xs text-amber-500 font-medium">
+                    Hết hạn sau {formatTime(countdown)}
+                  </span>
                 </div>
               </div>
-            </div>
 
-            <div className="flex items-center">
-              <RememberCheckbox checked={remember} onChange={setRemember} />
-            </div>
+              <div className="space-y-3">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="group relative w-full flex justify-center py-3.5 px-4 border border-transparent text-sm font-bold rounded-xl text-white bg-[var(--primary)] hover:bg-[#ff5722] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#1a100e] focus:ring-[var(--primary)] transition-all duration-300 shadow-[0_4px_14px_0_rgba(255,56,11,0.39)] hover:shadow-[0_6px_20px_rgba(255,56,11,0.23)] hover:-translate-y-0.5 disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3">
+                    {loading ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-b-0 border-white ml-1"></div>
+                    ) : (
+                      <span className="material-icons text-white/50 group-hover:text-white transition-colors text-lg">
+                        <LoginOutlined />
+                      </span>
+                    )}
+                  </span>
+                  {loading ? "Đang xác thực..." : "Xác thực & Đăng nhập"}
+                </button>
 
-            {/* Cloudflare Turnstile */}
-            <TurnstileWidget
-              ref={turnstileRef}
-              onSuccess={(token) => setTurnstileToken(token)}
-              onExpire={() => setTurnstileToken("")}
-              onError={() => setTurnstileToken("")}
-            />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRequires2FA(false);
+                    setOtpCode("");
+                    setTempToken("");
+                  }}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 text-xs font-semibold rounded-xl border border-gray-500/20 text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-300 bg-transparent cursor-pointer"
+                >
+                  <ArrowLeftOutlined /> Quay lại đăng nhập
+                </button>
+              </div>
+            </form>
+          ) : (
+            <>
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="space-y-4">
+                  <div className="relative">
+                    <GlassInput
+                      id="email"
+                      label={t('login_email_page.email_label')}
+                      icon={<MailOutlined />}
+                      type="email"
+                      required
+                      value={email}
+                      onChange={handleEmailChange}
+                      onBlur={() => setEmailTouched(true)}
+                      disabled={loading}
+                    />
+                    {(emailTouched && emailError) && (
+                      <div className="text-red-400 text-xs mt-1 ml-1 font-medium">{emailError}</div>
+                    )}
+                  </div>
 
-            <div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="group relative w-full flex justify-center py-3.5 px-4 border border-transparent text-sm font-bold rounded-xl text-white bg-[var(--primary)] hover:bg-[#ff5722] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#1a100e] focus:ring-[var(--primary)] transition-all duration-300 shadow-[0_4px_14px_0_rgba(255,56,11,0.39)] hover:shadow-[0_6px_20px_rgba(255,56,11,0.23)] hover:-translate-y-0.5 disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:transform-none"
-              >
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3">
-                  {loading ? (
-                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-b-0 border-white ml-1"></div>
-                  ) : (
-                    <span className="material-icons text-white/50 group-hover:text-white transition-colors text-lg">
-                      <LoginOutlined />
+                  <div className="relative">
+                    <GlassInput
+                      id="password"
+                      label={t('login_email_page.password_label')}
+                      icon={<LockOutlined />}
+                      type={showPassword ? "text" : "password"}
+                      required
+                      value={password}
+                      onChange={handlePasswordChange}
+                      onBlur={() => setPasswordTouched(true)}
+                      disabled={loading}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-9 text-gray-400 hover:text-white transition-colors bg-transparent border-none cursor-pointer outline-none"
+                    >
+                      {showPassword ? <EyeInvisibleOutlined className="text-lg" /> : <EyeOutlined className="text-lg" />}
+                    </button>
+                    {(passwordTouched && passwordError) && (
+                      <div className="text-red-400 text-xs mt-1 ml-1 font-medium">{passwordError}</div>
+                    )}
+                    <div className="text-right mt-1">
+                      <a
+                        href="/forgot-password"
+                        className="text-xs text-[var(--primary)] hover:text-[#ff5c35] hover:underline"
+                      >
+                        {t('login_email_page.forgot_password')}
+                      </a>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center">
+                  <RememberCheckbox checked={remember} onChange={setRemember} />
+                </div>
+
+                {/* Cloudflare Turnstile */}
+                <TurnstileWidget
+                  ref={turnstileRef}
+                  onSuccess={(token) => setTurnstileToken(token)}
+                  onExpire={() => setTurnstileToken("")}
+                  onError={() => setTurnstileToken("")}
+                />
+
+                <div>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="group relative w-full flex justify-center py-3.5 px-4 border border-transparent text-sm font-bold rounded-xl text-white bg-[var(--primary)] hover:bg-[#ff5722] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#1a100e] focus:ring-[var(--primary)] transition-all duration-300 shadow-[0_4px_14px_0_rgba(255,56,11,0.39)] hover:shadow-[0_6px_20px_rgba(255,56,11,0.23)] hover:-translate-y-0.5 disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:transform-none"
+                  >
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3">
+                      {loading ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-b-0 border-white ml-1"></div>
+                      ) : (
+                        <span className="material-icons text-white/50 group-hover:text-white transition-colors text-lg">
+                          <LoginOutlined />
+                        </span>
+                      )}
                     </span>
-                  )}
-                </span>
-                {loading ? t('login_button.loading') : t('login_button.login_text')}
-              </button>
-            </div>
+                    {loading ? t('login_button.loading') : t('login_button.login_text')}
+                  </button>
+                </div>
 
+                <div className="text-center text-sm mt-6 pt-4 border-t auth-divider">
+                  <span className="auth-text">{t('login_email_page.no_account')} </span>
+                  <a href="/register" className="auth-terms-link font-semibold hover:underline transition-colors">
+                    {t('login_email_page.sign_up_here')}
+                  </a>
+                </div>
+              </form>
 
-
-            <div className="text-center text-sm mt-6 pt-4 border-t auth-divider">
-              <span className="auth-text">{t('login_email_page.no_account')} </span>
-              <a href="/register" className="auth-terms-link font-semibold hover:underline transition-colors">
-                {t('login_email_page.sign_up_here')}
-              </a>
-            </div>
-          </form>
-
-          <SocialAuthMethods dividerLabel={t('login_email_page.or_login_with')}>
-            <GoogleIdentityButton
-              rememberMe={remember}
-              disabled={loading}
-              onAuthenticated={navigateAfterLogin}
-              variant="signin"
-            />
-            <SocialAuthButton
-              icon={<PhoneOutlined />}
-              onClick={() => router.push('/login-email')}
-              loading={loading}
-              inactive={loading}
-            >
-              {t('login_email_page.phone_number')}
-            </SocialAuthButton>
-          </SocialAuthMethods>
+              <SocialAuthMethods dividerLabel={t('login_email_page.or_login_with')}>
+                <GoogleIdentityButton
+                  rememberMe={remember}
+                  disabled={loading}
+                  onAuthenticated={navigateAfterLogin}
+                  variant="signin"
+                />
+                <SocialAuthButton
+                  icon={<PhoneOutlined />}
+                  onClick={() => message.info('Phone login is coming soon! / Đăng nhập bằng số điện thoại sẽ sớm ra mắt!')}
+                  loading={loading}
+                  inactive={loading}
+                >
+                  {t('login_email_page.phone_number')}
+                </SocialAuthButton>
+              </SocialAuthMethods>
+            </>
+          )}
         </div>
 
         {/* Footer */}

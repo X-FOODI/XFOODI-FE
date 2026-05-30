@@ -2,6 +2,7 @@
 
 import axiosInstance from './axiosInstance';
 import { API_ROUTES } from '../constants/apiRoutes';
+import { setAuthCookie, clearAuthCookie, setAdminAuthCookie, clearAdminAuthCookie } from '../utils/authCookies';
 
 export interface LoginCredentials {
   email: string;
@@ -75,22 +76,7 @@ export interface GenericResponse {
   error?: string;
 }
 
-// ── Cookie helpers (middleware runs server-side, needs cookie not localStorage) ──
-function setAuthCookie(token: string, rememberMe: boolean) {
-  if (typeof document === 'undefined') return;
-  if (rememberMe) {
-    const maxAge = 8 * 60 * 60; // 8 hours in seconds
-    document.cookie = `accessToken=${token}; path=/; max-age=${maxAge}; SameSite=Lax`;
-    return;
-  }
-  // Session cookie (cleared when browser closes)
-  document.cookie = `accessToken=${token}; path=/; SameSite=Lax`;
-}
 
-function clearAuthCookie() {
-  if (typeof document === 'undefined') return;
-  document.cookie = 'accessToken=; path=/; max-age=0; SameSite=Lax';
-}
 
 /** Google JWT payload only — not verified; used as fallback when API omits user.email. */
 function decodeGoogleCredentialEmail(idToken: string): string | undefined {
@@ -228,6 +214,8 @@ function finalizeLoginSession(
     roles: user.roles || (user.role ? [user.role] : ['Customer']),
     restaurantId: user.restaurantId ?? null,
     restaurantSlug: user.restaurantSlug ?? null,
+    avatar: user.avatar || (user as any).avatarUrl || '',
+    phoneNumber: user.phoneNumber || (user as any).phone || '',
   };
 
   const storage = rememberMe ? localStorage : sessionStorage;
@@ -238,15 +226,29 @@ function finalizeLoginSession(
   }
   storage.setItem('userInfo', JSON.stringify(normalizedUser));
 
+  const isAdmin = normalizedUser.roles?.some((r) =>
+    ['Admin', 'SuperAdmin', 'System Admin'].includes(r)
+  );
+
+  if (isAdmin) {
+    storage.setItem('adminAccessToken', tokens.accessToken);
+  }
+
   if (!rememberMe) {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('userInfo');
+    if (isAdmin) {
+      localStorage.removeItem('adminAccessToken');
+    }
   }
 
   setAuthCookie(tokens.accessToken, rememberMe);
+  if (isAdmin) {
+    setAdminAuthCookie(tokens.accessToken, rememberMe);
+  }
 
-  console.log('Login successful, user:', normalizedUser);
+  console.log('Login session finalized');
   return normalizedUser;
 }
 
@@ -271,7 +273,7 @@ const authService = {
   },
 
   // Login with .NET Backend
-  async login(credentials: LoginCredentials): Promise<User> {
+  async login(credentials: LoginCredentials): Promise<User | { requires2FA: true; tempToken: string }> {
     try {
       const response = await axiosInstance.post<any>(API_ROUTES.AUTH.LOGIN, {
         email: credentials.email,
@@ -279,17 +281,78 @@ const authService = {
         turnstileToken: credentials.turnstileToken,
       });
 
-      console.log('Login API Response:', response.data);
-      console.log('Response.data.data:', response.data?.data);
-      console.log('Response.data keys:', Object.keys(response.data || {}));
-      if (response.data?.data) {
-        console.log('Response.data.data keys:', Object.keys(response.data.data || {}));
+      console.log('Login successful');
+
+      if (response.data?.requires2FA) {
+        return {
+          requires2FA: true,
+          tempToken: response.data.tempToken,
+        };
       }
 
       const { user, tokens } = parseAuthLoginPayload(response.data, credentials.email);
       return finalizeLoginSession(user, tokens, !!credentials.rememberMe);
     } catch (error: any) {
       throwNormalizedLoginError(error, 'password');
+    }
+  },
+
+  // Validate 2FA TOTP code or backup code during login
+  async validate2FA(tempToken: string, code: string, rememberMe = true): Promise<User> {
+    try {
+      const response = await axiosInstance.post<any>(API_ROUTES.AUTH.TWO_FACTOR_VALIDATE, {
+        tempToken,
+        code,
+      });
+
+      console.log('2FA Validation successful');
+      const { user, tokens } = parseAuthLoginPayload(response.data, 'admin@xfoodi.com');
+      return finalizeLoginSession(user, tokens, rememberMe);
+    } catch (error: any) {
+      throwNormalizedLoginError(error, 'password');
+    }
+  },
+
+  // Generate 2FA setup details (QR code image and secret)
+  async setup2FA(): Promise<{ qrCode: string; secret: string }> {
+    try {
+      const response = await axiosInstance.post<any>(API_ROUTES.AUTH.TWO_FACTOR_SETUP);
+      return response.data?.data;
+    } catch (error: any) {
+      const backendMessage = readBackendErrorText(error.response?.data);
+      throw new Error(backendMessage || 'Không thể thiết lập 2FA. Vui lòng thử lại.');
+    }
+  },
+
+  // Verify first 2FA code and enable 2FA, returning backup codes
+  async enable2FA(code: string): Promise<{ backupCodes: string[] }> {
+    try {
+      const response = await axiosInstance.post<any>(API_ROUTES.AUTH.TWO_FACTOR_ENABLE, { code });
+      return response.data?.data;
+    } catch (error: any) {
+      const backendMessage = readBackendErrorText(error.response?.data);
+      throw new Error(backendMessage || 'Không thể kích hoạt 2FA. Vui lòng kiểm tra lại mã.');
+    }
+  },
+
+  // Disable 2FA with verification code
+  async disable2FA(code: string): Promise<void> {
+    try {
+      await axiosInstance.post<any>(API_ROUTES.AUTH.TWO_FACTOR_DISABLE, { code });
+    } catch (error: any) {
+      const backendMessage = readBackendErrorText(error.response?.data);
+      throw new Error(backendMessage || 'Không thể tắt 2FA. Vui lòng kiểm tra lại mã.');
+    }
+  },
+
+  // Retrieve current admin 2FA configuration status
+  async get2FAStatus(): Promise<{ twoFactorEnabled: boolean; remainingBackupCodes: number }> {
+    try {
+      const response = await axiosInstance.get<any>(API_ROUTES.AUTH.TWO_FACTOR_STATUS);
+      return response.data?.data;
+    } catch (error: any) {
+      const backendMessage = readBackendErrorText(error.response?.data);
+      throw new Error(backendMessage || 'Không thể tải trạng thái bảo mật 2FA.');
     }
   },
 
@@ -483,11 +546,14 @@ const authService = {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('userInfo');
+    localStorage.removeItem('adminAccessToken');
     sessionStorage.removeItem('accessToken');
     sessionStorage.removeItem('refreshToken');
     sessionStorage.removeItem('userInfo');
+    sessionStorage.removeItem('adminAccessToken');
     // Xóa cookie để middleware biết user đã logout
     clearAuthCookie();
+    clearAdminAuthCookie();
   },
 
   // Get current user
