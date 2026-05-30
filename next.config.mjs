@@ -1,7 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: "standalone",
+  // output: "standalone", // Bỏ comment khi deploy lên Linux/Docker — Windows không hỗ trợ symlink
   reactStrictMode: false,
+  experimental: {
+    middlewareClientMaxBodySize: 100 * 1024 * 1024, // 100MB
+  },
   transpilePackages: [
     'antd',
     '@ant-design',
@@ -19,15 +22,29 @@ const nextConfig = {
     '@rc-component/mini-decimal',
     'rc-drawer',
     'rc-dialog',
-    'rc-resize-observer'
+    'rc-resize-observer',
+    'mapbox-gl',
   ],
   // API rewrites for CORS bypass
+  // IMPORTANT: rewrites run server-side, so we MUST use the internal/private URL
+  // (e.g. http://backend:5000) to avoid a 508 infinite-loop where the public URL
+  // (api.xfoodi.website) resolves back to the same Next.js container.
+  // INTERNAL_API_URL and INTERNAL_ADMIN_API_URL must be set in the deployment
+  // environment (Docker, k8s, etc.) to the backend's internal address.
   async rewrites() {
     const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'xfoodi.website';
-    const adminApiUrl = process.env.NEXT_PUBLIC_ADMIN_API_URL || process.env.INTERNAL_ADMIN_API_URL || `https://api.${BASE_DOMAIN}/api`;
-    const tenantApiUrl = process.env.NEXT_PUBLIC_API_URL || process.env.INTERNAL_API_URL || `https://api.${BASE_DOMAIN}/api`;
 
-    // Strip trailing /api from tenantApiUrl to avoid double /api/api
+    // Server-side rewrite destinations — prefer internal URL to avoid proxy loops
+    const adminApiUrl =
+      process.env.INTERNAL_ADMIN_API_URL ||
+      process.env.NEXT_PUBLIC_ADMIN_API_URL ||
+      `https://api.${BASE_DOMAIN}/api`;
+    const tenantApiUrl =
+      process.env.INTERNAL_API_URL ||
+      process.env.NEXT_PUBLIC_API_URL ||
+      `https://api.${BASE_DOMAIN}/api`;
+
+    // Strip trailing /api to avoid double /api/api
     const tenantBase = tenantApiUrl.replace(/\/api$/, '');
     const adminBase = adminApiUrl.replace(/\/api$/, '');
 

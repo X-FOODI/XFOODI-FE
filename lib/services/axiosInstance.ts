@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_ROUTES } from '../constants/apiRoutes';
+import { setAuthCookie, clearAuthCookie } from '../utils/authCookies';
 
 // Get initial base URL based on current host
 // This is called once during module initialization
@@ -44,6 +45,11 @@ axiosInstance.interceptors.request.use(
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
+
+      // Add tenant domain header
+      const host = window.location.host;
+      const hostWithoutPort = host.includes(':') ? host.split(':')[0] : host;
+      config.headers['X-Tenant-Domain'] = hostWithoutPort;
     }
     // When sending FormData, do not set Content-Type so the browser/axios can set
     // multipart/form-data with the correct boundary. Otherwise server gets
@@ -56,20 +62,7 @@ axiosInstance.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-function setAuthCookie(token: string, rememberMe: boolean) {
-  if (typeof document === 'undefined') return;
-  if (rememberMe) {
-    const maxAge = 8 * 60 * 60; // 8 hours in seconds
-    document.cookie = `accessToken=${token}; path=/; max-age=${maxAge}; SameSite=Lax`;
-    return;
-  }
-  document.cookie = `accessToken=${token}; path=/; SameSite=Lax`;
-}
 
-function clearAuthCookie() {
-  if (typeof document === 'undefined') return;
-  document.cookie = 'accessToken=; path=/; max-age=0; SameSite=Lax';
-}
 
 axiosInstance.interceptors.response.use(
   (response) => response,
@@ -125,10 +118,7 @@ axiosInstance.interceptors.response.use(
           if (!windowPath.startsWith('/your-reservation')) {
             const currentPath = `${windowPath}${window.location.search || ''}`;
             const encodedRedirect = encodeURIComponent(currentPath || '/');
-            const loginPath =
-              windowPath.startsWith('/admin') || windowPath.startsWith('/staff')
-                ? '/login-email'
-                : '/login';
+            const loginPath = '/login';
 
             window.location.href = `${loginPath}?redirect=${encodedRedirect}`;
           }

@@ -77,7 +77,7 @@ export default function DashboardSidebar({
         {
           id: "tenant-requests",
           label: "Yêu cầu đăng ký",
-          path: "/admin/tenant-requests",
+          path: "/admin/applications",
           badge: 2,
           icon: (
             <svg className="dashboard-sidebar-item-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -111,6 +111,17 @@ export default function DashboardSidebar({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          ),
+        },
+        {
+          id: "security",
+          label: "Bảo mật 2FA",
+          path: "/admin/security",
+          icon: (
+            <svg className="dashboard-sidebar-item-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
             </svg>
           ),
         },
@@ -187,6 +198,17 @@ export default function DashboardSidebar({
       label: "Quản lý",
       items: [
         {
+          id: "categories",
+          label: "Danh mục",
+          path: "/restaurant/menu/categories",
+          icon: (
+            <svg className="dashboard-sidebar-item-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+          ),
+        },
+        {
           id: "menu",
           label: "Thực đơn",
           path: "/restaurant/menu",
@@ -258,7 +280,7 @@ export default function DashboardSidebar({
     <aside className="dashboard-sidebar" style={{ width: collapsed ? "5rem" : "16rem" }}>
       {/* Logo / Brand */}
       <div className="dashboard-sidebar-brand" style={{ padding: collapsed ? "1rem 0.75rem" : "1rem 1.25rem" }}>
-        <div className="flex items-center gap-2.5">
+        <Link href="/" className="flex items-center gap-2.5" style={{ textDecoration: "none" }}>
           <div
             style={{
               width: "2rem",
@@ -283,7 +305,7 @@ export default function DashboardSidebar({
               </p>
             </div>
           )}
-        </div>
+        </Link>
       </div>
 
       {/* Restaurant name banner (only for restaurant role) */}

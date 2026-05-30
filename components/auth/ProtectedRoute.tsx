@@ -2,12 +2,17 @@ import { useAuth } from '@/lib/contexts/AuthContext';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect } from 'react';
 
+// Role values must match what the backend returns in the JWT/user object
+type AppRole = 'Customer' | 'Admin' | 'Owner' | 'Staff' | 'System Admin' | 'SuperAdmin';
+
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredRole?: 'user' | 'admin' | 'shop';
+  requiredRole?: AppRole;
+  /** Allow multiple roles to access this route */
+  allowedRoles?: AppRole[];
 }
 
-export default function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
+export default function ProtectedRoute({ children, requiredRole, allowedRoles }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -20,18 +25,27 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
         const fullPath = `${pathname}${query ? `?${query}` : ''}`;
         const redirect = encodeURIComponent(fullPath || '/');
         router.push(`/login?redirect=${redirect}`);
-      } else if (requiredRole && user.role !== requiredRole) {
-        if (requiredRole === 'admin' || requiredRole === 'shop') {
+        return;
+      }
+
+      // Check role-based access
+      const userRole = user.role || '';
+      const userRoles = user.roles || (userRole ? [userRole] : []);
+
+      if (requiredRole && !userRoles.includes(requiredRole)) {
+        router.push('/login');
+        return;
+      }
+
+      if (allowedRoles && allowedRoles.length > 0) {
+        const hasAccess = allowedRoles.some(role => userRoles.includes(role));
+        if (!hasAccess) {
           router.push('/login');
-        } else {
-          const query = searchParams?.toString();
-          const fullPath = `${pathname}${query ? `?${query}` : ''}`;
-          const redirect = encodeURIComponent(fullPath || '/');
-          router.push(`/login?redirect=${redirect}`);
+          return;
         }
       }
     }
-  }, [user, loading, requiredRole, router, pathname, searchParams]);
+  }, [user, loading, requiredRole, allowedRoles, router, pathname, searchParams]);
 
   if (loading) {
     return (
@@ -41,8 +55,23 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
     );
   }
 
-  if (!user || (requiredRole && user.role !== requiredRole)) {
+  if (!user) {
     return null;
+  }
+
+  // Verify role access
+  const userRole = user.role || '';
+  const userRoles = user.roles || (userRole ? [userRole] : []);
+
+  if (requiredRole && !userRoles.includes(requiredRole)) {
+    return null;
+  }
+
+  if (allowedRoles && allowedRoles.length > 0) {
+    const hasAccess = allowedRoles.some(role => userRoles.includes(role));
+    if (!hasAccess) {
+      return null;
+    }
   }
 
   return <>{children}</>;

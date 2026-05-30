@@ -1,7 +1,6 @@
 export const API_ROUTES = {
   AUTH: {
     LOGIN: '/auth/login',
-    /** POST `{ googleToken: string }` — Google credential JWT. Full URL = NEXT_PUBLIC_API_URL + path (e.g. …/api/auth/google). */
     GOOGLE: '/auth/google',
     REGISTER: '/auth/register',
     CHECK_PHONE: '/auth/customer/check-phone',
@@ -12,10 +11,41 @@ export const API_ROUTES = {
     FORGOT_PASSWORD: '/auth/forgot-password',
     CONFIRM_EMAIL: '/auth/confirm-email',
     RESEND_CONFIRMATION_EMAIL: '/auth/resend-confirmation-email',
-    REFRESH_TOKEN: '/auth/refresh-token'
+    REFRESH_TOKEN: '/auth/refresh-token',
+    TWO_FACTOR_SETUP: '/auth/2fa/setup',
+    TWO_FACTOR_ENABLE: '/auth/2fa/enable',
+    TWO_FACTOR_DISABLE: '/auth/2fa/disable',
+    TWO_FACTOR_STATUS: '/auth/2fa/status',
+    TWO_FACTOR_VALIDATE: '/auth/2fa/validate',
   },
   USERS: {
     ME: '/users/me',
     CHANGE_PASSWORD: '/users/change-password',
-  }
+  },
+  RESTAURANT_APPLICATIONS: {
+    CREATE: '/restaurant-applications',
+    MY: '/restaurant-applications/my',
+    LIST: '/restaurant-applications',
+    DETAIL: (id: string) => `/restaurant-applications/${id}`,
+    APPROVE: (id: string) => `/restaurant-applications/${id}/approve`,
+    REJECT: (id: string) => `/restaurant-applications/${id}/reject`,
+  },
+  CATEGORIES: {
+    LIST: '/categories',
+    CREATE: '/categories',
+    DETAIL: (id: string) => `/categories/${id}`,
+    UPDATE: (id: string) => `/categories/${id}`,
+    DELETE: (id: string) => `/categories/${id}`,
+  },
+  DISHES: {
+    LIST: '/dishes',
+    CREATE: '/dishes',
+    DETAIL: (id: string) => `/dishes/${id}`,
+    UPDATE: (id: string) => `/dishes/${id}`,
+    DELETE: (id: string) => `/dishes/${id}`,
+  },
+  RESTAURANTS: {
+    LIST: '/restaurants',
+    BY_SLUG: (slug: string) => `/restaurants/${slug}`,
+  },
 };
