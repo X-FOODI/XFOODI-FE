@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { Star as StarIcon } from "@mui/icons-material";
 import KPICard from "@/components/dashboard/KPICard";
 import OrdersBarChart from "@/components/dashboard/OrdersBarChart";
 import RevenueChart from "@/components/dashboard/RevenueChart";
@@ -232,7 +233,9 @@ export default function AdminDashboardPage() {
                                 {r.orders.toLocaleString("vi-VN")} đơn
                               </span>
                               <span style={{ color: "var(--border)" }}>|</span>
-                              <span style={{ color: "#faad14" }}>★ {r.rating}</span>
+                              <span style={{ color: "#faad14", display: "inline-flex", alignItems: "center", gap: 3 }}>
+                                <StarIcon sx={{ fontSize: 14 }} /> {r.rating}
+                              </span>
                               <span style={{ color: "var(--border)" }}>|</span>
                               <span className="font-semibold" style={{ color: "var(--primary)" }}>
                                 {formatVND(r.revenue)}

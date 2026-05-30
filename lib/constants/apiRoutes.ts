@@ -25,4 +25,8 @@ export const API_ROUTES = {
     APPROVE: (id: string) => `/restaurant-applications/${id}/approve`,
     REJECT: (id: string) => `/restaurant-applications/${id}/reject`,
   },
+  RESTAURANTS: {
+    LIST: '/restaurants',
+    BY_SLUG: (slug: string) => `/restaurants/${slug}`,
+  },
 };
