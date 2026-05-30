@@ -25,4 +25,18 @@ export const API_ROUTES = {
     APPROVE: (id: string) => `/restaurant-applications/${id}/approve`,
     REJECT: (id: string) => `/restaurant-applications/${id}/reject`,
   },
+  CATEGORIES: {
+    LIST: '/categories',
+    CREATE: '/categories',
+    DETAIL: (id: string) => `/categories/${id}`,
+    UPDATE: (id: string) => `/categories/${id}`,
+    DELETE: (id: string) => `/categories/${id}`,
+  },
+  DISHES: {
+    LIST: '/dishes',
+    CREATE: '/dishes',
+    DETAIL: (id: string) => `/dishes/${id}`,
+    UPDATE: (id: string) => `/dishes/${id}`,
+    DELETE: (id: string) => `/dishes/${id}`,
+  },
 };

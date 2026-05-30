@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/contexts/AuthContext";
 
 interface DashboardHeaderProps {
   role: "admin" | "restaurant";
@@ -17,6 +19,13 @@ export default function DashboardHeader({
   userName = "Admin",
 }: DashboardHeaderProps) {
   const [showDropdown, setShowDropdown] = useState(false);
+  const router = useRouter();
+  const { logout } = useAuth();
+
+  const handleLogout = async () => {
+    logout();
+    router.push("/login-email");
+  };
 
   const pageTitle = title ?? (role === "admin" ? "Admin Panel" : restaurantName ?? "Nhà hàng");
 
@@ -163,6 +172,7 @@ export default function DashboardHeader({
               ))}
               <div style={{ borderTop: "1px solid var(--border)" }} />
               <button
+                onClick={handleLogout}
                 className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left"
                 style={{ color: "var(--danger)" }}
                 onMouseEnter={(e) => (e.currentTarget.style.background = "var(--danger-soft)")}

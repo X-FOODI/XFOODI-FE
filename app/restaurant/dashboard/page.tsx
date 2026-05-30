@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
@@ -82,7 +82,7 @@ export default function RestaurantDashboardPage() {
     }
     // Fetch thông tin nhà hàng thật
     axiosInstance
-      .get<{ success: boolean; data: RestaurantInfo }>("/api/restaurants/me")
+      .get<{ success: boolean; data: RestaurantInfo }>("/restaurants/me")
       .then((res: { data: { success: boolean; data: RestaurantInfo } }) =>
         setRestaurantInfo(res.data.data)
       )
