@@ -27,5 +27,6 @@ export const API_ROUTES = {
   },
   RESTAURANTS: {
     LIST: '/restaurants',
+    BY_SLUG: (slug: string) => `/restaurants/${slug}`,
   },
 };

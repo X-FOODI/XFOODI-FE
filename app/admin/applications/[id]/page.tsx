@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/contexts/AuthContext";
@@ -9,6 +9,176 @@ import restaurantApplicationService, {
 } from "@/lib/services/restaurantApplicationService";
 import { CheckCircle as CheckCircleIcon, Cancel as CancelIcon, TaskAlt as TaskAltIcon } from "@mui/icons-material";
 
+// ── Confirm Dialog ──────────────────────────────────────────────────────────────
+interface ConfirmDialogProps {
+  open: boolean;
+  title: string;
+  description: string;
+  confirmLabel: string;
+  confirmDanger?: boolean;
+  loading?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+  icon?: React.ReactNode;
+}
+
+function ConfirmDialog({
+  open,
+  title,
+  description,
+  confirmLabel,
+  confirmDanger = false,
+  loading = false,
+  onConfirm,
+  onCancel,
+  icon,
+}: ConfirmDialogProps) {
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  // Close on backdrop click
+  const handleOverlayClick = (e: React.MouseEvent) => {
+    if (e.target === overlayRef.current) onCancel();
+  };
+
+  // Close on Escape
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onCancel(); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [open, onCancel]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      ref={overlayRef}
+      onClick={handleOverlayClick}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 9999,
+        background: "rgba(0,0,0,0.45)",
+        backdropFilter: "blur(4px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "16px",
+        animation: "fadeIn 0.15s ease",
+      }}
+    >
+      <div
+        style={{
+          background: "var(--card)",
+          border: "1px solid var(--border)",
+          borderRadius: "20px",
+          boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
+          width: "100%",
+          maxWidth: "420px",
+          overflow: "hidden",
+          animation: "slideUp 0.2s ease",
+        }}
+      >
+        {/* Header */}
+        <div style={{ padding: "24px 24px 0" }}>
+          {icon && (
+            <div style={{
+              width: "48px",
+              height: "48px",
+              borderRadius: "50%",
+              background: confirmDanger ? "rgba(239,68,68,0.1)" : "rgba(34,197,94,0.1)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              marginBottom: "16px",
+            }}>
+              {icon}
+            </div>
+          )}
+          <h3 style={{
+            margin: "0 0 8px",
+            fontSize: "17px",
+            fontWeight: 700,
+            color: "var(--text)",
+          }}>
+            {title}
+          </h3>
+          <p style={{
+            margin: 0,
+            fontSize: "14px",
+            color: "var(--text-muted)",
+            lineHeight: 1.6,
+          }}>
+            {description}
+          </p>
+        </div>
+
+        {/* Actions */}
+        <div style={{ padding: "20px 24px 24px", display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+          <button
+            onClick={onCancel}
+            disabled={loading}
+            style={{
+              padding: "9px 20px",
+              borderRadius: "10px",
+              border: "1px solid var(--border)",
+              background: "transparent",
+              color: "var(--text)",
+              fontSize: "14px",
+              fontWeight: 500,
+              cursor: "pointer",
+              transition: "background 0.15s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface)")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+          >
+            Huỷ
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={loading}
+            style={{
+              padding: "9px 20px",
+              borderRadius: "10px",
+              border: "none",
+              background: confirmDanger ? "#ef4444" : "#22c55e",
+              color: "#fff",
+              fontSize: "14px",
+              fontWeight: 600,
+              cursor: loading ? "not-allowed" : "pointer",
+              opacity: loading ? 0.7 : 1,
+              display: "flex",
+              alignItems: "center",
+              gap: "7px",
+              transition: "opacity 0.15s",
+            }}
+          >
+            {loading && (
+              <div style={{
+                width: "14px",
+                height: "14px",
+                borderRadius: "50%",
+                border: "2px solid rgba(255,255,255,0.3)",
+                borderTopColor: "#fff",
+                animation: "spin 0.6s linear infinite",
+                flexShrink: 0,
+              }} />
+            )}
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+        @keyframes slideUp { from { transform: translateY(12px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
+        @keyframes spin { to { transform: rotate(360deg) } }
+      `}</style>
+    </div>
+  );
+}
+
+// ── Main page ───────────────────────────────────────────────────────────────────
 export default function AdminApplicationDetailPage() {
   const { user } = useAuth();
   const params = useParams();
@@ -21,6 +191,12 @@ export default function AdminApplicationDetailPage() {
   const [showRejectForm, setShowRejectForm] = useState(false);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+
+  // Dialog state
+  const [dialog, setDialog] = useState<{
+    open: boolean;
+    type: "approve" | "reject" | null;
+  }>({ open: false, type: null });
 
   useEffect(() => {
     fetchDetail();
@@ -38,33 +214,33 @@ export default function AdminApplicationDetailPage() {
     }
   };
 
-  const handleApprove = async () => {
-    if (!confirm("Xác nhận duyệt đơn này? Nhà hàng sẽ được tạo và quyền Owner sẽ được cấp cho người dùng.")) return;
-    setActionLoading(true);
+  const handleApprove = () => {
     setError("");
-    try {
-      await restaurantApplicationService.approve(id);
-      setSuccessMsg("Đã duyệt thành công. Email thông báo đã được gửi đến người dùng.");
-      fetchDetail();
-    } catch (err: any) {
-      setError(err?.response?.data?.message || "Đã có lỗi xảy ra");
-    } finally {
-      setActionLoading(false);
-    }
+    setDialog({ open: true, type: "approve" });
   };
 
-  const handleReject = async () => {
+  const handleReject = () => {
     if (!rejectReason.trim()) { setError("Vui lòng nhập lý do từ chối"); return; }
-    if (!confirm("Xác nhận từ chối đơn này?")) return;
-    setActionLoading(true);
     setError("");
+    setDialog({ open: true, type: "reject" });
+  };
+
+  const handleDialogConfirm = async () => {
+    setActionLoading(true);
     try {
-      await restaurantApplicationService.reject(id, rejectReason.trim());
-      setSuccessMsg("Đã từ chối đơn. Email thông báo đã được gửi đến người dùng.");
-      setShowRejectForm(false);
+      if (dialog.type === "approve") {
+        await restaurantApplicationService.approve(id);
+        setSuccessMsg("Đã duyệt thành công. Email thông báo đã được gửi đến người dùng.");
+      } else {
+        await restaurantApplicationService.reject(id, rejectReason.trim());
+        setSuccessMsg("Đã từ chối đơn. Email thông báo đã được gửi đến người dùng.");
+        setShowRejectForm(false);
+      }
+      setDialog({ open: false, type: null });
       fetchDetail();
     } catch (err: any) {
       setError(err?.response?.data?.message || "Đã có lỗi xảy ra");
+      setDialog({ open: false, type: null });
     } finally {
       setActionLoading(false);
     }
@@ -114,6 +290,28 @@ export default function AdminApplicationDetailPage() {
 
   return (
     <div className="p-6">
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        open={dialog.open}
+        type={dialog.type}
+        loading={actionLoading}
+        title={dialog.type === "approve" ? "Xác nhận phê duyệt" : "Xác nhận từ chối"}
+        description={
+          dialog.type === "approve"
+            ? `Bạn sắp phê duyệt đơn của "${application.restaurantName}". Nhà hàng sẽ được tạo và quyền Owner sẽ được cấp cho người dùng. Email xác nhận sẽ được gửi ngay.`
+            : `Bạn sắp từ chối đơn của "${application.restaurantName}". Người dùng sẽ nhận được email thông báo lý do từ chối.`
+        }
+        confirmLabel={dialog.type === "approve" ? "Phê duyệt" : "Từ chối"}
+        confirmDanger={dialog.type === "reject"}
+        icon={
+          dialog.type === "approve"
+            ? <CheckCircleIcon sx={{ fontSize: 24, color: "#22c55e" }} />
+            : <CancelIcon sx={{ fontSize: 24, color: "#ef4444" }} />
+        }
+        onConfirm={handleDialogConfirm}
+        onCancel={() => setDialog({ open: false, type: null })}
+      />
+
       <div className="max-w-3xl mx-auto">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-sm mb-6" style={{ color: "var(--text-muted)" }}>
@@ -232,7 +430,6 @@ export default function AdminApplicationDetailPage() {
                     disabled={actionLoading}
                     className="flex-1 py-3 rounded-xl font-semibold text-sm text-white transition-all hover:opacity-90 disabled:opacity-60 flex items-center justify-center gap-2"
                     style={{ background: "#22c55e" }}>
-                    {actionLoading && <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />}
                     <CheckCircleIcon sx={{ fontSize: 18 }} /> Phê duyệt
                   </button>
                   <button
@@ -270,7 +467,6 @@ export default function AdminApplicationDetailPage() {
                       disabled={actionLoading}
                       className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 disabled:opacity-60 flex items-center justify-center gap-2"
                       style={{ background: "#ef4444" }}>
-                      {actionLoading && <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />}
                       Xác nhận từ chối
                     </button>
                   </div>
