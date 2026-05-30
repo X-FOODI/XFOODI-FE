@@ -9,9 +9,10 @@ import { useState } from 'react';
 interface ProfileHeaderProps {
   profile: SocialProfile;
   onFollowChange?: (following: boolean) => void;
+  onEdit?: () => void;
 }
 
-export default function ProfileHeader({ profile, onFollowChange }: ProfileHeaderProps) {
+export default function ProfileHeader({ profile, onFollowChange, onEdit }: ProfileHeaderProps) {
   const [following, setFollowing] = useState(profile.isFollowing ?? false);
   const [busy, setBusy] = useState(false);
 
@@ -35,6 +36,8 @@ export default function ProfileHeader({ profile, onFollowChange }: ProfileHeader
     }
   };
 
+  const showEngagementStats = profile.isSelf;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -45,7 +48,7 @@ export default function ProfileHeader({ profile, onFollowChange }: ProfileHeader
         className="h-32 bg-gradient-to-r from-[var(--primary-soft)] to-[var(--primary)]/40 sm:h-40"
         style={
           profile.coverUrl
-            ? { backgroundImage: `url(${profile.coverUrl})`, backgroundSize: 'cover' }
+            ? { backgroundImage: `url(${profile.coverUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
             : undefined
         }
       />
@@ -64,35 +67,68 @@ export default function ProfileHeader({ profile, onFollowChange }: ProfileHeader
               <p className="mt-2 max-w-xl text-sm text-[var(--text)]">{profile.bio}</p>
             )}
           </div>
-          {!profile.isSelf && (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={toggleFollow}
-              className={`rounded-full px-5 py-2 text-sm font-semibold transition ${
-                following
-                  ? 'border border-[var(--border)] bg-[var(--surface)] text-[var(--text)]'
-                  : 'bg-[var(--primary)] text-white hover:opacity-90'
-              }`}
-            >
-              {following ? 'Đang theo dõi' : 'Theo dõi'}
-            </button>
-          )}
-        </div>
-        <div className="mt-4 flex gap-6 text-sm">
-          <div>
-            <span className="font-bold text-[var(--text)]">{profile.postsCount ?? 0}</span>
-            <span className="ml-1 text-[var(--text-muted)]">Bài viết</span>
-          </div>
-          <div>
-            <span className="font-bold text-[var(--text)]">{profile.followersCount ?? 0}</span>
-            <span className="ml-1 text-[var(--text-muted)]">Người theo dõi</span>
-          </div>
-          <div>
-            <span className="font-bold text-[var(--text)]">{profile.followingCount ?? 0}</span>
-            <span className="ml-1 text-[var(--text-muted)]">Đang theo dõi</span>
+          <div className="flex flex-wrap gap-2">
+            {profile.isSelf && onEdit && (
+              <button
+                type="button"
+                onClick={onEdit}
+                className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-5 py-2 text-sm font-semibold text-[var(--text)] transition hover:bg-[var(--primary-soft)]"
+              >
+                Chỉnh sửa hồ sơ
+              </button>
+            )}
+            {!profile.isSelf && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={toggleFollow}
+                className={`rounded-full px-5 py-2 text-sm font-semibold transition ${
+                  following
+                    ? 'border border-[var(--border)] bg-[var(--surface)] text-[var(--text)]'
+                    : 'bg-[var(--primary)] text-white hover:opacity-90'
+                }`}
+              >
+                {following ? 'Đang theo dõi' : 'Theo dõi'}
+              </button>
+            )}
           </div>
         </div>
+
+        {showEngagementStats ? (
+          <div className="mt-4 grid grid-cols-3 gap-4 text-center sm:text-left">
+            <div>
+              <p className="text-lg font-bold text-[var(--text)]">{profile.postsCount ?? 0}</p>
+              <p className="text-xs text-[var(--text-muted)]">Bài viết</p>
+            </div>
+            <div>
+              <p className="text-lg font-bold text-[var(--text)]">
+                {profile.likesReceivedCount ?? 0}
+              </p>
+              <p className="text-xs text-[var(--text-muted)]">Lượt thích</p>
+            </div>
+            <div>
+              <p className="text-lg font-bold text-[var(--text)]">
+                {profile.savedPostsCount ?? 0}
+              </p>
+              <p className="text-xs text-[var(--text-muted)]">Đã lưu</p>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-4 flex gap-6 text-sm">
+            <div>
+              <span className="font-bold text-[var(--text)]">{profile.postsCount ?? 0}</span>
+              <span className="ml-1 text-[var(--text-muted)]">Bài viết</span>
+            </div>
+            <div>
+              <span className="font-bold text-[var(--text)]">{profile.followersCount ?? 0}</span>
+              <span className="ml-1 text-[var(--text-muted)]">Người theo dõi</span>
+            </div>
+            <div>
+              <span className="font-bold text-[var(--text)]">{profile.followingCount ?? 0}</span>
+              <span className="ml-1 text-[var(--text-muted)]">Đang theo dõi</span>
+            </div>
+          </div>
+        )}
       </div>
     </motion.div>
   );

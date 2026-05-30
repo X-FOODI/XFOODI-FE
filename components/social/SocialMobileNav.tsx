@@ -9,7 +9,7 @@ const ITEMS = [
   { href: '/social/search', label: 'Tìm', icon: '🔍' },
   { href: '/social', label: 'Đăng', icon: '➕', action: 'create' as const },
   { href: '/social', label: 'Thông báo', icon: '🔔' },
-  { href: '/profile', label: 'Tôi', icon: '👤' },
+  { href: '/social/profile', label: 'Tôi', icon: '👤' },
 ];
 
 export default function SocialMobileNav() {

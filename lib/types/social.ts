@@ -107,11 +107,22 @@ export interface SocialNotification {
 export interface SocialProfile extends SocialUser {
   bio?: string;
   coverUrl?: string;
+  email?: string;
+  joinedAt?: string;
   isFollowing?: boolean;
   isSelf?: boolean;
+  likesReceivedCount?: number;
+  savedPostsCount?: number;
 }
 
-export type ProfileTab = 'posts' | 'media' | 'saved';
+export type ProfileTab = 'posts' | 'saved' | 'about';
+
+export interface UpdateSocialProfilePayload {
+  bio?: string;
+  fullName?: string;
+  avatarUrl?: string;
+  coverImageUrl?: string;
+}
 
 export interface SearchResults {
   users: SocialUser[];

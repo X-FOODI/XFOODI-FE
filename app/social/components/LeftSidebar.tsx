@@ -27,7 +27,7 @@ export default function LeftSidebar({ profile, activeFeed, onFeedChange }: LeftS
     >
       <div className="mb-4 flex flex-col items-center text-center">
         <Link
-          href={profile.id ? `/social/profile/${profile.id}` : '/social'}
+          href={profile.id ? `/social/profile` : '/social'}
           className="flex flex-col items-center transition hover:opacity-90"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -79,7 +79,7 @@ export default function LeftSidebar({ profile, activeFeed, onFeedChange }: LeftS
         </Link>
         {profile.id && (
           <Link
-            href={`/social/profile/${profile.id}`}
+            href="/social/profile"
             className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-[var(--text-muted)] hover:bg-[var(--surface)]"
           >
             <span>👤</span>

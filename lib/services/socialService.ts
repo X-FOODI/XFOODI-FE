@@ -11,6 +11,7 @@ import type {
   SocialProfile,
   SocialSidebarData,
   SocialUser,
+  UpdateSocialProfilePayload,
 } from '../types/social';
 
 const SOCIAL_BASE = '/social';
@@ -62,37 +63,65 @@ function feedCacheKey(feed: FeedFilter, authorId?: string): string {
   return `${feed}:${authorId ?? ''}`;
 }
 
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result !== 'string') {
+        reject(new Error('Không thể đọc file ảnh'));
+        return;
+      }
+      const base64 = result.includes(',') ? result.split(',')[1] : result;
+      resolve(base64);
+    };
+    reader.onerror = () => reject(new Error('Không thể đọc file ảnh'));
+    reader.readAsDataURL(file);
+  });
+}
+
 async function uploadPostImage(file: File): Promise<string> {
   const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
   const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
-  if (!cloudName || !uploadPreset) {
-    throw new Error(
-      'Chưa cấu hình Cloudinary. Thêm NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME và NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET.'
-    );
+  if (cloudName && uploadPreset) {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', uploadPreset);
+    formData.append('folder', 'xfoodi/posts');
+
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!res.ok) {
+      throw new Error('Không thể tải ảnh lên. Vui lòng thử lại.');
+    }
+
+    const json = (await res.json()) as { secure_url: string };
+    return json.secure_url;
   }
 
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('upload_preset', uploadPreset);
-  formData.append('folder', 'xfoodi/posts');
-
-  const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
-    method: 'POST',
-    body: formData,
-  });
-
-  if (!res.ok) {
+  const base64 = await fileToBase64(file);
+  const response = await axiosInstance.post<ApiResponse<{ urls: string[] }>>(
+    `${SOCIAL_BASE}/media/upload`,
+    {
+      files: [{ base64, mimeType: file.type || 'image/jpeg' }],
+    }
+  );
+  const data = unwrap(response);
+  const url = data.urls?.[0];
+  if (!url) {
     throw new Error('Không thể tải ảnh lên. Vui lòng thử lại.');
   }
-
-  const json = (await res.json()) as { secure_url: string };
-  return json.secure_url;
+  return url;
 }
 
 export function normalizeUser(raw: Partial<SocialUser> | Record<string, unknown>): SocialUser {
   const r = raw as Record<string, unknown>;
   const userName = r.userName ?? r.username;
+  const stats = (r.stats ?? {}) as Record<string, unknown>;
   return {
     id: String(r.id ?? ''),
     username: String(userName ?? r.fullName ?? r.name ?? 'user'),
@@ -100,9 +129,27 @@ export function normalizeUser(raw: Partial<SocialUser> | Record<string, unknown>
     name: r.name as string | undefined,
     avatarUrl: (r.avatarUrl ?? r.avatar) as string | undefined,
     avatar: r.avatar as string | undefined,
-    followersCount: Number(r.followersCount ?? 0),
-    followingCount: Number(r.followingCount ?? 0),
-    postsCount: Number(r.postsCount ?? 0),
+    followersCount: Number(r.followersCount ?? stats.followersCount ?? 0),
+    followingCount: Number(r.followingCount ?? stats.followingCount ?? 0),
+    postsCount: Number(r.postsCount ?? stats.postsCount ?? 0),
+  };
+}
+
+export function normalizeSocialProfile(
+  raw: Record<string, unknown>,
+  currentUserId?: string
+): SocialProfile {
+  const user = normalizeUser(raw);
+  return {
+    ...user,
+    bio: raw.bio as string | undefined,
+    coverUrl: (raw.coverImageUrl ?? raw.coverUrl) as string | undefined,
+    email: raw.email as string | undefined,
+    joinedAt: raw.createdAt as string | undefined,
+    isFollowing: Boolean(raw.isFollowing),
+    isSelf: Boolean(
+      raw.isOwner ?? (currentUserId && String(raw.id ?? user.id) === currentUserId)
+    ),
   };
 }
 
@@ -449,22 +496,57 @@ const socialService = {
   async getUserProfile(userId: string, currentUserId?: string): Promise<SocialProfile> {
     try {
       const response = await axiosInstance.get<ApiResponse<Record<string, unknown>>>(
-        `${SOCIAL_BASE}/users/${userId}`
+        `${SOCIAL_BASE}/profile/${userId}`
       );
-      const raw = unwrap(response) as Record<string, unknown>;
-      const user = normalizeUser(raw);
-      return {
-        ...user,
-        bio: raw.bio as string | undefined,
-        coverUrl: (raw.coverUrl ?? raw.coverImage) as string | undefined,
-        isFollowing: Boolean(
-          raw.isFollowing ??
-            (raw.viewer as Record<string, unknown> | undefined)?.isFollowing
-        ),
-        isSelf: currentUserId ? user.id === currentUserId : false,
-      };
+      return normalizeSocialProfile(unwrap(response) as Record<string, unknown>, currentUserId);
     } catch (error) {
       extractError(error, 'Không thể tải hồ sơ');
+    }
+  },
+
+  async updateSocialProfile(payload: UpdateSocialProfilePayload): Promise<SocialProfile> {
+    try {
+      const response = await axiosInstance.patch<ApiResponse<Record<string, unknown>>>(
+        `${SOCIAL_BASE}/profile/me`,
+        payload
+      );
+      const raw = unwrap(response) as Record<string, unknown>;
+      return normalizeSocialProfile(raw, String(raw.id ?? ''));
+    } catch (error) {
+      extractError(error, 'Không thể cập nhật hồ sơ');
+    }
+  },
+
+  async uploadProfileImage(file: File): Promise<string> {
+    return uploadPostImage(file);
+  },
+
+  /** Client-side stats from existing post APIs (no DB changes). */
+  async getProfileEngagementStats(
+    userId: string,
+    isSelf: boolean
+  ): Promise<{ likesReceivedCount: number; savedPostsCount: number }> {
+    try {
+      const postsResult = await this.getPosts({
+        feed: 'my',
+        authorId: userId,
+        page: 1,
+        limit: 50,
+      });
+      const likesReceivedCount = postsResult.items.reduce(
+        (sum, p) => sum + (p.reactions.total ?? 0),
+        0
+      );
+
+      let savedPostsCount = 0;
+      if (isSelf) {
+        const savedResult = await this.getPosts({ feed: 'saved', page: 1, limit: 50 });
+        savedPostsCount = savedResult.items.length;
+      }
+
+      return { likesReceivedCount, savedPostsCount };
+    } catch {
+      return { likesReceivedCount: 0, savedPostsCount: 0 };
     }
   },
 
