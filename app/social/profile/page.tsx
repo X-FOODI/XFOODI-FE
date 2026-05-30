@@ -19,10 +19,14 @@ export default function MySocialProfilePage() {
 
   if (!isAuthReady || !user) {
     return (
-      <div className="mx-auto max-w-2xl space-y-4">
-        <BackButton />
-        <PostSkeleton />
-        <PostSkeleton />
+      <div className="mx-auto max-w-2xl">
+        <div className="mb-5">
+          <BackButton />
+        </div>
+        <div className="space-y-4">
+          <PostSkeleton />
+          <PostSkeleton />
+        </div>
       </div>
     );
   }

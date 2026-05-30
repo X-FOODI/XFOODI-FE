@@ -1,5 +1,6 @@
 'use client';
 
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useRouter } from 'next/navigation';
 
 interface BackButtonProps {
@@ -9,7 +10,7 @@ interface BackButtonProps {
 
 export default function BackButton({
   fallbackHref = '/social',
-  label = '← Back',
+  label = 'Quay lại',
 }: BackButtonProps) {
   const router = useRouter();
 
@@ -25,8 +26,10 @@ export default function BackButton({
     <button
       type="button"
       onClick={handleBack}
-      className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm font-medium text-[var(--text-muted)] transition hover:bg-[var(--surface)] hover:text-[var(--text)]"
+      aria-label={label}
+      className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-[var(--text-muted)] transition hover:bg-[var(--surface)] hover:text-[var(--text)]"
     >
+      <ArrowBackIcon sx={{ fontSize: 20 }} />
       {label}
     </button>
   );

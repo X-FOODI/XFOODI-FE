@@ -3,6 +3,9 @@
 import { getAvatarUrl, getDisplayName } from '@/app/social/utils/socialHelpers';
 import type { SocialProfile } from '@/lib/types/social';
 import followService from '@/lib/services/social/followService';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import PersonAddOutlinedIcon from '@mui/icons-material/PersonAddOutlined';
+import PersonRemoveOutlinedIcon from '@mui/icons-material/PersonRemoveOutlined';
 import { motion } from 'framer-motion';
 import { useState } from 'react';
 
@@ -52,14 +55,14 @@ export default function ProfileHeader({ profile, onFollowChange, onEdit }: Profi
             : undefined
         }
       />
-      <div className="relative px-4 pb-4 sm:px-6">
+      <div className="relative px-4 pb-6 sm:px-6">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={getAvatarUrl(profile)}
           alt=""
           className="-mt-12 h-24 w-24 rounded-full border-4 border-[var(--card)] object-cover ring-2 ring-[var(--primary)] sm:-mt-14 sm:h-28 sm:w-28"
         />
-        <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
+        <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-xl font-bold text-[var(--text)]">{getDisplayName(profile)}</h1>
             <p className="text-sm text-[var(--text-muted)]">@{profile.username}</p>
@@ -72,8 +75,9 @@ export default function ProfileHeader({ profile, onFollowChange, onEdit }: Profi
               <button
                 type="button"
                 onClick={onEdit}
-                className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-5 py-2 text-sm font-semibold text-[var(--text)] transition hover:bg-[var(--primary-soft)]"
+                className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-5 py-2 text-sm font-semibold text-[var(--text)] transition hover:bg-[var(--primary-soft)]"
               >
+                <EditOutlinedIcon sx={{ fontSize: 18 }} />
                 Chỉnh sửa hồ sơ
               </button>
             )}
@@ -82,20 +86,30 @@ export default function ProfileHeader({ profile, onFollowChange, onEdit }: Profi
                 type="button"
                 disabled={busy}
                 onClick={toggleFollow}
-                className={`rounded-full px-5 py-2 text-sm font-semibold transition ${
+                className={`inline-flex items-center gap-1.5 rounded-full px-5 py-2 text-sm font-semibold transition ${
                   following
                     ? 'border border-[var(--border)] bg-[var(--surface)] text-[var(--text)]'
                     : 'bg-[var(--primary)] text-white hover:opacity-90'
                 }`}
               >
-                {following ? 'Đang theo dõi' : 'Theo dõi'}
+                {following ? (
+                  <>
+                    <PersonRemoveOutlinedIcon sx={{ fontSize: 18 }} />
+                    Đang theo dõi
+                  </>
+                ) : (
+                  <>
+                    <PersonAddOutlinedIcon sx={{ fontSize: 18 }} />
+                    Theo dõi
+                  </>
+                )}
               </button>
             )}
           </div>
         </div>
 
         {showEngagementStats ? (
-          <div className="mt-4 grid grid-cols-3 gap-4 text-center sm:text-left">
+          <div className="mt-5 grid grid-cols-3 gap-4 text-center sm:text-left">
             <div>
               <p className="text-lg font-bold text-[var(--text)]">{profile.postsCount ?? 0}</p>
               <p className="text-xs text-[var(--text-muted)]">Bài viết</p>
@@ -114,7 +128,7 @@ export default function ProfileHeader({ profile, onFollowChange, onEdit }: Profi
             </div>
           </div>
         ) : (
-          <div className="mt-4 flex gap-6 text-sm">
+          <div className="mt-5 flex gap-6 text-sm">
             <div>
               <span className="font-bold text-[var(--text)]">{profile.postsCount ?? 0}</span>
               <span className="ml-1 text-[var(--text-muted)]">Bài viết</span>

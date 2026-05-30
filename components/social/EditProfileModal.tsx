@@ -3,6 +3,8 @@
 import { getAvatarUrl, getDisplayName } from '@/app/social/utils/socialHelpers';
 import socialService from '@/lib/services/socialService';
 import type { SocialProfile } from '@/lib/types/social';
+import CloseIcon from '@mui/icons-material/Close';
+import PhotoCameraOutlinedIcon from '@mui/icons-material/PhotoCameraOutlined';
 import { useEffect, useRef, useState } from 'react';
 import { useToast } from '@/lib/contexts/ToastContext';
 
@@ -87,10 +89,10 @@ export default function EditProfileModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg px-2 py-1 text-[var(--text-muted)] hover:bg-[var(--surface)]"
+            className="inline-flex items-center justify-center rounded-lg p-1 text-[var(--text-muted)] hover:bg-[var(--surface)]"
             aria-label="Đóng"
           >
-            ✕
+            <CloseIcon sx={{ fontSize: 22 }} />
           </button>
         </div>
 
@@ -111,8 +113,9 @@ export default function EditProfileModal({
                 type="button"
                 disabled={uploading === 'cover'}
                 onClick={() => coverInputRef.current?.click()}
-                className="absolute bottom-2 right-2 rounded-lg bg-black/50 px-3 py-1 text-xs text-white"
+                className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-lg bg-black/50 px-3 py-1 text-xs text-white"
               >
+                <PhotoCameraOutlinedIcon sx={{ fontSize: 14 }} />
                 {uploading === 'cover' ? 'Đang tải...' : 'Đổi ảnh bìa'}
               </button>
             </div>

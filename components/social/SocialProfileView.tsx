@@ -139,30 +139,42 @@ export default function SocialProfileView({ userId, showBack = true }: SocialPro
 
   if (!profile) {
     return (
-      <div className="space-y-4">
-        {showBack && <BackButton />}
-        <PostSkeleton />
-        <PostSkeleton />
+      <div className="mx-auto max-w-2xl">
+        {showBack && (
+          <div className="mb-5">
+            <BackButton />
+          </div>
+        )}
+        <div className="space-y-4">
+          <PostSkeleton />
+          <PostSkeleton />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
-      {showBack && <BackButton />}
+    <div className="mx-auto max-w-2xl">
+      {showBack && (
+        <div className="mb-5">
+          <BackButton />
+        </div>
+      )}
 
-      <ProfileHeader
-        profile={profile}
-        onEdit={profile.isSelf ? () => setEditOpen(true) : undefined}
-      />
+      <div className="mb-6">
+        <ProfileHeader
+          profile={profile}
+          onEdit={profile.isSelf ? () => setEditOpen(true) : undefined}
+        />
+      </div>
 
-      <div className="flex gap-2 border-b border-[var(--border)]">
+      <div className="mb-6 flex gap-2 border-b border-[var(--border)]">
         {visibleTabs.map((t) => (
           <button
             key={t.key}
             type="button"
             onClick={() => setTab(t.key)}
-            className={`border-b-2 px-4 py-2 text-sm font-medium transition ${
+            className={`border-b-2 px-4 py-2.5 text-sm font-medium transition ${
               tab === t.key
                 ? 'border-[var(--primary)] text-[var(--primary)]'
                 : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text)]'
@@ -173,6 +185,7 @@ export default function SocialProfileView({ userId, showBack = true }: SocialPro
         ))}
       </div>
 
+      <div className="space-y-4">
       {tab === 'about' ? (
         <ProfileAboutTab profile={profile} />
       ) : loading ? (
@@ -238,6 +251,7 @@ export default function SocialProfileView({ userId, showBack = true }: SocialPro
           />
         ))
       )}
+      </div>
 
       {profile.isSelf && (
         <EditProfileModal
