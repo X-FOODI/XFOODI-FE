@@ -13,9 +13,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // Auth guard — chỉ Admin / SuperAdmin mới vào được
   useEffect(() => {
     if (!isAuthReady) return;
-    const roles: string[] = user?.roles || (user?.role ? [user.role] : []);
-    if (!user || (!roles.includes("Admin") && !roles.includes("SuperAdmin") && !roles.includes("System Admin"))) {
+    if (!user) {
       router.replace("/login-email?redirect=/admin/dashboard");
+      return;
+    }
+    const roles: string[] = user?.roles || (user?.role ? [user.role] : []);
+    if (!roles.includes("Admin") && !roles.includes("SuperAdmin") && !roles.includes("System Admin")) {
+      router.replace("/login-email?redirect=/admin/dashboard");
+      return;
     }
   }, [isAuthReady, user, router]);
 
@@ -36,6 +41,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <DashboardHeader
         role="admin"
         userName={displayName}
+        userEmail={email}
         title="XFoodi Platform"
       />
 

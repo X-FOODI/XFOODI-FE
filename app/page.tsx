@@ -6,6 +6,7 @@ import Footer from "./components/Footer";
 import Header from "./components/Header";
 import HeroSection from "./components/HeroSection";
 import PageTransition from "./components/PageTransition";
+import RestaurantsSection from "./components/RestaurantsSection";
 import TestimonialsSection from "./components/TestimonialsSection";
 import WorkflowSection from "./components/WorkflowSection";
 
@@ -23,6 +24,10 @@ export default function Home() {
           </section>
           <section id="workflow" style={{ scrollMarginTop: 120 }}>
             <WorkflowSection />
+          </section>
+          {/* ── Danh sách nhà hàng đã đăng ký ── */}
+          <section id="restaurants" style={{ scrollMarginTop: 120 }}>
+            <RestaurantsSection />
           </section>
           <section id="about-us" style={{ scrollMarginTop: 120 }}>
             <AboutUsSection />

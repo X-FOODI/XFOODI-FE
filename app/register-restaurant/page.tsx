@@ -1,11 +1,26 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/contexts/AuthContext";
 import restaurantApplicationService, {
   CreateApplicationData,
 } from "@/lib/services/restaurantApplicationService";
+import type { MapPosition, AddressResult } from "@/app/components/MapLocationPicker";
+import { CheckCircle as CheckCircleIcon } from "@mui/icons-material";
+import Header from "../components/Header";
+import Footer from "../components/Footer";
+import PageTransition from "../components/PageTransition";
+
+const MapLocationPicker = dynamic(() => import("@/app/components/MapLocationPicker"), {
+  ssr: false,
+  loading: () => (
+    <div style={{ height: 360, borderRadius: 16, background: 'var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Đang tải bản đồ...</p>
+    </div>
+  ),
+});
 
 type Step = 1 | 2;
 
@@ -26,6 +41,12 @@ export default function RegisterRestaurantPage() {
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
+  const [restaurantImage, setRestaurantImage] = useState<File | null>(null);
+  const [restaurantImagePreview, setRestaurantImagePreview] = useState<string | null>(null);
+  const restaurantImageRef = useRef<HTMLInputElement>(null);
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
+  const [cuisineType, setCuisineType] = useState<string>("other");
 
   // Step 2 files
   const [businessLicense, setBusinessLicense] = useState<File | null>(null);
@@ -37,6 +58,60 @@ export default function RegisterRestaurantPage() {
   const opRef = useRef<HTMLInputElement>(null);
   const niRef = useRef<HTMLInputElement>(null);
   const nibRef = useRef<HTMLInputElement>(null);
+
+  const hasLoadedRef = useRef(false);
+
+  // Load draft from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem("xfoodi_registration_draft");
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        if (data.restaurantName !== undefined) setRestaurantName(data.restaurantName);
+        if (data.slug !== undefined) setSlug(data.slug);
+        if (data.description !== undefined) setDescription(data.description);
+        if (data.address !== undefined) setAddress(data.address);
+        if (data.phone !== undefined) setPhone(data.phone);
+        if (data.email !== undefined) setEmail(data.email);
+        if (data.cuisineType !== undefined) setCuisineType(data.cuisineType);
+        if (data.latitude !== undefined) setLatitude(data.latitude);
+        if (data.longitude !== undefined) setLongitude(data.longitude);
+        if (data.step !== undefined) setStep(data.step);
+      } catch (e) {
+        console.error("Failed to load registration draft:", e);
+      }
+    }
+    hasLoadedRef.current = true;
+  }, []);
+
+  // Save form data to localStorage on change
+  useEffect(() => {
+    if (!hasLoadedRef.current) return;
+    const formData = {
+      restaurantName,
+      slug,
+      description,
+      address,
+      phone,
+      email,
+      cuisineType,
+      latitude,
+      longitude,
+      step,
+    };
+    localStorage.setItem("xfoodi_registration_draft", JSON.stringify(formData));
+  }, [
+    restaurantName,
+    slug,
+    description,
+    address,
+    phone,
+    email,
+    cuisineType,
+    latitude,
+    longitude,
+    step,
+  ]);
 
   // Auth guard + check existing application
   useEffect(() => {
@@ -101,12 +176,17 @@ export default function RegisterRestaurantPage() {
         address: address.trim(),
         phone: phone.trim(),
         email: email.trim(),
+        latitude: latitude ?? undefined,
+        longitude: longitude ?? undefined,
+        cuisineType,
+        restaurantImage: restaurantImage ?? undefined,
         businessLicense,
         ownershipProof,
         nationalId,
         nationalIdBack: nationalIdBack ?? undefined,
       };
       await restaurantApplicationService.create(data);
+      localStorage.removeItem("xfoodi_registration_draft");
       router.replace("/register-restaurant/pending");
     } catch (err: any) {
       const msg =
@@ -202,10 +282,30 @@ export default function RegisterRestaurantPage() {
   }
 
   return (
-    <div className="min-h-screen py-12 px-4" style={{ background: "var(--bg-base)" }}>
-      <div className="max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-8">
+    <PageTransition minimumLoadingTime={1500}>
+      <Header />
+      <div className="min-h-screen pt-28 pb-12 px-4" style={{ background: "var(--bg-base)" }}>
+        <div className="max-w-2xl mx-auto">
+          {/* Back button */}
+          <button
+            onClick={() => {
+              if (typeof window !== "undefined" && document.referrer && !document.referrer.includes("/login") && !document.referrer.includes("/register-restaurant")) {
+                router.back();
+              } else {
+                router.push("/");
+              }
+            }}
+            className="flex items-center gap-2 mb-6 px-4 py-2 rounded-xl text-sm font-semibold transition-all hover:bg-[rgba(255,56,11,0.08)]"
+            style={{ color: "var(--primary)", border: "1px solid var(--border)", background: "var(--card)" }}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Quay lại trang trước
+          </button>
+
+          {/* Header */}
+          <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-4" style={{ background: "var(--primary)" }}>
             <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -347,6 +447,103 @@ export default function RegisterRestaurantPage() {
                 </div>
               </div>
 
+              <div>
+                <label className="block text-sm font-semibold mb-2" style={{ color: "var(--text)" }}>
+                  Ảnh đại diện nhà hàng
+                </label>
+                <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>Ảnh sẽ hiển thị trên trang chủ XFoodi · JPG, PNG, WebP · Tối đa 5 MB</p>
+                <div
+                  className="relative border-2 border-dashed rounded-2xl overflow-hidden cursor-pointer transition-all hover:border-[var(--primary)]"
+                  style={{
+                    borderColor: restaurantImage ? "var(--primary)" : "var(--border)",
+                    background: restaurantImage ? "var(--primary-soft)" : "var(--bg-base)",
+                    minHeight: 160,
+                  }}
+                  onClick={() => restaurantImageRef.current?.click()}
+                >
+                  <input
+                    ref={restaurantImageRef}
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.webp"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] || null;
+                      setRestaurantImage(file);
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onloadend = () => setRestaurantImagePreview(reader.result as string);
+                        reader.readAsDataURL(file);
+                      } else {
+                        setRestaurantImagePreview(null);
+                      }
+                    }}
+                  />
+                  {restaurantImagePreview ? (
+                    <div className="relative w-full flex items-center justify-center" style={{ height: 220, background: "rgba(0,0,0,0.3)" }}>
+                      <img
+                        src={restaurantImagePreview}
+                        alt="preview"
+                        className="max-w-full max-h-full object-contain"
+                      />
+                      <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                        <p className="text-white text-sm font-semibold">Nhấn để thay đổi ảnh</p>
+                      </div>
+                      <button
+                        type="button"
+                        className="absolute top-2 right-2 w-8 h-8 rounded-full bg-red-500 flex items-center justify-center shadow-lg"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setRestaurantImage(null);
+                          setRestaurantImagePreview(null);
+                          if (restaurantImageRef.current) restaurantImageRef.current.value = "";
+                        }}
+                      >
+                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-10 gap-3">
+                      <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: "var(--border)" }}>
+                        <svg className="w-7 h-7" style={{ color: "var(--text-muted)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                      <p className="text-sm font-medium" style={{ color: "var(--text-muted)" }}>Nhấn để tải ảnh nhà hàng lên</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Map vị trí nhà hàng */}
+              <div>
+                <label className="block text-sm font-semibold mb-1" style={{ color: "var(--text)" }}>
+                  Vị trí trên bản đồ
+                </label>
+                <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
+                  Ghim vị trí chính xác để hiển thị trên bản đồ của XFoodi · Click vào bản đồ hoặc tìm kiếm địa điểm
+                </p>
+                <MapLocationPicker
+                  height={360}
+                  onPositionChange={(pos) => {
+                    setLatitude(pos.lat);
+                    setLongitude(pos.lng);
+                  }}
+                  onAddressChange={(addr) => {
+                    if (!address && addr.formattedAddress) {
+                      setAddress(addr.formattedAddress);
+                    }
+                  }}
+                />
+                {latitude && longitude && (
+                  <p className="text-xs mt-2 flex items-center gap-1" style={{ color: "var(--primary)" }}>
+                    <CheckCircleIcon sx={{ fontSize: 14 }} />
+                    Đã chọn vị trí: {latitude.toFixed(5)}, {longitude.toFixed(5)}
+                  </p>
+                )}
+              </div>
+
               <button
                 type="button"
                 onClick={handleNextStep}
@@ -435,5 +632,7 @@ export default function RegisterRestaurantPage() {
         </p>
       </div>
     </div>
+    <Footer />
+    </PageTransition>
   );
 }

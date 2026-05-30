@@ -39,4 +39,8 @@ export const API_ROUTES = {
     UPDATE: (id: string) => `/dishes/${id}`,
     DELETE: (id: string) => `/dishes/${id}`,
   },
+  RESTAURANTS: {
+    LIST: '/restaurants',
+    BY_SLUG: (slug: string) => `/restaurants/${slug}`,
+  },
 };
