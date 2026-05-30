@@ -127,7 +127,7 @@ export default function AvatarUpload({
       />
 
       <p className="text-xs text-gray-400">
-        {uploading ? "Uploading…" : "Click to change avatar · JPG, PNG, WebP · max 5 MB"}
+        {uploading ? "Uploading…" : "Click to change avatar · JPG, PNG, WebP, GIF · max 5 MB"}
       </p>
 
       {error && (

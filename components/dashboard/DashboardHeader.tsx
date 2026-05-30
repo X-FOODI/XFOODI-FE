@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 interface DashboardHeaderProps {
@@ -26,7 +27,7 @@ export default function DashboardHeader({
     >
       {/* Left: Logo / Title */}
       <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2">
+        <Link href="/" className="flex items-center gap-2" style={{ textDecoration: "none" }}>
           <div
             style={{
               width: "1.75rem",
@@ -44,7 +45,7 @@ export default function DashboardHeader({
             </svg>
           </div>
           <span className="font-bold text-sm" style={{ color: "var(--primary)" }}>XFoodi</span>
-        </div>
+        </Link>
 
         <div style={{ width: "1px", height: "1.25rem", background: "var(--border)" }} />
 
