@@ -281,7 +281,7 @@ const Header: React.FC = () => {
                   menu={{ items: userMenuItems }}
                   placement="bottomRight"
                   trigger={['click']}
-                  dropdownRender={(menu) => (
+                  popupRender={(menu) => (
                     <div style={{
                       background: mode === "dark" ? "#141927" : "#ffffff",
                       borderRadius: "12px",
