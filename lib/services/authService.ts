@@ -55,6 +55,7 @@ export interface User {
   gender?: 'MALE' | 'FEMALE' | 'OTHER' | string;
   dateOfBirth?: string; // ISO date string e.g. "1995-08-20"
   address?: string;
+  hasPassword?: boolean;
 }
 
 export interface AuthResponse {
