@@ -12,6 +12,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import AvatarUpload from "./components/AvatarUpload";
 import ProfileInfoForm, { type ProfileFormValues } from "./components/ProfileInfoForm";
 
@@ -79,6 +80,7 @@ function SectionCard({
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function ProfilePage() {
+  const { t } = useTranslation();
   const { user, loading: authLoading, updateUser } = useAuth();
   const { showToast } = useToast();
   const router = useRouter();
@@ -107,10 +109,14 @@ export default function ProfilePage() {
         address: values.address || undefined,
       });
       updateUser({ ...user!, ...updated });
-      showToast("success", "Profile updated", "Your information has been saved.");
+      showToast(
+        "success",
+        t("customer_page.profile.toast.update_success_title", "Profile updated"),
+        t("customer_page.profile.toast.update_success_desc", "Your information has been saved.")
+      );
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to update profile.";
-      showToast("error", "Update failed", msg);
+      const msg = err instanceof Error ? err.message : t("customer_page.profile.toast.update_failed_desc", "Failed to update profile.");
+      showToast("error", t("customer_page.profile.validation.update_failed", "Update failed"), msg);
     } finally {
       setProfileLoading(false);
     }
@@ -123,10 +129,14 @@ export default function ProfilePage() {
       // + lưu avatarUrl vào DB trong 1 request — không cần gọi updateProfile thêm
       const avatarUrl = await userService.uploadAvatar(file);
       updateUser({ ...user!, avatar: avatarUrl });
-      showToast("success", "Avatar updated", "Your profile picture has been changed.");
+      showToast(
+        "success",
+        t("customer_page.profile.toast.avatar_success_title", "Avatar updated"),
+        t("customer_page.profile.toast.avatar_success_desc", "Your profile picture has been changed.")
+      );
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Avatar upload failed.";
-      showToast("error", "Upload failed", msg);
+      const msg = err instanceof Error ? err.message : t("customer_page.profile.toast.avatar_failed_desc", "Avatar upload failed.");
+      showToast("error", t("customer_page.profile.toast.avatar_failed_desc", "Upload failed"), msg);
       throw err;
     } finally {
       setAvatarUploading(false);
@@ -157,7 +167,7 @@ export default function ProfilePage() {
               animation: "spin 0.8s linear infinite",
             }}
           />
-          <p style={{ fontSize: "0.875rem", color: "var(--text-muted)" }}>Loading profile…</p>
+          <p style={{ fontSize: "0.875rem", color: "var(--text-muted)" }}>{t("menu_page.loading", "Loading...")}</p>
         </div>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
@@ -210,11 +220,11 @@ export default function ProfilePage() {
             onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
           >
             <ArrowLeftOutlined />
-            <span>Back</span>
+            <span>{t("customer_page.profile.back", "Back")}</span>
           </Link>
           <span style={{ color: "var(--border)" }}>/</span>
           <span style={{ fontSize: "0.875rem", fontWeight: 500, color: "var(--text)" }}>
-            My Profile
+            {t("customer_page.profile.title", "My Profile")}
           </span>
         </div>
       </div>
@@ -233,15 +243,15 @@ export default function ProfilePage() {
         {/* Page heading */}
         <div>
           <h1 style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--text)", margin: 0 }}>
-            Account Settings
+            {t("customer_page.profile.account_settings", "Account Settings")}
           </h1>
           <p style={{ marginTop: "0.25rem", fontSize: "0.875rem", color: "var(--text-muted)" }}>
-            Manage your personal information and account security.
+            {t("customer_page.profile.account_settings_desc", "Manage your personal information and account security.")}
           </p>
         </div>
 
         {/* ── Profile Info Card ── */}
-        <SectionCard title="Profile Information" icon={<IdcardOutlined />}>
+        <SectionCard title={t("customer_page.profile.profile_information", "Profile Information")} icon={<IdcardOutlined />}>
           <div className="flex flex-col md:flex-row gap-8">
             {/* Avatar */}
             <div style={{ flexShrink: 0, display: "flex", justifyContent: "center" }}>
@@ -264,7 +274,7 @@ export default function ProfilePage() {
         </SectionCard>
 
         {/* ── Security Card ── */}
-        <SectionCard title="Security" icon={<LockOutlined />}>
+        <SectionCard title={t("customer_page.profile.security", "Security")} icon={<LockOutlined />}>
           <div
             style={{
               display: "flex",
@@ -273,7 +283,7 @@ export default function ProfilePage() {
             }}
           >
             <p style={{ fontSize: "0.875rem", color: "var(--text-muted)", margin: 0 }}>
-              Keep your account secure by using a strong, unique password.
+              {t("customer_page.profile.security_desc", "Keep your account secure by using a strong, unique password.")}
             </p>
 
             {/* Change Password button */}
@@ -322,10 +332,10 @@ export default function ProfilePage() {
                 </span>
                 <div>
                   <p style={{ margin: 0, fontSize: "0.875rem", fontWeight: 600, color: "var(--text)" }}>
-                    Change Password
+                    {t("customer_page.profile.change_password", "Change Password")}
                   </p>
                   <p style={{ margin: 0, fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                    Update your account password
+                    {t("customer_page.profile.change_password_desc", "Update your account password")}
                   </p>
                 </div>
               </div>
@@ -338,4 +348,5 @@ export default function ProfilePage() {
       </main>
     </div>
   );
+
 }
