@@ -43,21 +43,6 @@ function LoginEmailPageContent() {
   const [mounted, setMounted] = useState(false);
   const [isAdminDomain, setIsAdminDomain] = useState(false);
 
-  // Handle Google OAuth callback inside popup window
-  useEffect(() => {
-    if (typeof window !== "undefined" && window.opener && window.location.hash) {
-      const params = new URLSearchParams(window.location.hash.substring(1));
-      const idToken = params.get("id_token");
-      if (idToken) {
-        window.opener.postMessage(
-          { type: "GOOGLE_OAUTH_TOKEN", token: idToken },
-          window.location.origin
-        );
-        window.close();
-      }
-    }
-  }, []);
-
   // State
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
