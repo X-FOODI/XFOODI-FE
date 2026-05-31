@@ -4,6 +4,8 @@ export const API_ROUTES = {
     GOOGLE: '/auth/google',
     REGISTER: '/auth/register',
     CHECK_PHONE: '/auth/customer/check-phone',
+    PHONE_OTP: '/auth/phone-login/otp',
+    PHONE_VERIFY: '/auth/phone-login/verify',
     LOGOUT: '/auth/logout',
     ME: '/auth/me',
     CHANGE_PASSWORD: '/auth/change-password',

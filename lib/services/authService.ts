@@ -273,6 +273,57 @@ const authService = {
     }
   },
 
+  // Request login OTP via phone
+  async requestPhoneLoginOtp(phoneNumber: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await axiosInstance.post<any>(API_ROUTES.AUTH.PHONE_OTP, { phoneNumber });
+      return {
+        success: !!response.data?.success,
+        message: response.data?.message || 'Gửi mã OTP thành công.'
+      };
+    } catch (error: any) {
+      console.error('Request phone OTP error:', error);
+      const backendMessage = error.response?.data?.message || 'Không thể gửi mã xác thực. Vui lòng thử lại.';
+      throw new Error(backendMessage);
+    }
+  },
+
+  // Verify phone OTP and sign in
+  async verifyPhoneLoginOtp(phoneNumber: string, code: string): Promise<User> {
+    try {
+      const response = await axiosInstance.post<any>(API_ROUTES.AUTH.PHONE_VERIFY, { phoneNumber, code });
+      const data = response.data?.data || response.data;
+
+      if (!data?.accessToken) {
+        throw new Error('Xác thực OTP thành công nhưng không nhận được thông tin đăng nhập.');
+      }
+
+      const userObj: User = {
+        id: data.user.id,
+        email: data.user.email,
+        fullName: data.user.fullName,
+        phoneNumber: data.user.phoneNumber,
+        avatar: data.user.avatarUrl || '',
+        role: data.user.roles?.[0] || 'Customer',
+        roles: data.user.roles || ['Customer'],
+        restaurantId: data.user.restaurantId || null,
+        restaurantSlug: data.user.restaurantSlug || null,
+      };
+
+      const normalizedUser = finalizeLoginSession(userObj, {
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken
+      }, true);
+
+      console.log('Phone OTP login successful');
+      return normalizedUser;
+    } catch (error: any) {
+      console.error('Verify phone OTP error:', error);
+      const backendMessage = error.response?.data?.message || 'Mã OTP không chính xác hoặc đã hết hạn.';
+      throw new Error(backendMessage);
+    }
+  },
+
   // Login with .NET Backend
   async login(credentials: LoginCredentials): Promise<User | { requires2FA: true; tempToken: string }> {
     try {
