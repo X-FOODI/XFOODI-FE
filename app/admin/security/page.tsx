@@ -28,6 +28,18 @@ export default function AdminSecurityPage() {
   const [disabling, setDisabling] = useState(false);
   const [disableCode, setDisableCode] = useState("");
 
+  // Regenerate Backup Codes States
+  const [regeneratingCodes, setRegeneratingCodes] = useState(false);
+  const [regenCode, setRegenCode] = useState("");
+  const [newBackupCodes, setNewBackupCodes] = useState<string[]>([]);
+
+  // Add New Device States
+  const [addingNewDevice, setAddingNewDevice] = useState(false);
+  const [newDeviceStep, setNewDeviceStep] = useState(1); // 1 = Check current device OTP, 2 = Scan QR on new device & verify
+  const [currentDeviceCode, setCurrentDeviceCode] = useState("");
+  const [newDeviceSetupData, setNewDeviceSetupData] = useState<{ qrCode: string; secret: string } | null>(null);
+  const [newDeviceCode, setNewDeviceCode] = useState("");
+
   const fetchStatus = async () => {
     try {
       setLoading(true);
@@ -125,6 +137,89 @@ export default function AdminSecurityPage() {
     message.success("Đã tải tệp mã dự phòng về máy!");
   };
 
+  const handleRegenerateBackupCodes = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!regenCode || regenCode.length !== 6) {
+      message.error("Vui lòng cung cấp mã xác thực 6 chữ số.");
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      const res = await authService.regenerateBackupCodes(regenCode);
+      setNewBackupCodes(res.backupCodes);
+      message.success("Tạo mới danh sách mã dự phòng thành công!");
+      setRegenCode("");
+      await fetchStatus();
+    } catch (err: any) {
+      message.error(err.message || "Mã xác thực không chính xác.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleStartSetupNewDevice = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentDeviceCode || currentDeviceCode.length !== 6) {
+      message.error("Vui lòng nhập mã xác thực OTP từ thiết bị hiện tại.");
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      const res = await authService.setupNew2FADevice(currentDeviceCode);
+      setNewDeviceSetupData(res);
+      setNewDeviceStep(2);
+      setCurrentDeviceCode("");
+      message.success("Xác thực thành công! Hãy quét mã QR trên thiết bị mới.");
+    } catch (err: any) {
+      message.error(err.message || "Mã xác thực thiết bị cũ không chính xác.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleConfirmNewDevice = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDeviceCode || newDeviceCode.length !== 6) {
+      message.error("Vui lòng cung cấp mã xác thực 6 chữ số từ thiết bị mới.");
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      const res = await authService.confirmNew2FADevice(newDeviceCode);
+      setNewBackupCodes(res.backupCodes);
+      message.success("Thêm thiết bị 2FA mới thành công!");
+      setAddingNewDevice(false);
+      setNewDeviceSetupData(null);
+      setNewDeviceCode("");
+      await fetchStatus();
+    } catch (err: any) {
+      message.error(err.message || "Mã xác thực từ thiết bị mới không chính xác.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCopyNewBackupCodes = () => {
+    if (newBackupCodes.length === 0) return;
+    navigator.clipboard.writeText(newBackupCodes.join("\n"));
+    message.success("Đã sao chép danh sách mã dự phòng mới!");
+  };
+
+  const handleDownloadNewBackupCodes = () => {
+    if (newBackupCodes.length === 0) return;
+    const element = document.createElement("a");
+    const file = new Blob([newBackupCodes.join("\n")], { type: 'text/plain' });
+    element.href = URL.createObjectURL(file);
+    element.download = "xfoodi-new-2fa-backup-codes.txt";
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+    message.success("Đã tải tệp mã dự phòng mới về máy!");
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--bg-base)" }}>
@@ -159,106 +254,466 @@ export default function AdminSecurityPage() {
           {status?.twoFactorEnabled ? (
             /* ACTIVE 2FA SCREEN */
             <div className="space-y-6">
-              <div className="flex items-center gap-4 flex-wrap">
-                <div 
-                  className="w-16 h-16 rounded-full flex items-center justify-center text-3xl animate-pulse"
-                  style={{ 
-                    background: "var(--success-soft)", 
-                    color: "var(--success)", 
-                    border: "1px solid var(--success-border)" 
-                  }}
-                >
-                  <CheckCircleOutlined />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold">Google Authenticator (2FA) Đang Bật</h3>
-                  <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                    Tài khoản của bạn đã được bảo vệ tối đa chống lại các cuộc tấn công đánh cắp mật khẩu.
-                  </p>
-                </div>
-              </div>
-
-              <div 
-                className="p-4 rounded-xl text-sm leading-relaxed"
-                style={{ 
-                  background: "var(--bg-base)",
-                  border: "1px solid var(--border)"
-                }}
-              >
-                <div className="flex items-start gap-3">
-                  <WarningOutlined className="text-amber-500 text-lg mt-0.5" />
-                  <div>
-                    <span className="font-semibold">Mã dự phòng khôi phục:</span> Bạn còn{" "}
-                    <span className="font-bold text-[var(--primary)]">{status.remainingBackupCodes}</span> mã dự phòng chưa sử dụng. 
-                    Mỗi mã dự phòng chỉ có thể được dùng một lần để đăng nhập trong trường hợp bạn mất thiết bị Authenticator.
-                  </div>
-                </div>
-              </div>
-
-              {disabling ? (
-                /* Secure Disabling Form */
-                <form onSubmit={handleDisable2FA} className="p-4 rounded-xl border border-red-500/20 space-y-4 bg-red-500/5">
-                  <div>
-                    <label className="block text-sm font-semibold mb-2">
-                      Xác nhận tắt bảo mật 2FA
-                    </label>
-                    <p className="text-xs mb-3 text-red-400">
-                      CẢNH BÁO: Tắt 2FA sẽ làm giảm đáng kể mức độ bảo mật cho tài khoản quản trị của bạn.
-                    </p>
-                    <input
-                      type="text"
-                      maxLength={6}
-                      placeholder="Mã OTP 2FA hiện tại"
-                      value={disableCode}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (/^\d*$/.test(val)) setDisableCode(val);
+              {newBackupCodes.length > 0 ? (
+                /* Display newly generated backup codes */
+                <div className="space-y-6 animate-fadeIn">
+                  <div className="text-center space-y-3 py-4">
+                    <div 
+                      className="w-16 h-16 rounded-full inline-flex items-center justify-center text-4xl"
+                      style={{ 
+                        background: "var(--success-soft)", 
+                        color: "var(--success)", 
+                        border: "1px solid var(--success-border)" 
                       }}
-                      className="px-4 py-2.5 rounded-lg text-sm w-full font-mono text-center tracking-widest max-w-[200px]"
-                      style={{
-                        background: "var(--bg-base)",
-                        border: "1px solid var(--border)",
-                        color: "var(--text)",
-                        outline: "none"
-                      }}
-                      disabled={actionLoading}
-                    />
-                  </div>
-
-                  <div className="flex gap-2">
-                    <button
-                      type="submit"
-                      disabled={actionLoading}
-                      className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-red-600 hover:bg-red-700 transition-colors cursor-pointer"
                     >
-                      {actionLoading ? "Đang xử lý..." : "Xác nhận tắt"}
-                    </button>
+                      <CheckCircleOutlined />
+                    </div>
+                    <h3 className="text-xl font-bold">Cập Nhật Mã Dự Phòng Thành Công!</h3>
+                    <p className="text-sm max-w-lg mx-auto" style={{ color: "var(--text-muted)" }}>
+                      Tài khoản của bạn đã được cập nhật danh sách mã dự phòng mới. 
+                      Hãy sao lưu và lưu trữ 10 mã khôi phục dưới đây ở một nơi an toàn. Các mã cũ đã không còn hiệu lực.
+                    </p>
+                  </div>
+
+                  <div 
+                    className="p-5 rounded-2xl border"
+                    style={{ 
+                      background: "var(--bg-base)", 
+                      borderColor: "var(--border)" 
+                    }}
+                  >
+                    <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
+                      <span className="text-sm font-bold flex items-center gap-2">
+                        <KeyOutlined className="text-amber-500" />
+                        Mã Dự Phòng Khôi Phục Mới (10 mã)
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={handleCopyNewBackupCodes}
+                          className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer animate-scale"
+                          style={{
+                            background: "var(--card)",
+                            border: "1px solid var(--border)",
+                            color: "var(--text)"
+                          }}
+                        >
+                          <CopyOutlined /> Sao chép
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleDownloadNewBackupCodes}
+                          className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer text-white bg-[var(--primary)] border border-[var(--primary)] hover:bg-[#ff5722] animate-scale"
+                        >
+                          <DownloadOutlined /> Tải về (.txt)
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                      {newBackupCodes.map((code, index) => (
+                        <div 
+                          key={index}
+                          className="py-2.5 px-1.5 text-center font-mono text-xs font-bold rounded-lg select-all border shadow-sm"
+                          style={{ 
+                            background: "var(--card)", 
+                            borderColor: "var(--border)",
+                            color: "var(--text)"
+                          }}
+                        >
+                          {code}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="pt-2 text-center">
                     <button
                       type="button"
                       onClick={() => {
-                        setDisabling(false);
-                        setDisableCode("");
+                        setNewBackupCodes([]);
+                        setRegeneratingCodes(false);
+                        setAddingNewDevice(false);
                       }}
-                      className="px-4 py-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
-                      style={{
-                        background: "var(--bg-base)",
-                        border: "1px solid var(--border)",
-                        color: "var(--text)"
-                      }}
-                      disabled={actionLoading}
+                      className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-[var(--primary)] border border-[var(--primary)] hover:bg-[#ff5722] transition-colors cursor-pointer"
                     >
-                      Hủy bỏ
+                      Hoàn thành
                     </button>
                   </div>
-                </form>
+                </div>
+              ) : regeneratingCodes ? (
+                /* Form to verify current OTP to regenerate codes */
+                <div className="space-y-6">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRegeneratingCodes(false);
+                        setRegenCode("");
+                      }}
+                      className="p-2 rounded-lg hover:bg-white/5 transition-colors cursor-pointer bg-transparent border-none"
+                    >
+                      <ArrowLeftOutlined style={{ color: "var(--text)" }} />
+                    </button>
+                    <h3 className="text-lg font-bold">Tạo Lại Mã Dự Phòng Khôi Phục</h3>
+                  </div>
+
+                  <form onSubmit={handleRegenerateBackupCodes} className="p-5 rounded-2xl border space-y-4 max-w-lg"
+                    style={{
+                      background: "var(--bg-base)",
+                      borderColor: "var(--border)",
+                    }}
+                  >
+                    <div>
+                      <label className="block text-sm font-semibold mb-1.5">
+                        Nhập mã OTP 2FA hiện tại để xác thực
+                      </label>
+                      <p className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>
+                        Hành động này sẽ tạo mới hoàn toàn 10 mã khôi phục và vô hiệu hóa tất cả các mã dự phòng hiện tại của bạn để đảm bảo an toàn tuyệt đối.
+                      </p>
+                      <input
+                        type="text"
+                        maxLength={6}
+                        required
+                        placeholder="Mã OTP 2FA"
+                        value={regenCode}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (/^\d*$/.test(val)) setRegenCode(val);
+                        }}
+                        className="px-4 py-2.5 rounded-lg text-sm w-full font-mono text-center tracking-widest max-w-[200px] outline-none"
+                        style={{
+                          background: "var(--card)",
+                          border: "1px solid var(--border)",
+                          color: "var(--text)"
+                        }}
+                        disabled={actionLoading}
+                      />
+                    </div>
+
+                    <div className="flex gap-2 pt-2">
+                      <button
+                        type="submit"
+                        disabled={actionLoading}
+                        className="px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-[var(--primary)] hover:bg-[#ff5722] transition-colors cursor-pointer"
+                      >
+                        {actionLoading ? "Đang xử lý..." : "Xác nhận tạo mới"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRegeneratingCodes(false);
+                          setRegenCode("");
+                        }}
+                        className="px-4 py-2.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                        style={{
+                          background: "var(--card)",
+                          border: "1px solid var(--border)",
+                          color: "var(--text)"
+                        }}
+                        disabled={actionLoading}
+                      >
+                        Hủy bỏ
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              ) : addingNewDevice ? (
+                /* Wizard to add a synchronous secondary device */
+                <div className="space-y-6">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAddingNewDevice(false);
+                        setNewDeviceStep(1);
+                        setNewDeviceSetupData(null);
+                        setCurrentDeviceCode("");
+                        setNewDeviceCode("");
+                      }}
+                      className="p-2 rounded-lg hover:bg-white/5 transition-colors cursor-pointer bg-transparent border-none"
+                    >
+                      <ArrowLeftOutlined style={{ color: "var(--text)" }} />
+                    </button>
+                    <h3 className="text-lg font-bold">Thêm Thiết Bị 2FA Đồng Bộ Mới</h3>
+                  </div>
+
+                  {newDeviceStep === 1 ? (
+                    /* STEP 1: VERIFY CURRENT DEVICE OTP */
+                    <form onSubmit={handleStartSetupNewDevice} className="p-5 rounded-2xl border space-y-4 max-w-lg"
+                      style={{
+                        background: "var(--bg-base)",
+                        borderColor: "var(--border)",
+                      }}
+                    >
+                      <div>
+                        <label className="block text-sm font-semibold mb-1.5">
+                          Bước 1: Xác thực thiết bị 2FA hiện tại
+                        </label>
+                        <p className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>
+                          Để đảm bảo an toàn tuyệt đối, bạn phải nhập mã xác thực OTP từ thiết bị 2FA hiện tại trước khi hệ thống tạo QR cho điện thoại khác quét.
+                        </p>
+                        <input
+                          type="text"
+                          maxLength={6}
+                          required
+                          placeholder="Mã OTP hiện tại"
+                          value={currentDeviceCode}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (/^\d*$/.test(val)) setCurrentDeviceCode(val);
+                          }}
+                          className="px-4 py-2.5 rounded-lg text-sm w-full font-mono text-center tracking-widest max-w-[200px] outline-none"
+                          style={{
+                            background: "var(--card)",
+                            border: "1px solid var(--border)",
+                            color: "var(--text)"
+                          }}
+                          disabled={actionLoading}
+                        />
+                      </div>
+
+                      <div className="flex gap-2 pt-2">
+                        <button
+                          type="submit"
+                          disabled={actionLoading}
+                          className="px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-[var(--primary)] hover:bg-[#ff5722] transition-colors cursor-pointer"
+                        >
+                          {actionLoading ? "Đang xác thực..." : "Tiếp tục"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAddingNewDevice(false);
+                            setCurrentDeviceCode("");
+                          }}
+                          className="px-4 py-2.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                          style={{
+                            background: "var(--card)",
+                            border: "1px solid var(--border)",
+                            color: "var(--text)"
+                          }}
+                          disabled={actionLoading}
+                        >
+                          Hủy bỏ
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    /* STEP 2: SCAN QR WITH THE NEW DEVICE AND CONFIRM */
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                      {/* QR Code Column */}
+                      {newDeviceSetupData && (
+                        <div className="flex flex-col items-center p-4 rounded-2xl bg-white text-black shadow-inner border border-gray-100 max-w-[280px] mx-auto w-full">
+                          <img 
+                            src={newDeviceSetupData.qrCode} 
+                            alt="New QR Code" 
+                            className="w-48 h-48 object-contain"
+                          />
+                          <span className="text-[10px] text-gray-400 mt-2 font-mono select-none text-center">
+                            Quét mã này bằng thiết bị Authenticator MỚI
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Instructions & OTP Confirm Column */}
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <span className="text-xs font-bold uppercase tracking-wider text-[var(--primary)]">Bước 2: Quét mã QR trên điện thoại mới</span>
+                          <p className="text-xs leading-relaxed" style={{ color: "var(--text-muted)" }}>
+                            Mở ứng dụng xác thực mới (trên điện thoại khác) quét mã QR bên cạnh để đồng bộ.
+                          </p>
+                        </div>
+
+                        {newDeviceSetupData && (
+                          <div className="space-y-2">
+                            <span className="text-xs font-bold uppercase tracking-wider text-[var(--primary)] block">Hoặc nhập khóa bí mật thủ công</span>
+                            <div 
+                              className="flex items-center justify-between p-2.5 rounded-lg font-mono text-xs select-all truncate"
+                              style={{ background: "var(--bg-base)", border: "1px solid var(--border)" }}
+                            >
+                              <span className="truncate max-w-[200px]">{newDeviceSetupData.secret}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(newDeviceSetupData.secret);
+                                  message.success("Đã sao chép khóa bí mật thiết bị mới!");
+                                }}
+                                className="p-1 rounded hover:bg-white/10 transition-colors border-none bg-transparent cursor-pointer"
+                                title="Sao chép khóa"
+                              >
+                                <CopyOutlined style={{ color: "var(--text)" }} />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        <form onSubmit={handleConfirmNewDevice} className="space-y-3 pt-2">
+                          <span className="text-xs font-bold uppercase tracking-wider text-[var(--primary)] block">Bước 3: Nhập mã OTP từ thiết bị MỚI</span>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              maxLength={6}
+                              required
+                              placeholder="Mã OTP mới"
+                              value={newDeviceCode}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (/^\d*$/.test(val)) setNewDeviceCode(val);
+                              }}
+                              className="px-4 py-2.5 rounded-xl text-sm font-mono text-center tracking-widest outline-none w-full max-w-[160px]"
+                              style={{
+                                background: "var(--bg-base)",
+                                border: "1px solid var(--border)",
+                                color: "var(--text)"
+                              }}
+                              disabled={actionLoading}
+                            />
+                            <button
+                              type="submit"
+                              disabled={actionLoading}
+                              className="px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-[var(--primary)] hover:bg-[#ff5722] shadow-md transition-colors cursor-pointer"
+                            >
+                              {actionLoading ? "Đang xác thực..." : "Kích hoạt thiết bị"}
+                            </button>
+                          </div>
+                        </form>
+                      </div>
+                    </div>
+                  )}
+                </div>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => setDisabling(true)}
-                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-red-500 hover:text-red-600 hover:bg-red-500/5 border border-red-500/20 bg-transparent transition-all duration-300 cursor-pointer"
-                >
-                  Tắt bảo mật 2FA
-                </button>
+                /* Standard active state view */
+                <>
+                  <div className="flex items-center gap-4 flex-wrap">
+                    <div 
+                      className="w-16 h-16 rounded-full flex items-center justify-center text-3xl animate-pulse"
+                      style={{ 
+                        background: "var(--success-soft)", 
+                        color: "var(--success)", 
+                        border: "1px solid var(--success-border)" 
+                      }}
+                    >
+                      <CheckCircleOutlined />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold">Google Authenticator (2FA) Đang Bật</h3>
+                      <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                        Tài khoản của bạn đã được bảo vệ tối đa chống lại các cuộc tấn công đánh cắp mật khẩu.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div 
+                    className="p-4 rounded-xl text-sm leading-relaxed"
+                    style={{ 
+                      background: "var(--bg-base)",
+                      border: "1px solid var(--border)"
+                    }}
+                  >
+                    <div className="flex items-start gap-3">
+                      <WarningOutlined className="text-amber-500 text-lg mt-0.5" />
+                      <div>
+                        <span className="font-semibold">Mã dự phòng khôi phục:</span> Bạn còn{" "}
+                        <span className="font-bold text-[var(--primary)]">{status.remainingBackupCodes}</span> mã dự phòng chưa sử dụng. 
+                        Mỗi mã dự phòng chỉ có thể được dùng một lần để đăng nhập trong trường hợp bạn mất thiết bị Authenticator.
+                      </div>
+                    </div>
+                  </div>
+
+                  {disabling ? (
+                    /* Secure Disabling Form */
+                    <form onSubmit={handleDisable2FA} className="p-4 rounded-xl border border-red-500/20 space-y-4 bg-red-500/5 max-w-lg">
+                      <div>
+                        <label className="block text-sm font-semibold mb-2">
+                          Xác nhận tắt bảo mật 2FA
+                        </label>
+                        <p className="text-xs mb-3 text-red-400">
+                          CẢNH BÁO: Tắt 2FA sẽ làm giảm đáng kể mức độ bảo mật cho tài khoản quản trị của bạn.
+                        </p>
+                        <input
+                          type="text"
+                          maxLength={6}
+                          placeholder="Mã OTP 2FA hiện tại"
+                          value={disableCode}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (/^\d*$/.test(val)) setDisableCode(val);
+                          }}
+                          className="px-4 py-2.5 rounded-lg text-sm w-full font-mono text-center tracking-widest max-w-[200px]"
+                          style={{
+                            background: "var(--bg-base)",
+                            border: "1px solid var(--border)",
+                            color: "var(--text)",
+                            outline: "none"
+                          }}
+                          disabled={actionLoading}
+                        />
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          type="submit"
+                          disabled={actionLoading}
+                          className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-red-600 hover:bg-red-700 transition-colors cursor-pointer"
+                        >
+                          {actionLoading ? "Đang xử lý..." : "Xác nhận tắt"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDisabling(false);
+                            setDisableCode("");
+                          }}
+                          className="px-4 py-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                          style={{
+                            background: "var(--bg-base)",
+                            border: "1px solid var(--border)",
+                            color: "var(--text)"
+                          }}
+                          disabled={actionLoading}
+                        >
+                          Hủy bỏ
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAddingNewDevice(true);
+                          setNewDeviceStep(1);
+                        }}
+                        className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-[var(--primary)] hover:bg-[#ff5722] border border-[var(--primary)] hover:border-[#ff5722] shadow-md transition-all duration-300 cursor-pointer animate-scale"
+                      >
+                        Thêm thiết bị 2FA mới
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRegeneratingCodes(true);
+                          setNewBackupCodes([]);
+                        }}
+                        className="px-5 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 cursor-pointer animate-scale border border-solid"
+                        style={{
+                          background: "var(--bg-base)",
+                          borderColor: "var(--border)",
+                          color: "var(--text)"
+                        }}
+                      >
+                        Tạo lại mã dự phòng
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDisabling(true)}
+                        className="px-5 py-2.5 rounded-xl text-xs font-bold text-red-500 hover:text-red-600 hover:bg-red-500/5 border border-red-500/20 bg-transparent transition-all duration-300 cursor-pointer animate-scale"
+                      >
+                        Tắt bảo mật 2FA
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           ) : (

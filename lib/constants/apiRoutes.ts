@@ -17,6 +17,9 @@ export const API_ROUTES = {
     TWO_FACTOR_DISABLE: '/auth/2fa/disable',
     TWO_FACTOR_STATUS: '/auth/2fa/status',
     TWO_FACTOR_VALIDATE: '/auth/2fa/validate',
+    TWO_FACTOR_REGENERATE_BACKUP_CODES: '/auth/2fa/regenerate-backup-codes',
+    TWO_FACTOR_SETUP_NEW_DEVICE: '/auth/2fa/setup-new-device',
+    TWO_FACTOR_CONFIRM_NEW_DEVICE: '/auth/2fa/confirm-new-device',
   },
   USERS: {
     ME: '/users/me',
