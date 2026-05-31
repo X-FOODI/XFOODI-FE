@@ -119,26 +119,30 @@ const userService = {
   },
 
   /**
-   * Upload an avatar image to Cloudinary and return the secure URL.
-   * Requires NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME and NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET.
+   * Upload an avatar image — sends file as multipart FormData to BE,
+   * which uploads to Cloudinary and returns the secure URL.
    */
   async uploadAvatar(file: File): Promise<string> {
     try {
       const formData = new FormData();
       formData.append('avatar', file);
 
+      // PUT /api/users/me with multipart — BE uses multer to read the file,
+      // uploads to Cloudinary, and returns the updated profile with avatarUrl
       const response = await axiosInstance.put<UpdateProfileResponse>(
         API_ROUTES.USERS.ME,
-        formData
+        formData,
+        // Let browser set Content-Type with boundary for multipart
+        { headers: { 'Content-Type': undefined } }
       );
 
       if (response.data.success && response.data.data) {
-        const avatarUrl = (response.data.data as any).avatarUrl || response.data.data.avatar;
-        if (avatarUrl) {
-          return avatarUrl;
-        }
+        const avatarUrl =
+          (response.data.data as any).avatarUrl ||
+          response.data.data.avatar;
+        if (avatarUrl) return avatarUrl;
       }
-      throw new Error(response.data.message || 'Failed to upload avatar');
+      throw new Error(response.data.message || 'Upload succeeded but no URL returned');
     } catch (error) {
       extractErrorMessage(error, 'Failed to upload avatar');
     }

@@ -119,13 +119,10 @@ export default function ProfilePage() {
   const handleAvatarUpload = async (file: File) => {
     setAvatarUploading(true);
     try {
+      // uploadAvatar gọi PUT /api/users/me (multipart) → BE upload Cloudinary
+      // + lưu avatarUrl vào DB trong 1 request — không cần gọi updateProfile thêm
       const avatarUrl = await userService.uploadAvatar(file);
-      const updated = await userService.updateProfile({
-        fullName: user?.fullName || user?.name || "",
-        phoneNumber: user?.phoneNumber,
-        avatarUrl,
-      });
-      updateUser({ ...user!, ...updated, avatar: avatarUrl });
+      updateUser({ ...user!, avatar: avatarUrl });
       showToast("success", "Avatar updated", "Your profile picture has been changed.");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Avatar upload failed.";
@@ -337,33 +334,7 @@ export default function ProfilePage() {
           </div>
         </SectionCard>
 
-        {/* ── Account meta ── */}
-        <div
-          style={{
-            borderRadius: "1rem",
-            border: "1px solid var(--border)",
-            background: "var(--card)",
-            padding: "1rem 1.5rem",
-            display: "flex",
-            flexWrap: "wrap",
-            gap: "0.5rem 2rem",
-          }}
-        >
-          {[
-            { label: "User ID", value: user.id, mono: true },
-            user.role ? { label: "Role", value: user.role } : null,
-            user.email ? { label: "Email", value: user.email } : null,
-          ]
-            .filter(Boolean)
-            .map((item) => (
-              <span key={item!.label} style={{ fontSize: "0.8125rem", color: "var(--text-muted)" }}>
-                <span style={{ fontWeight: 500, color: "var(--text)" }}>{item!.label}: </span>
-                <span style={item!.mono ? { fontFamily: "monospace", fontSize: "0.75rem" } : {}}>
-                  {item!.value}
-                </span>
-              </span>
-            ))}
-        </div>
+
       </main>
     </div>
   );
