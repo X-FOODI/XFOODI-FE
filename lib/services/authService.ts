@@ -349,6 +349,21 @@ const authService = {
     }
   },
 
+  // Unlock blocked admin account using Turnstile token
+  async unlockAccount(email: string, turnstileToken: string): Promise<any> {
+    try {
+      const response = await axiosInstance.post<any>('/auth/unlock', {
+        email,
+        turnstileToken,
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Unlock account error:', error);
+      const backendMessage = error.response?.data?.message || 'Mở khóa tài khoản thất bại. Vui lòng kiểm tra lại.';
+      throw new Error(backendMessage);
+    }
+  },
+
   // Validate 2FA TOTP code or backup code during login
   async validate2FA(tempToken: string, code: string, rememberMe = true): Promise<User> {
     try {
