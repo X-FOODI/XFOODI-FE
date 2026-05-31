@@ -3077,12 +3077,18 @@
       "brand": "Nhà hàng",
       "product": "Sản phẩm",
       "workflow": "Quy trình",
+      "restaurants": "Nhà hàng",
       "about": "Về chúng tôi",
       "testimonials": "Khách hàng",
       "contact": "Liên hệ",
       "staff": "Staff",
       "login": "Đăng nhập",
-      "signup": "Đăng ký"
+      "signup": "Đăng ký",
+      "view_profile": "Xem hồ sơ",
+      "admin_dashboard": "Trang quản trị",
+      "restaurant_dashboard": "Trang nhà hàng",
+      "open_restaurant": "Mở nhà hàng",
+      "logout": "Đăng xuất"
     },
     "hero": {
       "tag": "Nền tảng vận hành nhà hàng toàn diện",

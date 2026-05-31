@@ -3030,12 +3030,18 @@
       "brand": "Restaurant",
       "product": "Product",
       "workflow": "Workflow",
+      "restaurants": "Restaurants",
       "about": "About Us",
       "testimonials": "Testimonials",
       "contact": "Contact",
       "staff": "Staff",
       "login": "Log in",
-      "signup": "Sign up"
+      "signup": "Sign up",
+      "view_profile": "View Profile",
+      "admin_dashboard": "Admin Dashboard",
+      "restaurant_dashboard": "Restaurant Dashboard",
+      "open_restaurant": "Register Restaurant",
+      "logout": "Logout"
     },
     "hero": {
       "tag": "All-in-one Restaurant Ops Platform",
