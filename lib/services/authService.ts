@@ -356,6 +356,39 @@ const authService = {
     }
   },
 
+  // Regenerate emergency backup codes
+  async regenerateBackupCodes(code: string): Promise<{ backupCodes: string[] }> {
+    try {
+      const response = await axiosInstance.post<any>(API_ROUTES.AUTH.TWO_FACTOR_REGENERATE_BACKUP_CODES, { code });
+      return response.data?.data;
+    } catch (error: any) {
+      const backendMessage = readBackendErrorText(error.response?.data);
+      throw new Error(backendMessage || 'Không thể tạo lại mã dự phòng. Vui lòng kiểm tra lại mã OTP.');
+    }
+  },
+
+  // Setup a new 2FA device, requiring authorization from the old device first
+  async setupNew2FADevice(code: string): Promise<{ qrCode: string; secret: string }> {
+    try {
+      const response = await axiosInstance.post<any>(API_ROUTES.AUTH.TWO_FACTOR_SETUP_NEW_DEVICE, { code });
+      return response.data?.data;
+    } catch (error: any) {
+      const backendMessage = readBackendErrorText(error.response?.data);
+      throw new Error(backendMessage || 'Xác thực thiết bị hiện tại thất bại. Vui lòng kiểm tra lại mã OTP.');
+    }
+  },
+
+  // Confirm new 2FA device setup with OTP from the new device
+  async confirmNew2FADevice(code: string): Promise<{ backupCodes: string[] }> {
+    try {
+      const response = await axiosInstance.post<any>(API_ROUTES.AUTH.TWO_FACTOR_CONFIRM_NEW_DEVICE, { code });
+      return response.data?.data;
+    } catch (error: any) {
+      const backendMessage = readBackendErrorText(error.response?.data);
+      throw new Error(backendMessage || 'Xác thực thiết bị mới thất bại. Vui lòng kiểm tra lại mã OTP.');
+    }
+  },
+
   /**
    * Exchange Google credential JWT for app tokens.
    * Backend: POST `{ googleToken }` to `/auth/google` (full URL: NEXT_PUBLIC_API_URL + path; or NEXT_PUBLIC_AUTH_GOOGLE_LOGIN_PATH).

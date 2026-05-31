@@ -83,7 +83,11 @@ const userService = {
         data
       );
       if (response.data.success && response.data.data) {
-        return response.data.data;
+        const u = response.data.data;
+        if ((u as any).avatarUrl && !u.avatar) {
+          u.avatar = (u as any).avatarUrl;
+        }
+        return u;
       }
       throw new Error(response.data.message || 'Failed to update profile');
     } catch (error) {
@@ -119,29 +123,25 @@ const userService = {
    * Requires NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME and NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET.
    */
   async uploadAvatar(file: File): Promise<string> {
-    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
-    const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+    try {
+      const formData = new FormData();
+      formData.append('avatar', file);
 
-    if (!cloudName || !uploadPreset) {
-      throw new Error('Cloudinary is not configured. Please set NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME and NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET.');
+      const response = await axiosInstance.put<UpdateProfileResponse>(
+        API_ROUTES.USERS.ME,
+        formData
+      );
+
+      if (response.data.success && response.data.data) {
+        const avatarUrl = (response.data.data as any).avatarUrl || response.data.data.avatar;
+        if (avatarUrl) {
+          return avatarUrl;
+        }
+      }
+      throw new Error(response.data.message || 'Failed to upload avatar');
+    } catch (error) {
+      extractErrorMessage(error, 'Failed to upload avatar');
     }
-
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', uploadPreset);
-    formData.append('folder', 'xfoodi/avatars');
-
-    const res = await fetch(
-      `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
-      { method: 'POST', body: formData }
-    );
-
-    if (!res.ok) {
-      throw new Error('Avatar upload failed. Please try again.');
-    }
-
-    const json = await res.json() as { secure_url: string };
-    return json.secure_url;
   },
 };
 
