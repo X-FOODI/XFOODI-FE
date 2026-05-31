@@ -41,6 +41,7 @@ function LoginEmailPageContent() {
   const tenantName = tenant?.businessName || tenant?.name;
   const tenantLogoUrl = tenant?.logoUrl?.trim() || "/images/logo/xfoodi-logo.png";
   const [mounted, setMounted] = useState(false);
+  const [isAdminDomain, setIsAdminDomain] = useState(false);
 
   // State
   const [email, setEmail] = useState("");
@@ -64,6 +65,10 @@ function LoginEmailPageContent() {
 
   useEffect(() => {
     setMounted(true);
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname;
+      setIsAdminDomain(hostname.startsWith('admin.') || hostname.includes('admin.localhost'));
+    }
   }, []);
 
   useEffect(() => {
@@ -249,7 +254,11 @@ function LoginEmailPageContent() {
 
           <div className="text-center md:text-left mb-8">
             <h1 className="auth-heading text-3xl font-bold tracking-tight drop-shadow-sm transition-colors">
-              {requires2FA ? "Xác thực 2 lớp (2FA)" : t('login_email_page.title')}
+              {requires2FA 
+                ? "Xác thực 2 lớp (2FA)" 
+                : isAdminDomain 
+                  ? "Quản trị viên XFoodi" 
+                  : t('login_email_page.title')}
             </h1>
           </div>
 
@@ -422,30 +431,34 @@ function LoginEmailPageContent() {
                   </button>
                 </div>
 
-                <div className="text-center text-sm mt-6 pt-4 border-t auth-divider">
-                  <span className="auth-text">{t('login_email_page.no_account')} </span>
-                  <a href="/register" className="auth-terms-link font-semibold hover:underline transition-colors">
-                    {t('login_email_page.sign_up_here')}
-                  </a>
-                </div>
+                {!isAdminDomain && (
+                  <div className="text-center text-sm mt-6 pt-4 border-t auth-divider">
+                    <span className="auth-text">{t('login_email_page.no_account')} </span>
+                    <a href="/register" className="auth-terms-link font-semibold hover:underline transition-colors">
+                      {t('login_email_page.sign_up_here')}
+                    </a>
+                  </div>
+                )}
               </form>
 
-              <SocialAuthMethods dividerLabel={t('login_email_page.or_login_with')}>
-                <GoogleIdentityButton
-                  rememberMe={remember}
-                  disabled={loading}
-                  onAuthenticated={navigateAfterLogin}
-                  variant="signin"
-                />
-                <SocialAuthButton
-                  icon={<PhoneOutlined />}
-                  onClick={() => message.info('Phone login is coming soon! / Đăng nhập bằng số điện thoại sẽ sớm ra mắt!')}
-                  loading={loading}
-                  inactive={loading}
-                >
-                  {t('login_email_page.phone_number')}
-                </SocialAuthButton>
-              </SocialAuthMethods>
+              {!isAdminDomain && (
+                <SocialAuthMethods dividerLabel={t('login_email_page.or_login_with')}>
+                  <GoogleIdentityButton
+                    rememberMe={remember}
+                    disabled={loading}
+                    onAuthenticated={navigateAfterLogin}
+                    variant="signin"
+                  />
+                  <SocialAuthButton
+                    icon={<PhoneOutlined />}
+                    onClick={() => message.info('Phone login is coming soon! / Đăng nhập bằng số điện thoại sẽ sớm ra mắt!')}
+                    loading={loading}
+                    inactive={loading}
+                  >
+                    {t('login_email_page.phone_number')}
+                  </SocialAuthButton>
+                </SocialAuthMethods>
+              )}
             </>
           )}
         </div>
