@@ -48,6 +48,16 @@ export function GoogleIdentityButton({
   useEffect(() => {
     const handleMessage = async (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
+
+      if (event.data?.type === "GOOGLE_OAUTH_ERROR") {
+        const fallback =
+          t("login_email_page.google_login_error") ||
+          "Đăng nhập Google thất bại. Vui lòng thử lại.";
+        message.error(event.data.error || fallback);
+        setBusy(false);
+        return;
+      }
+
       if (event.data?.type === "GOOGLE_OAUTH_TOKEN") {
         const idToken = event.data.token;
         if (!idToken) return;
@@ -93,15 +103,23 @@ export function GoogleIdentityButton({
     const top = window.screenY + (window.outerHeight - height) / 2;
 
     const nonce = Math.random().toString(36).substring(2);
-    // Use window.location.origin so it matches the registered redirect URIs in Google Cloud Console
-    const redirectUri = encodeURIComponent(window.location.origin);
+    // Use the dedicated callback page so the popup doesn't load the full app.
+    // This URL must be registered as an Authorized Redirect URI in Google Cloud Console.
+    const callbackUrl = `${window.location.origin}/auth/google/callback`;
+    const redirectUri = encodeURIComponent(callbackUrl);
     const googleUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${redirectUri}&response_type=id_token&scope=openid%20email%20profile&nonce=${nonce}`;
 
-    window.open(
+    setBusy(true); // show spinner immediately while popup opens
+    const popup = window.open(
       googleUrl,
       "google-login-popup",
       `width=${width},height=${height},left=${left},top=${top},status=no,resizable=yes,scrollbars=yes`
     );
+
+    // If the popup was blocked, reset busy state
+    if (!popup || popup.closed) {
+      setBusy(false);
+    }
   };
 
   const label =
