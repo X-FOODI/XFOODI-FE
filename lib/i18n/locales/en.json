@@ -3727,6 +3727,8 @@
     "change_password_page": {
       "title": "Change Password",
       "subtitle": "Update your password to keep your account secure",
+      "create_title": "Set Password",
+      "create_subtitle": "Create a new password for your account to enable standard email/password login.",
       "current_password_label": "Current Password",
       "current_password_placeholder": "Enter current password",
       "new_password_label": "New Password",
@@ -3734,6 +3736,7 @@
       "confirm_password_label": "Confirm New Password",
       "confirm_password_placeholder": "Confirm new password",
       "change_btn": "CHANGE PASSWORD",
+      "create_btn": "SET PASSWORD",
       "back_to_dashboard": "Back to Dashboard",
       "password_strong": "Password is strong",
       "passwords_match": "Passwords match",
@@ -3747,7 +3750,8 @@
         "password_mismatch": "Passwords do not match"
       },
       "alerts": {
-        "success": "Password Changed Successfully!\n\nYour password has been updated."
+        "success": "Password Changed Successfully!\n\nYour password has been updated.",
+        "create_success": "Password Set Successfully!\n\nYour password has been configured."
       }
     }
   },

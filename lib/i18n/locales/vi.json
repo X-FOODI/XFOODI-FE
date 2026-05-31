@@ -3774,6 +3774,8 @@
     "change_password_page": {
       "title": "Đổi Mật khẩu",
       "subtitle": "Cập nhật mật khẩu để bảo mật tài khoản của bạn",
+      "create_title": "Tạo Mật khẩu",
+      "create_subtitle": "Tạo mật khẩu mới cho tài khoản của bạn để có thể đăng nhập bằng email.",
       "current_password_label": "Mật khẩu hiện tại",
       "current_password_placeholder": "Nhập mật khẩu hiện tại",
       "new_password_label": "Mật khẩu mới",
@@ -3781,6 +3783,7 @@
       "confirm_password_label": "Xác nhận Mật khẩu mới",
       "confirm_password_placeholder": "Xác nhận mật khẩu mới",
       "change_btn": "ĐỔI MẬT KHẨU",
+      "create_btn": "TẠO MẬT KHẨU",
       "back_to_dashboard": "Quay lại Dashboard",
       "password_strong": "Mật khẩu mạnh",
       "passwords_match": "Mật khẩu khớp",
@@ -3794,7 +3797,8 @@
         "password_mismatch": "Mật khẩu không khớp"
       },
       "alerts": {
-        "success": "Đổi mật khẩu thành công!\n\nMật khẩu của bạn đã được cập nhật."
+        "success": "Đổi mật khẩu thành công!\n\nMật khẩu của bạn đã được cập nhật.",
+        "create_success": "Tạo mật khẩu thành công!\n\nMật khẩu của bạn đã được thiết lập."
       }
     }
   },
