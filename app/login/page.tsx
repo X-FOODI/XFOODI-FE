@@ -48,6 +48,7 @@ function LoginEmailPageContent() {
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [unlockLoading, setUnlockLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [passwordError, setPasswordError] = useState("");
   const [passwordTouched, setPasswordTouched] = useState(false);
@@ -209,6 +210,31 @@ function LoginEmailPageContent() {
       console.error('Login error:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUnlockAccount = async () => {
+    if (!email || !email.trim()) {
+      message.error("Vui lòng nhập email của tài khoản cần mở khóa.");
+      return;
+    }
+    if (!turnstileToken) {
+      message.error("Vui lòng hoàn tất xác thực Cloudflare Turnstile trước khi mở khóa.");
+      return;
+    }
+
+    setUnlockLoading(true);
+    try {
+      const res = await authService.unlockAccount(email.trim(), turnstileToken);
+      message.success(res.message || "Mở khóa tài khoản thành công! Bạn có thể đăng nhập lại.");
+      turnstileRef.current?.reset();
+      setTurnstileToken("");
+    } catch (error: any) {
+      message.error(error.message || "Mở khóa thất bại. Vui lòng thử lại.");
+      turnstileRef.current?.reset();
+      setTurnstileToken("");
+    } finally {
+      setUnlockLoading(false);
     }
   };
 
@@ -514,10 +540,10 @@ function LoginEmailPageContent() {
                 onError={() => setTurnstileToken("")}
               />
 
-              <div>
+              <div className="space-y-3">
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || unlockLoading}
                   className="group relative w-full flex justify-center py-3.5 px-4 border border-transparent text-sm font-bold rounded-2xl text-white bg-[var(--primary)] hover:bg-[#ff5722] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#1a100e] focus:ring-[var(--primary)] transition-all duration-300 shadow-[0_4px_14px_0_rgba(255,56,11,0.39)] hover:shadow-[0_6px_20px_rgba(255,56,11,0.23)] hover:-translate-y-0.5 disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:transform-none"
                 >
                   <span className="absolute inset-y-0 left-0 flex items-center pl-3">
@@ -530,6 +556,24 @@ function LoginEmailPageContent() {
                     )}
                   </span>
                   {loading ? t('login_button.loading') : t('login_button.login_text')}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleUnlockAccount}
+                  disabled={loading || unlockLoading}
+                  className={`w-full flex items-center justify-center gap-2 py-3 px-4 text-sm font-bold rounded-2xl border transition-all duration-300 bg-transparent cursor-pointer ${
+                    isDark 
+                      ? 'border-amber-500/30 text-amber-500 hover:text-amber-400 hover:bg-amber-500/5' 
+                      : 'border-amber-500/40 text-amber-600 hover:text-amber-700 hover:bg-amber-500/5'
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  {unlockLoading ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-b-0 border-amber-500"></div>
+                  ) : (
+                    <SafetyCertificateOutlined className="text-lg" />
+                  )}
+                  {unlockLoading ? "Đang mở khóa..." : "Mở khóa tài khoản bị chặn"}
                 </button>
               </div>
             </form>
