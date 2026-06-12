@@ -111,7 +111,7 @@ export function middleware(req: NextRequest) {
   // Allow public routes on any domain
   const isPublicRoute =
     PUBLIC_ROUTES.has(pathname) ||
-    pathname.startsWith('/restaurant');
+    (pathname.startsWith('/restaurant') && !pathname.startsWith('/restaurant/dashboard') && !pathname.startsWith('/restaurant/settings'));
 
   if (isPublicRoute) {
     return NextResponse.next();
@@ -147,15 +147,15 @@ export function middleware(req: NextRequest) {
       return NextResponse.rewrite(new URL('/restaurant', req.url));
     }
 
-    // ── Protect /admin/* — require auth token in cookie ──
-    if (pathname.startsWith('/admin')) {
+    // ── Protect /admin/* and /restaurant/dashboard — require auth token in cookie ──
+    if (pathname.startsWith('/admin') || pathname.startsWith('/restaurant/dashboard') || pathname.startsWith('/restaurant/settings')) {
       if (!hasAuthToken) {
         const loginUrl = new URL('/login-email', req.url);
         // Pass redirect so login page can send user back after login
         loginUrl.searchParams.set('redirect', pathname);
         return NextResponse.redirect(loginUrl);
       }
-      // Has token → let AdminAuthGuard do the role check on client
+      // Has token → let AuthGuard do the role check on client
       return NextResponse.next();
     }
 

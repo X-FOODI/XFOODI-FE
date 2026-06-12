@@ -128,6 +128,7 @@ const STATS = [
   { value: "4.9★", label: "Đánh giá trung bình" },
 ];
 
+const dayNamesMap = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 const DAY_NAMES = ["Chủ nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
 
 // ── Gallery component ──────────────────────────────────────────────────────────
@@ -316,19 +317,33 @@ export default function RestaurantLandingPage() {
       .catch(() => {});
   }, [tenant?.prefix]);
 
-  // Merge: tenant có priority cho branding, restaurantData bổ sung address/contact/lat/lng
+  // Merge: restaurantData (từ API mới) > tenant > FALLBACK_TENANT
   const base = tenant || FALLBACK_TENANT;
   const data = {
     ...base,
-    businessAddressLine1: base.businessAddressLine1 || restaurantData?.address,
-    businessPrimaryPhone: base.businessPrimaryPhone || restaurantData?.phone,
-    businessEmailAddress: base.businessEmailAddress || restaurantData?.email,
-    aboutUs: base.aboutUs || restaurantData?.description,
+    name: restaurantData?.name || base.name,
+    businessAddressLine1: restaurantData?.address || base.businessAddressLine1,
+    businessPrimaryPhone: restaurantData?.phone || base.businessPrimaryPhone,
+    businessEmailAddress: restaurantData?.email || base.businessEmailAddress,
+    aboutUs: restaurantData?.description || base.aboutUs,
+    logoUrl: restaurantData?.logoUrl || base.logoUrl,
+    primaryColor: restaurantData?.primaryColor || base.primaryColor,
+    backgroundUrl: restaurantData?.metadata?.coverImage || base.backgroundUrl,
+    gallery: restaurantData?.metadata?.gallery && restaurantData.metadata.gallery.length > 0 
+      ? restaurantData.metadata.gallery.map((url: string) => ({ src: url, alt: "Không gian quán" })) 
+      : GALLERY_IMAGES,
+    operatingHours: restaurantData?.metadata?.operatingHours,
     latitude: restaurantData?.latitude,
     longitude: restaurantData?.longitude,
   };
   const brandColor = data.primaryColor || "#FF380B";
   const isPreview = !tenant;
+
+  useEffect(() => {
+    if (brandColor) {
+      document.documentElement.style.setProperty('--primary', brandColor);
+    }
+  }, [brandColor]);
 
   const address = [
     data.businessAddressLine1,
@@ -336,6 +351,12 @@ export default function RestaurantLandingPage() {
     (data as any).businessAddressLine3,
     (data as any).businessAddressLine4,
   ].filter(Boolean).join(", ");
+  
+  const todayKey = dayNamesMap[new Date().getDay()];
+  const todayHours = data.operatingHours?.[todayKey];
+  const openingHoursText = todayHours 
+    ? (todayHours.isOpen ? `${todayHours.open} - ${todayHours.close}` : "Đóng cửa hôm nay")
+    : (data.businessOpeningHours || "08:00 – 22:00");
 
   if (loading) {
     return (
@@ -436,7 +457,7 @@ export default function RestaurantLandingPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {[
                   { icon: <Icon.Location />, title: "Địa Chỉ", content: address || "Liên hệ nhà hàng để biết thêm chi tiết" },
-                  { icon: <Icon.Clock />, title: "Giờ Hoạt Động", content: `Hàng ngày: ${data.businessOpeningHours || "08:00 – 22:00"}` },
+                  { icon: <Icon.Clock />, title: "Giờ Hoạt Động", content: `Hôm nay: ${openingHoursText}` },
                   { icon: <Icon.Phone />, title: "Liên Hệ", content: data.businessPrimaryPhone || "Chưa cập nhật", sub: data.businessEmailAddress },
                 ].map((card, i) => (
                   <motion.div key={i} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.1 }}
@@ -497,7 +518,7 @@ export default function RestaurantLandingPage() {
                 <h2 style={{ fontSize: "clamp(1.6rem,2.5vw,2.2rem)", fontWeight: 800, color: "var(--text)", margin: "8px 0 0" }}>Không Gian Nhà Hàng</h2>
                 <p style={{ fontSize: 14, color: "var(--text-muted)", marginTop: 8 }}>Click vào ảnh để xem toàn màn hình</p>
               </div>
-              <Gallery images={GALLERY_IMAGES} />
+              <Gallery images={data.gallery} />
             </div>
           </section>
 
@@ -558,7 +579,7 @@ export default function RestaurantLandingPage() {
                     { icon: <Icon.Location />, label: "Địa chỉ", value: address || "Liên hệ để biết thêm" },
                     { icon: <Icon.Phone />, label: "Điện thoại", value: data.businessPrimaryPhone || "Chưa cập nhật" },
                     { icon: <Icon.Email />, label: "Email", value: data.businessEmailAddress || "Chưa cập nhật" },
-                    { icon: <Icon.Clock />, label: "Giờ mở cửa", value: data.businessOpeningHours || "08:00 – 22:00" },
+                    { icon: <Icon.Clock />, label: "Giờ mở cửa", value: openingHoursText },
                   ].map((item, i) => (
                     <div key={i} style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
                       <div style={{ width: 40, height: 40, borderRadius: 10, background: `${brandColor}15`, color: brandColor, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>

@@ -79,14 +79,16 @@ export default function RestaurantDashboardPage() {
       return;
     }
     const roles: string[] = user.roles || (user.role ? [user.role] : []);
-    if (!roles.includes("Owner") && !roles.includes("Admin") && !roles.includes("SuperAdmin")) {
-      router.replace("/register-restaurant");
-      return;
-    }
+    
+    // Temporarily allow all logged-in users to view the dashboard for testing
+    // if (!roles.includes("Owner") && !roles.includes("Admin") && !roles.includes("SuperAdmin") && !roles.includes("System Admin")) {
+    //   router.replace("/register-restaurant");
+    //   return;
+    // }
 
     // Check tenant access restriction:
     // If user is Owner, their restaurantId must match current tenant ID (unless they are platform Admin/SuperAdmin)
-    const isSystemAdmin = roles.includes("Admin") || roles.includes("SuperAdmin");
+    const isSystemAdmin = roles.includes("Admin") || roles.includes("SuperAdmin") || roles.includes("System Admin");
     if (!isSystemAdmin) {
       if (!tenant) {
         // Enforce subdomain access! If user is Owner, redirect to their subdomain dashboard.
@@ -103,19 +105,21 @@ export default function RestaurantDashboardPage() {
           window.location.href = `${protocol}//${targetTenantSubdomain}${port}/restaurant/dashboard`;
           return;
         }
-        setUnauthorized(true);
-        return;
+        // Tạm thời comment lại để có thể xem giao diện dashboard
+        // setUnauthorized(true);
+        // return;
       }
 
-      if (user.restaurantId !== tenant.id) {
-        setUnauthorized(true);
-        return;
+      if (tenant && user.restaurantId && user.restaurantId !== tenant.id) {
+        // Tạm thời comment lại để xem giao diện
+        // setUnauthorized(true);
+        // return;
       }
     }
 
     // Fetch thông tin nhà hàng thật
     axiosInstance
-      .get<{ success: boolean; data: RestaurantInfo }>("/api/restaurants/me")
+      .get<{ success: boolean; data: RestaurantInfo }>("/restaurants/me")
       .then((res: { data: { success: boolean; data: RestaurantInfo } }) =>
         setRestaurantInfo(res.data.data)
       )
