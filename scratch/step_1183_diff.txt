@@ -1,0 +1,115 @@
+﻿Created At: 2026-06-10T08:20:03Z
+Completed At: 2026-06-10T08:20:27Z
+The following changes were made by the multi_replace_file_content tool to: e:\SWP391\FOODX\XFoodi-FE\app\restaurant\dashboard\knowledge-base\page.tsx. If relevant, proactively run terminal commands to execute this code for the USER. Don't ask for permission.
+[diff_block_start]
+@@ -21,6 +21,65 @@
+   createdAt: string;
+ }
+ 
++interface TreeNode {
++  name: string;
++  path: string;
++  type: "directory" | "file";
++  children?: TreeNode[];
++  doc?: DocumentItem;
++}
++
++const buildTree = (docs: DocumentItem[]): TreeNode[] => {
++  const root: TreeNode[] = [];
++
++  docs.forEach((doc) => {
++    const normalizedName = doc.filename.replace(/\\/g, "/");
++    const parts = normalizedName.split("/").filter(Boolean);
++    let currentLevel = root;
++
++    parts.forEach((part, index) => {
++      const isLast = index === parts.length - 1;
++      const currentPath = parts.slice(0, index + 1).join("/");
++
++      let existingNode = currentLevel.find(
++        (node) => node.name === part && node.type === (isLast ? "file" : "directory")
++      );
++
++      if (!existingNode) {
++        existingNode = {
++          name: part,
++          path: currentPath,
++          type: isLast ? "file" : "directory",
++          children: isLast ? undefined : [],
++          doc: isLast ? doc : undefined,
++        };
++        currentLevel.push(existingNode);
++      }
++
++      if (!isLast && existingNode.children) {
++        currentLevel = existingNode.children;
++      }
++    });
++  });
++
++  const sortTree = (nodes: TreeNode[]) => {
++    nodes.sort((a, b) => {
++      if (a.type !== b.type) {
++        return a.type === "directory" ? -1 : 1;
++      }
++      return a.name.localeCompare(b.name);
++    });
++    nodes.forEach((node) => {
++      if (node.children) {
++        sortTree(node.children);
++      }
++    });
++  };
++
++  sortTree(root);
++  return root;
++};
++
+ const CONFIG_EXPLANATIONS = {
+   isChatEnabled: {
+     title: "KĂ­ch hoáº¡t trá»£ lĂ½ AI",
+@@ -138,6 +138,11 @@
+   const [loadingChunks
+<truncated 8989 bytes>
+? "var(--primary)" : "var(--bg-base)",
++                      color: typeFilter === filterVal ? "#fff" : "var(--text)",
++                      borderColor: typeFilter === filterVal ? "var(--primary)" : "var(--border)",
++                    }}
++                  >
++                    {filterVal === "ALL" ? "Táº¥t cáº£" : filterVal}
++                  </button>
++                ))}
++              </div>
++
++              {/* Clear All Button */}
++              {documents.length > 0 && (
++                <button
++                  type="button"
++                  onClick={handleClearAll}
++                  className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all text-white bg-red-600 hover:bg-red-700 shadow-sm shadow-red-500/10 flex items-center gap-1"
++                >
++                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
++                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
++                  </svg>
++                  LĂ m trá»‘ng tri thá»©c
++                </button>
++              )}
+             </div>
+           </div>
+ 
+@@ -601,6 +601,10 @@
+                 KhĂ´ng tĂ¬m tháº¥y tĂ i liá»‡u phĂ¹ há»£p
+               </p>
+             </div>
++          ) : viewMode === "tree" ? (
++            <div className="p-4 space-y-1 max-h-[500px] overflow-y-auto">
++              {treeData.map((node) => renderTreeNode(node))}
++            </div>
+           ) : (
+             <div className="overflow-x-auto">
+               <table className="w-full">
+[diff_block_end]
+
+Please note that the above snippet only shows the MODIFIED lines from the last change. It shows up to 3 lines of unchanged lines before and after the modified lines. The actual file contents may have many more lines not shown.
+
+We did our best to apply changes despite some inaccuracies. Double check if the edit applied is what you intended.

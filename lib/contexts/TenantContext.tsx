@@ -22,9 +22,15 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
   const fetchTenant = async () => {
     const host = window.location.host; // e.g., demo.xfoodi.com:3000
     const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || "xfoodi.website";
+    const hostWithoutPort = host.includes(":") ? host.split(":")[0] : host;
 
     // 1. Check for Landing domains (Skip API call)
-    if (host === BASE_DOMAIN || host === `www.${BASE_DOMAIN}`) {
+    if (
+      hostWithoutPort === BASE_DOMAIN ||
+      hostWithoutPort === `www.${BASE_DOMAIN}` ||
+      hostWithoutPort === "localhost" ||
+      hostWithoutPort === "127.0.0.1"
+    ) {
       console.log(
         "[TenantContext] Landing domain detected, skipping tenant fetch",
       );
@@ -33,7 +39,11 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     }
 
     // 2. Check for Admin domain (Skip tenant fetch, admin has its own context)
-    if (host === `admin.${BASE_DOMAIN}` || host.startsWith("admin.")) {
+    if (
+      hostWithoutPort === `admin.${BASE_DOMAIN}` ||
+      hostWithoutPort === "admin.localhost" ||
+      hostWithoutPort.startsWith("admin.")
+    ) {
       console.log(
         "[TenantContext] Admin domain detected, skipping tenant fetch",
       );
@@ -42,17 +52,14 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     }
 
     // 3. Get hostname for tenant lookup
-    const hostWithoutPort = host.includes(":") ? host.split(":")[0] : host;
     let hostname = hostWithoutPort;
 
     // For *.localhost in development, convert to equivalent production hostname
     // e.g., demo.localhost -> demo.xfoodi.com
     if (hostname.endsWith(".localhost")) {
       const subdomain = hostname.replace(".localhost", "");
-      hostname = `${subdomain}.${BASE_DOMAIN}`;
-    } else if (hostname === "localhost" || hostname === "127.0.0.1") {
-      // Plain localhost without subdomain - default to demo.BASE_DOMAIN
-      hostname = `demo.${BASE_DOMAIN}`;
+      const actualBaseDomain = BASE_DOMAIN === "localhost" || BASE_DOMAIN === "127.0.0.1" ? "xfoodi.website" : BASE_DOMAIN;
+      hostname = `${subdomain}.${actualBaseDomain}`;
     }
 
     try {
