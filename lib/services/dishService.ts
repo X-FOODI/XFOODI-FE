@@ -1,5 +1,7 @@
 import axiosInstance from "./axiosInstance";
+import { API_ROUTES } from "../constants/apiRoutes";
 
+// Interfaces from HEAD
 export interface DishCreateDto {
   name: string;
   categoryId: string;
@@ -111,29 +113,83 @@ export interface ComboCreateDto {
 
 export interface ComboUpdateDto extends ComboCreateDto {}
 
+// Interfaces from dev branch
+export interface Dish {
+  id: string;
+  categoryId: string;
+  restaurantId: string;
+  name: string;
+  description: string;
+  price: string;
+  unit: string;
+  isVegetarian: boolean;
+  isSpicy: boolean;
+  isBestSeller: boolean;
+  isActive: boolean;
+  autoDisableByStock: boolean;
+  createdAt: string;
+  updatedAt: string;
+  category?: { id: string; name: string };
+}
+
+export interface CreateDishData {
+  categoryId: string;
+  name: string;
+  description: string;
+  price: number | string;
+  unit: string;
+  isVegetarian?: boolean;
+  isSpicy?: boolean;
+  isBestSeller?: boolean;
+  isActive?: boolean;
+  autoDisableByStock?: boolean;
+}
+
+export interface UpdateDishData {
+  categoryId?: string;
+  name?: string;
+  description?: string;
+  price?: number | string;
+  unit?: string;
+  isVegetarian?: boolean;
+  isSpicy?: boolean;
+  isBestSeller?: boolean;
+  isActive?: boolean;
+  autoDisableByStock?: boolean;
+}
+
+export interface DishListParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  categoryId?: string;
+  status?: string;
+  isVegetarian?: boolean;
+  isSpicy?: boolean;
+  isBestSeller?: boolean;
+  restaurantId?: string;
+}
+
+export interface DishListResponse {
+  success: boolean;
+  data: Dish[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 class DishService {
   private dishListCache = new Map<string, DishListResponseDto>();
-
   private dishListInFlight = new Map<string, Promise<DishListResponseDto>>();
-
   private dishByIdCache = new Map<string, DishResponseDto>();
-
   private dishByIdInFlight = new Map<string, Promise<DishResponseDto>>();
-
   private menuCache: MenuCategory[] | null = null;
-
   private menuInFlight: Promise<MenuCategory[]> | null = null;
-
   private comboListCache: ComboSummaryDto[] | null = null;
-
   private comboListInFlight: Promise<ComboSummaryDto[]> | null = null;
-
   private activeComboListCache: ComboSummaryDto[] | null = null;
-
   private activeComboListInFlight: Promise<ComboSummaryDto[]> | null = null;
-
   private comboByIdCache = new Map<string, ComboSummaryDto>();
-
   private comboByIdInFlight = new Map<string, Promise<ComboSummaryDto>>();
 
   private getDishListCacheKey(page: number, itemsPerPage: number): string {
@@ -232,6 +288,44 @@ class DishService {
     return typeof id === "string" ? id : "";
   }
 
+  // --- REST Methods from dev branch ---
+  async list(params: DishListParams): Promise<DishListResponse> {
+    const res = await axiosInstance.get<DishListResponse>(API_ROUTES.DISHES.LIST, { params });
+    return res.data;
+  }
+
+  async getDetail(id: string, restaurantId?: string): Promise<Dish> {
+    const res = await axiosInstance.get<{ success: boolean; data: Dish }>(
+      API_ROUTES.DISHES.DETAIL(id),
+      { params: { restaurantId } }
+    );
+    return res.data.data;
+  }
+
+  async create(data: CreateDishData, restaurantId?: string): Promise<Dish> {
+    const res = await axiosInstance.post<{ success: boolean; data: Dish }>(
+      API_ROUTES.DISHES.CREATE,
+      { ...data, restaurantId }
+    );
+    this.invalidateDishCache();
+    return res.data.data;
+  }
+
+  async update(id: string, data: UpdateDishData, restaurantId?: string): Promise<Dish> {
+    const res = await axiosInstance.put<{ success: boolean; data: Dish }>(
+      API_ROUTES.DISHES.UPDATE(id),
+      { ...data, restaurantId }
+    );
+    this.invalidateDishCache(id);
+    return res.data.data;
+  }
+
+  async delete(id: string, restaurantId?: string): Promise<void> {
+    await axiosInstance.delete(API_ROUTES.DISHES.DELETE(id), { params: { restaurantId } });
+    this.invalidateDishCache(id);
+  }
+
+  // --- Methods from HEAD branch ---
   async getDishes(
     page: number = 1,
     itemsPerPage: number = 100,
@@ -315,41 +409,20 @@ class DishService {
     return request;
   }
 
-  /**
-   * Create a new dish with FormData (matches backend [FromForm] expectation)
-   */
   async createDish(dish: DishCreateDto): Promise<DishResponseDto> {
     const formData = this.buildFormData(dish);
-
-    console.log("[DishService] FormData contents:");
-    for (const pair of (formData as any).entries()) {
-      console.log(`  ${pair[0]}:`, pair[1]);
-    }
-
     const response = await axiosInstance.post("/dishes", formData);
     this.invalidateDishCache();
     return response.data;
   }
 
-  /**
-   * Update existing dish with FormData (matches backend [FromForm] expectation)
-   */
   async updateDish(id: string, dish: DishUpdateDto): Promise<DishResponseDto> {
     const formData = this.buildFormData(dish);
-
-    console.log("[DishService] UpdateDish FormData contents:");
-    for (const pair of (formData as any).entries()) {
-      console.log(`  ${pair[0]}:`, pair[1]);
-    }
-
     const response = await axiosInstance.put(`/dishes/${id}`, formData);
     this.invalidateDishCache(id);
     return response.data;
   }
 
-  /**
-   * Helper: Build FormData from dish object
-   */
   private buildFormData(dish: DishCreateDto | DishUpdateDto): FormData {
     const formData = new FormData();
 
@@ -369,7 +442,6 @@ class DishService {
     formData.append("isBestSeller", String(dish.isBestSeller));
     formData.append("autoDisableByStock", String(dish.autoDisableByStock));
 
-    // Handle images array (both new files and existing images)
     if (dish.images && dish.images.length > 0) {
       dish.images.forEach((img, index) => {
         if (img.id) {
