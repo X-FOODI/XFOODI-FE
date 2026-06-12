@@ -50,7 +50,7 @@ export default function RegisterRestaurantPendingPage() {
 
   useEffect(() => {
     if (!isAuthReady) return;
-    if (!user) { router.replace("/login-email"); return; }
+    if (!user) { router.replace("/login"); return; }
 
     restaurantApplicationService
       .getMy()

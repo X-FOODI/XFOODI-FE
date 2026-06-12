@@ -3077,12 +3077,18 @@
       "brand": "Nhà hàng",
       "product": "Sản phẩm",
       "workflow": "Quy trình",
+      "restaurants": "Nhà hàng",
       "about": "Về chúng tôi",
       "testimonials": "Khách hàng",
       "contact": "Liên hệ",
       "staff": "Staff",
       "login": "Đăng nhập",
-      "signup": "Đăng ký"
+      "signup": "Đăng ký",
+      "view_profile": "Xem hồ sơ",
+      "admin_dashboard": "Trang quản trị",
+      "restaurant_dashboard": "Trang nhà hàng",
+      "open_restaurant": "Mở nhà hàng",
+      "logout": "Đăng xuất"
     },
     "hero": {
       "tag": "Nền tảng vận hành nhà hàng toàn diện",
@@ -3413,10 +3419,46 @@
       "cancel": "Hủy",
       "name_label": "Họ và tên",
       "phone_label": "Số điện thoại",
+      "account_settings": "Cài đặt tài khoản",
+      "account_settings_desc": "Quản lý thông tin cá nhân và bảo mật tài khoản của bạn.",
+      "profile_information": "Thông tin cá nhân",
+      "security": "Bảo mật",
+      "security_desc": "Giữ tài khoản của bạn an toàn bằng cách sử dụng mật khẩu mạnh và duy nhất.",
+      "change_password": "Đổi mật khẩu",
+      "change_password_desc": "Cập nhật mật khẩu tài khoản của bạn",
+      "back": "Quay lại",
+      "email_label": "Email",
+      "cannot_be_changed": "(không thể thay đổi)",
+      "gender_label": "Giới tính",
+      "gender_prefer_not_to_say": "Không muốn tiết lộ",
+      "gender_male": "Nam",
+      "gender_female": "Nữ",
+      "gender_other": "Khác",
+      "dob_label": "Ngày sinh",
+      "address_label": "Địa chỉ",
+      "address_placeholder": "Đường, Quận/Huyện, Tỉnh/Thành phố",
+      "saving": "Đang lưu...",
+      "name_placeholder": "Họ và tên của bạn",
       "validation": {
         "required_fields": "Vui lòng điền đầy đủ thông tin!",
         "update_success": "Cập nhật thành công!",
-        "update_failed": "Cập nhật thất bại"
+        "update_failed": "Cập nhật thất bại",
+        "name_required": "Họ và tên là bắt buộc.",
+        "name_min": "Họ và tên phải có ít nhất 2 ký tự.",
+        "name_max": "Họ và tên tối đa 100 ký tự.",
+        "phone_invalid": "Số điện thoại không hợp lệ. Vui lòng sử dụng số điện thoại Việt Nam hợp lệ (ví dụ: 0912345678).",
+        "dob_invalid": "Ngày sinh không hợp lệ.",
+        "dob_future": "Ngày sinh không thể ở tương lai.",
+        "dob_too_old": "Vui lòng nhập ngày sinh hợp lệ.",
+        "address_max": "Địa chỉ tối đa 255 ký tự."
+      },
+      "toast": {
+        "update_success_title": "Cập nhật hồ sơ",
+        "update_success_desc": "Thông tin của bạn đã được lưu lại.",
+        "update_failed_desc": "Cập nhật hồ sơ thất bại.",
+        "avatar_success_title": "Cập nhật ảnh đại diện",
+        "avatar_success_desc": "Ảnh đại diện của bạn đã được thay đổi.",
+        "avatar_failed_desc": "Cập nhật ảnh đại diện thất bại."
       }
     },
     "cart_modal": {
@@ -3738,6 +3780,8 @@
     "change_password_page": {
       "title": "Đổi Mật khẩu",
       "subtitle": "Cập nhật mật khẩu để bảo mật tài khoản của bạn",
+      "create_title": "Tạo Mật khẩu",
+      "create_subtitle": "Tạo mật khẩu mới cho tài khoản của bạn để có thể đăng nhập bằng email.",
       "current_password_label": "Mật khẩu hiện tại",
       "current_password_placeholder": "Nhập mật khẩu hiện tại",
       "new_password_label": "Mật khẩu mới",
@@ -3745,6 +3789,7 @@
       "confirm_password_label": "Xác nhận Mật khẩu mới",
       "confirm_password_placeholder": "Xác nhận mật khẩu mới",
       "change_btn": "ĐỔI MẬT KHẨU",
+      "create_btn": "TẠO MẬT KHẨU",
       "back_to_dashboard": "Quay lại Dashboard",
       "password_strong": "Mật khẩu mạnh",
       "passwords_match": "Mật khẩu khớp",
@@ -3758,7 +3803,8 @@
         "password_mismatch": "Mật khẩu không khớp"
       },
       "alerts": {
-        "success": "Đổi mật khẩu thành công!\n\nMật khẩu của bạn đã được cập nhật."
+        "success": "Đổi mật khẩu thành công!\n\nMật khẩu của bạn đã được cập nhật.",
+        "create_success": "Tạo mật khẩu thành công!\n\nMật khẩu của bạn đã được thiết lập."
       }
     }
   },

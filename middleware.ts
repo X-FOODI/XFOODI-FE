@@ -25,11 +25,12 @@ export function middleware(req: NextRequest) {
   // Public routes accessible on any domain (no auth needed)
   const PUBLIC_ROUTES = new Set([
     "/login",
-    "/login-email",
     "/register",
     "/forgot-password",
     "/restaurant",
     "/reset-password",
+    "/check-email",
+    "/confirm-email",
   ]);
 
   // Skip middleware for static assets and API routes
@@ -79,30 +80,40 @@ export function middleware(req: NextRequest) {
   const adminAccessToken = req.cookies.get('adminAccessToken')?.value;
   const hasAdminAuthToken = !!adminAccessToken;
 
+  const ADMIN_GATE_CODE = process.env.NEXT_PUBLIC_ADMIN_GATE_CODE || '';
+
   // Super Admin domain (admin.xfoodi.com or admin.localhost)
   if (isAdminDomain) {
-    // Canonical login path: /login (rewrite to admin login page)
-    if (pathname === '/login') {
-      // If already logged in, go to home (which will redirect to /tenants)
+    // 1. Secret gate path (only accessible if ADMIN_GATE_CODE is configured in environment)
+    if (ADMIN_GATE_CODE && pathname === `/login/${ADMIN_GATE_CODE}`) {
       if (hasAdminAuthToken) {
-        return NextResponse.redirect(new URL('/tenants', req.url));
+        return NextResponse.redirect(new URL('/admin/dashboard', req.url));
       }
-      return NextResponse.rewrite(new URL('/login-admin', req.url));
+      // Internally rewrite to /login so Next.js renders the login page
+      return NextResponse.rewrite(new URL('/login', req.url));
     }
 
-    // Backward compatibility: redirect /login-admin to /login
-    if (pathname === '/login-admin') {
-      return NextResponse.redirect(new URL('/login', req.url));
+    // 2. Direct login path is blocked and redirected to landing page
+    if (pathname === '/login') {
+      const landingUrl = new URL('/', `http://${BASE_DOMAIN}`);
+      landingUrl.protocol = req.nextUrl.protocol;
+      return NextResponse.redirect(landingUrl);
     }
 
-    // Require admin token for all other paths on the admin domain
+    // 3. Require admin token for all other paths on the admin domain
     if (!hasAdminAuthToken) {
-      return NextResponse.redirect(new URL('/login', req.url));
+      if (ADMIN_GATE_CODE) {
+        return NextResponse.redirect(new URL(`/login/${ADMIN_GATE_CODE}`, req.url));
+      }
+      // If gate code is not configured, redirect to landing page safely
+      const landingUrl = new URL('/', `http://${BASE_DOMAIN}`);
+      landingUrl.protocol = req.nextUrl.protocol;
+      return NextResponse.redirect(landingUrl);
     }
 
-    // Redirect root to /tenants
+    // 4. Redirect root to dashboard
     if (pathname === '/') {
-      return NextResponse.redirect(new URL('/tenants', req.url));
+      return NextResponse.redirect(new URL('/admin/dashboard', req.url));
     }
     
     return NextResponse.next();
@@ -150,7 +161,7 @@ export function middleware(req: NextRequest) {
     // ── Protect /admin/* and /restaurant/dashboard — require auth token in cookie ──
     if (pathname.startsWith('/admin') || pathname.startsWith('/restaurant/dashboard') || pathname.startsWith('/restaurant/settings')) {
       if (!hasAuthToken) {
-        const loginUrl = new URL('/login-email', req.url);
+        const loginUrl = new URL('/login', req.url);
         // Pass redirect so login page can send user back after login
         loginUrl.searchParams.set('redirect', pathname);
         return NextResponse.redirect(loginUrl);
@@ -181,8 +192,13 @@ export function middleware(req: NextRequest) {
       return NextResponse.next();
     }
 
-    // Staff routes
+    // Staff routes — require authentication
     if (pathname.startsWith('/staff')) {
+      if (!hasAuthToken) {
+        const loginUrl = new URL('/login', req.url);
+        loginUrl.searchParams.set('redirect', pathname);
+        return NextResponse.redirect(loginUrl);
+      }
       return NextResponse.next();
     }
 

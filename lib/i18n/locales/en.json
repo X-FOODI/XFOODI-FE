@@ -3030,12 +3030,18 @@
       "brand": "Restaurant",
       "product": "Product",
       "workflow": "Workflow",
+      "restaurants": "Restaurants",
       "about": "About Us",
       "testimonials": "Testimonials",
       "contact": "Contact",
       "staff": "Staff",
       "login": "Log in",
-      "signup": "Sign up"
+      "signup": "Sign up",
+      "view_profile": "View Profile",
+      "admin_dashboard": "Admin Dashboard",
+      "restaurant_dashboard": "Restaurant Dashboard",
+      "open_restaurant": "Register Restaurant",
+      "logout": "Logout"
     },
     "hero": {
       "tag": "All-in-one Restaurant Ops Platform",
@@ -3366,10 +3372,46 @@
       "cancel": "Cancel",
       "name_label": "Full Name",
       "phone_label": "Phone Number",
+      "account_settings": "Account Settings",
+      "account_settings_desc": "Manage your personal information and account security.",
+      "profile_information": "Profile Information",
+      "security": "Security",
+      "security_desc": "Keep your account secure by using a strong, unique password.",
+      "change_password": "Change Password",
+      "change_password_desc": "Update your account password",
+      "back": "Back",
+      "email_label": "Email",
+      "cannot_be_changed": "(cannot be changed)",
+      "gender_label": "Gender",
+      "gender_prefer_not_to_say": "Prefer not to say",
+      "gender_male": "Male",
+      "gender_female": "Female",
+      "gender_other": "Other",
+      "dob_label": "Date of Birth",
+      "address_label": "Address",
+      "address_placeholder": "Street, District, City",
+      "saving": "Saving...",
+      "name_placeholder": "Your full name",
       "validation": {
         "required_fields": "Please fill in all fields!",
         "update_success": "Profile updated successfully!",
-        "update_failed": "Failed to update profile"
+        "update_failed": "Failed to update profile",
+        "name_required": "Full name is required.",
+        "name_min": "Full name must be at least 2 characters.",
+        "name_max": "Full name must be at most 100 characters.",
+        "phone_invalid": "Invalid phone number. Use a valid Vietnamese number (e.g. 0912345678).",
+        "dob_invalid": "Invalid date.",
+        "dob_future": "Date of birth cannot be in the future.",
+        "dob_too_old": "Please enter a valid date of birth.",
+        "address_max": "Address must be at most 255 characters."
+      },
+      "toast": {
+        "update_success_title": "Profile updated",
+        "update_success_desc": "Your information has been saved.",
+        "update_failed_desc": "Failed to update profile.",
+        "avatar_success_title": "Avatar updated",
+        "avatar_success_desc": "Your profile picture has been changed.",
+        "avatar_failed_desc": "Avatar upload failed."
       }
     },
     "cart_modal": {
@@ -3691,6 +3733,8 @@
     "change_password_page": {
       "title": "Change Password",
       "subtitle": "Update your password to keep your account secure",
+      "create_title": "Set Password",
+      "create_subtitle": "Create a new password for your account to enable standard email/password login.",
       "current_password_label": "Current Password",
       "current_password_placeholder": "Enter current password",
       "new_password_label": "New Password",
@@ -3698,6 +3742,7 @@
       "confirm_password_label": "Confirm New Password",
       "confirm_password_placeholder": "Confirm new password",
       "change_btn": "CHANGE PASSWORD",
+      "create_btn": "SET PASSWORD",
       "back_to_dashboard": "Back to Dashboard",
       "password_strong": "Password is strong",
       "passwords_match": "Passwords match",
@@ -3711,7 +3756,8 @@
         "password_mismatch": "Passwords do not match"
       },
       "alerts": {
-        "success": "Password Changed Successfully!\n\nYour password has been updated."
+        "success": "Password Changed Successfully!\n\nYour password has been updated.",
+        "create_success": "Password Set Successfully!\n\nYour password has been configured."
       }
     }
   },

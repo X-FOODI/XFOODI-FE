@@ -14,12 +14,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (!isAuthReady) return;
     if (!user) {
-      router.replace("/login-email?redirect=/admin/dashboard");
+      router.replace("/login?redirect=/admin/dashboard");
       return;
     }
     const roles: string[] = user?.roles || (user?.role ? [user.role] : []);
     if (!roles.includes("Admin") && !roles.includes("SuperAdmin") && !roles.includes("System Admin")) {
-      router.replace("/login-email?redirect=/admin/dashboard");
+      router.replace("/login?redirect=/admin/dashboard");
       return;
     }
   }, [isAuthReady, user, router]);
