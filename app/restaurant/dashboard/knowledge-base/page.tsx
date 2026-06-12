@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import axiosInstance from "@/lib/services/axiosInstance";
-import { message as antdMessage } from "antd";
+import { message as antdMessage, App } from "antd";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   MessageOutlined,
@@ -2812,6 +2812,7 @@ interface KbTestPanelProps {
 }
 
 function KbTestPanel({ bucketId, restaurantId }: KbTestPanelProps) {
+  const { message } = App.useApp();
   const [query, setQuery] = useState("");
   const [testMode, setTestMode] = useState<"retrieve" | "rag">("rag");
   const [retrievalSource, setRetrievalSource] = useState<"document" | "database" | "api">("document");
@@ -2917,7 +2918,7 @@ function KbTestPanel({ bucketId, restaurantId }: KbTestPanelProps) {
             }
           ]);
         } else {
-          antdMessage.error("Tìm kiếm tài liệu thất bại.");
+          message.error("Tìm kiếm tài liệu thất bại.");
         }
       } else {
         const res = await axiosInstance.post(reqPath, payload);
@@ -2961,7 +2962,7 @@ function KbTestPanel({ bucketId, restaurantId }: KbTestPanelProps) {
       }
     } catch (err: any) {
       console.error(err);
-      antdMessage.error(err.response?.data?.message || "Đã xảy ra lỗi khi thử nghiệm.");
+      message.error(err.response?.data?.message || "Đã xảy ra lỗi khi thử nghiệm.");
       
       const responseTime = Date.now() - requestStartTime;
       const logEntry = {
@@ -3538,7 +3539,7 @@ function KbTestPanel({ bucketId, restaurantId }: KbTestPanelProps) {
                         <button
                           onClick={() => {
                             navigator.clipboard.writeText(activeTrace.systemInstruction || "");
-                            antdMessage.success("Đã sao chép prompt hệ thống!");
+                            message.success("Đã sao chép prompt hệ thống!");
                           }}
                           className="p-1 rounded hover:bg-[var(--surface)] text-[var(--primary)] flex items-center gap-1 transition-colors text-[10px] font-bold"
                         >
@@ -3805,7 +3806,7 @@ function KbTestPanel({ bucketId, restaurantId }: KbTestPanelProps) {
                             <button
                               onClick={() => {
                                 navigator.clipboard.writeText(JSON.stringify(activeLog, null, 2));
-                                antdMessage.success("Đã copy toàn bộ log!");
+                                message.success("Đã copy toàn bộ log!");
                               }}
                               className="px-2 py-1 text-xs border rounded-lg hover:bg-[var(--surface)] flex items-center gap-1 font-semibold flex-shrink-0"
                               style={{ color: "var(--text)", borderColor: "var(--border)" }}
@@ -3924,7 +3925,7 @@ function KbTestPanel({ bucketId, restaurantId }: KbTestPanelProps) {
                                   setQuery(payload.text);
                                   setRetrievalSource(targetSource);
                                   setIsTestSuiteOpen(false);
-                                  antdMessage.info("Đã nạp kịch bản vào hộp thoại chat!");
+                                  message.info("Đã nạp kịch bản vào hộp thoại chat!");
                                 }}
                                 className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold border hover:bg-[var(--surface)]"
                                 style={{ color: "var(--text)", borderColor: "var(--border)" }}
