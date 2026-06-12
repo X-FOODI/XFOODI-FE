@@ -1,42 +1,103 @@
-'use client';
+"use client";
 
-import { FileTextOutlined, PlayCircleOutlined } from '@ant-design/icons';
-import { Button, Card, Col, Flex, Grid, Row, Tag, Typography } from 'antd';
-import { motion } from 'framer-motion';
-import React, { useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { usePageTransition } from './PageTransition';
-import TenantRequestForm from './TenantRequestForm';
-import { useAuth } from '@/lib/contexts/AuthContext';
+import {
+  ArrowRightOutlined,
+  CheckCircleOutlined,
+  PlayCircleOutlined,
+  MobileOutlined,
+  ShopOutlined,
+  ShoppingOutlined,
+  LineChartOutlined,
+  LaptopOutlined,
+  QrcodeOutlined
+} from "@ant-design/icons";
+import { Button, Card, Col, Flex, Grid, Row, Tag, Typography } from "antd";
+import { motion, AnimatePresence } from "framer-motion";
+import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { usePageTransition } from "./PageTransition";
+import TenantRequestForm from "./TenantRequestForm";
+import { useAuth } from "@/lib/contexts/AuthContext";
+import Link from "next/link";
 
 const { Title, Paragraph, Text } = Typography;
 const { useBreakpoint } = Grid;
 
 const HeroSection: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isVi = i18n.language === 'vi';
   const { isAnimationReady } = usePageTransition();
   const screens = useBreakpoint();
   const { user } = useAuth();
   const isAuthenticated = !!user;
 
-  // Use state for isMobile to match existing logic (or we could rely entirely on screens)
-  // Maintaining isMobile for granular typography/padding tweaks if needed, but syncing with breakpoints is better.
-  // Let's use screens for layout decisions primarily.
-  // Note: screens might be empty on first render, so we need to handle that or use a useEffect for isMobile if we want exact px match.
-  // But for this refactor, let's stick to the simpler isMobile state for "small mobile" specifically (<768)
-  // and use screens for the larger layout breaks (lg).
-
   const [isMobile, setIsMobile] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+
+  // Animation states for the dual mockup interactive loop
+  const [mockupStep, setMockupStep] = useState(0);
+  const [revenue, setRevenue] = useState(12500000);
+  const [orderCount, setOrderCount] = useState(152);
+  const [recentOrders, setRecentOrders] = useState([
+    { id: "1401", item: "2x Bún bò Huế", table: "Bàn 08", price: "130.000", status: "Hoàn tất" },
+    { id: "1400", item: "1x Trà đào", table: "Bàn 15", price: "25.000", status: "Hoàn tất" }
+  ]);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
     checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  const isStacked = !screens.lg; // Tablet or Mobile (< 992px)
+  // Loop simulation of user scan -> order -> receive
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setMockupStep((prev) => {
+        const next = (prev + 1) % 5;
+        
+        if (next === 0) {
+          // Reset dashboard numbers
+          setRevenue(12500000);
+          setOrderCount(152);
+          setRecentOrders([
+            { id: "1401", item: "2x Bún bò Huế", table: "Bàn 08", price: "130.000", status: "Hoàn tất" },
+            { id: "1400", item: "1x Trà đào", table: "Bàn 15", price: "25.000", status: "Hoàn tất" }
+          ]);
+        }
+        
+        if (next === 2) {
+          // Add item flying animation triggers new order insertion
+          setOrderCount((prev) => prev + 1);
+          setRevenue((prev) => prev + 65000);
+          setRecentOrders((prev) => [
+            { id: "1402", item: "1x Phở bò tái", table: "Bàn 04", price: "65.000", status: "Mới" },
+            ...prev.slice(0, 2)
+          ]);
+        }
+        
+        if (next === 3) {
+          // Order moves to kitchen (Đang chế biến)
+          setRecentOrders((prev) =>
+            prev.map((o) => (o.id === "1402" ? { ...o, status: "Bếp làm" } : o))
+          );
+        }
+
+        if (next === 4) {
+          // Order completed
+          setRecentOrders((prev) =>
+            prev.map((o) => (o.id === "1402" ? { ...o, status: "Hoàn tất" } : o))
+          );
+        }
+
+        return next;
+      });
+    }, 3500);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const isStacked = !screens.lg;
 
   // Animation variants
   const containerVariants = {
@@ -44,8 +105,8 @@ const HeroSection: React.FC = () => {
     visible: {
       opacity: 1,
       transition: {
-        staggerChildren: 0.15,
-        delayChildren: 0.2,
+        staggerChildren: 0.12,
+        delayChildren: 0.1,
       },
     },
   };
@@ -62,52 +123,14 @@ const HeroSection: React.FC = () => {
     },
   };
 
-  const cardVariants = {
-    hidden: { opacity: 0, x: 60, scale: 0.95 },
+  const rightVisualVariants = {
+    hidden: { opacity: 0, x: 40, scale: 0.95 },
     visible: {
       opacity: 1,
       x: 0,
       scale: 1,
       transition: {
-        duration: 0.8,
-        delay: 0.5,
-        ease: [0.25, 0.4, 0.25, 1],
-      },
-    },
-  };
-
-  const blobVariants = {
-    hidden: { opacity: 0, scale: 0.8 },
-    visible: {
-      opacity: 0.12,
-      scale: 1,
-      transition: {
-        duration: 1.2,
-        ease: 'easeOut',
-      },
-    },
-  };
-
-  const statsVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: {
-        duration: 0.5,
-        ease: [0.25, 0.4, 0.25, 1],
-      },
-    },
-  };
-
-  const trustedByVariants = {
-    hidden: { opacity: 0, y: 30 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: {
-        duration: 0.6,
-        delay: 1,
+        duration: 0.7,
         ease: [0.25, 0.4, 0.25, 1],
       },
     },
@@ -116,66 +139,63 @@ const HeroSection: React.FC = () => {
   return (
     <section
       style={{
-        position: 'relative',
-        minHeight: isMobile ? 'auto' : '100vh',
-        padding: isMobile ? '100px 16px 40px' : '100px 24px 40px',
-        overflow: 'hidden',
-        background: 'var(--bg-base)',
-        display: 'flex',
-        alignItems: 'center',
-      }}
-    >
-      {/* Orange Gradient Blob - Hidden on mobile for cleaner look */}
+        position: "relative",
+        minHeight: isMobile ? "auto" : "100vh",
+        padding: isMobile ? "100px 16px 160px" : "100px 24px 180px",
+        overflow: "hidden",
+        background: "var(--bg-base)",
+        display: "flex",
+        alignItems: "center",
+      }}>
+      {/* Decorative Blob */}
       {!isMobile && (
         <motion.div
-          variants={blobVariants}
-          initial="hidden"
-          animate={isAnimationReady ? 'visible' : 'hidden'}
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={isAnimationReady ? { opacity: 0.12, scale: 1 } : {}}
+          transition={{ duration: 1.2, ease: "easeOut" }}
           style={{
-            position: 'absolute',
-            top: '-10%',
-            right: '-15%',
-            width: '60%',
-            height: '120%',
-            background: 'linear-gradient(135deg, #FF6B3B 0%, var(--primary) 50%, #CC2D08 100%)',
-            borderRadius: '40% 30% 50% 40%',
-            transform: 'rotate(-15deg)',
+            position: "absolute",
+            top: "-15%",
+            right: "-15%",
+            width: "55%",
+            height: "120%",
+            background: "linear-gradient(135deg, #FF6B3B 0%, var(--primary) 50%, #CC2D08 100%)",
+            borderRadius: "40% 30% 50% 40%",
+            transform: "rotate(-12deg)",
             zIndex: 0,
+            pointerEvents: "none"
           }}
         />
       )}
 
-      <div style={{ maxWidth: 1200, margin: '0 auto', position: 'relative', zIndex: 1, width: '100%' }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto", position: "relative", zIndex: 1, width: "100%" }}>
         <Row gutter={[48, 48]} align="middle">
-          {/* Left Column */}
-          <Col xs={24} lg={12}>
+          {/* Left Column (Hero Content) */}
+          <Col xs={24} lg={11}>
             <motion.div
               variants={containerVariants}
               initial="hidden"
-              animate={isAnimationReady ? 'visible' : 'hidden'}
-            >
+              animate={isAnimationReady ? "visible" : "hidden"}>
               <Flex
                 vertical
-                gap={20}
+                gap={24}
                 style={{
-                  width: '100%',
-                  alignItems: isStacked ? 'center' : 'flex-start',
-                  textAlign: isStacked ? 'center' : 'left'
-                }}
-              >
+                  width: "100%",
+                  alignItems: isStacked ? "center" : "flex-start",
+                  textAlign: isStacked ? "center" : "left",
+                }}>
                 <motion.div variants={itemVariants}>
                   <Tag
                     style={{
-                      background: 'linear-gradient(135deg, #FFF3E8 0%, #FFE8D6 100%)',
-                      border: 'none',
-                      color: '#CC2D08',
-                      fontWeight: 600,
+                      background: "var(--primary-soft)",
+                      border: "1px solid var(--primary-border)",
+                      color: "var(--primary)",
+                      fontWeight: 700,
                       fontSize: isMobile ? 12 : 14,
-                      padding: isMobile ? '6px 12px' : '8px 16px',
+                      padding: isMobile ? "6px 14px" : "8px 18px",
                       borderRadius: 50,
-                    }}
-                  >
-                    {t('homepage.hero.tag')}
+                    }}>
+                    {t("homepage.hero.tag")}
                   </Tag>
                 </motion.div>
 
@@ -183,104 +203,94 @@ const HeroSection: React.FC = () => {
                   <Title
                     level={1}
                     style={{
-                      fontSize: isMobile ? 28 : 'clamp(36px, 5vw, 56px)',
-                      fontWeight: 700,
-                      lineHeight: 1.15,
+                      fontSize: isMobile ? 32 : "clamp(38px, 4.5vw, 54px)",
+                      fontWeight: 850,
+                      lineHeight: 1.2,
                       margin: 0,
-                      color: 'var(--text)',
-                    }}
-                  >
-                    {t('homepage.hero.title')}
+                      color: "var(--text)",
+                      letterSpacing: "-0.02em"
+                    }}>
+                    {t("homepage.hero.title")}
                   </Title>
                 </motion.div>
 
                 <motion.div variants={itemVariants}>
                   <Paragraph
                     style={{
-                      fontSize: isMobile ? 15 : 18,
-                      color: 'var(--text-muted)',
-                      lineHeight: 1.7,
+                      fontSize: isMobile ? 16 : 18,
+                      color: "var(--text-muted)",
+                      lineHeight: 1.8,
                       margin: 0,
-                      maxWidth: 480,
-                    }}
-                  >
-                    {t('homepage.hero.description')}
+                      maxWidth: 520,
+                    }}>
+                    {t("homepage.hero.description")}
                   </Paragraph>
                 </motion.div>
 
-                <motion.div variants={itemVariants} style={{ width: '100%' }}>
-                  <Flex gap={12} wrap="wrap" justify={isStacked ? 'center' : 'flex-start'}>
-                    <Button
-                      type="primary"
-                      size={isMobile ? 'middle' : 'large'}
-                      block={isMobile}
-                      onClick={() => {
-                        if (isAuthenticated) {
-                          setModalVisible(true);
-                        } else {
-                          window.location.href = '/login';
-                        }
-                      }}
-                      style={{
-                        height: isMobile ? 44 : 52,
-                        padding: isMobile ? '0 24px' : '0 36px',
-                        fontSize: isMobile ? 14 : 16,
-                        fontWeight: 600,
-                        borderRadius: 50,
-                        background: 'linear-gradient(135deg, var(--primary) 0%, #CC2D08 100%)',
-                        border: 'none',
-                        boxShadow: '0 8px 24px rgba(255, 56, 11, 0.35)',
-                      }}
-                    >
-                      {t('homepage.hero.get_started')}
-                    </Button>
-                    <Button
-                      size={isMobile ? 'middle' : 'large'}
-                      icon={<PlayCircleOutlined />}
-                      block={isMobile}
-                      style={{
-                        height: isMobile ? 44 : 52,
-                        padding: isMobile ? '0 20px' : '0 32px',
-                        fontSize: isMobile ? 14 : 16,
-                        fontWeight: 600,
-                        borderRadius: 50,
-                        borderColor: 'var(--border)',
-                        color: 'var(--text)',
-                        background: 'var(--card)',
-                      }}
-                    >
-                      {t('homepage.hero.watch_demo')}
-                    </Button>
+                {/* Interactive CTA buttons */}
+                <motion.div variants={itemVariants} style={{ width: "100%" }}>
+                  <Flex gap={16} wrap="wrap" justify={isStacked ? "center" : "flex-start"}>
+                    <Link href="/register-restaurant" prefetch>
+                      <Button
+                        type="primary"
+                        size="large"
+                        style={{
+                          height: 54,
+                          padding: "0 36px",
+                          fontSize: 16,
+                          fontWeight: 700,
+                          borderRadius: 28,
+                          background: "linear-gradient(135deg, var(--primary) 0%, #FF6B3B 100%)",
+                          border: "none",
+                          boxShadow: "0 10px 24px rgba(255, 90, 44, 0.3)",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 8,
+                        }}>
+                        {t("homepage.hero.get_started")}
+                        <ArrowRightOutlined />
+                      </Button>
+                    </Link>
+                    <a href="#case-studies">
+                      <Button
+                        size="large"
+                        icon={<PlayCircleOutlined />}
+                        style={{
+                          height: 54,
+                          padding: "0 32px",
+                          fontSize: 16,
+                          fontWeight: 600,
+                          borderRadius: 28,
+                          borderColor: "var(--border)",
+                          color: "var(--text)",
+                          background: "var(--card)",
+                          boxShadow: "var(--shadow-sm)",
+                        }}>
+                        {t("homepage.hero.watch_demo")}
+                      </Button>
+                    </a>
                   </Flex>
                 </motion.div>
 
-                {/* Stats */}
+                {/* Hero Stats */}
                 <motion.div
-                  variants={containerVariants}
-                  initial="hidden"
-                  animate={isAnimationReady ? 'visible' : 'hidden'}
-                  style={{ marginTop: 8, width: '100%' }}
-                >
-                  <Row gutter={[isMobile ? 16 : 32, 16]} justify={isStacked ? 'center' : 'start'}>
+                  variants={itemVariants}
+                  style={{ marginTop: 16, width: "100%", borderTop: "1px solid var(--border)", paddingTop: 24 }}>
+                  <Row gutter={[isMobile ? 12 : 24, 16]} justify={isStacked ? "center" : "start"}>
                     {[
-                      { value: '100.000+', label: t('homepage.hero.stats.brands') },
-                      { value: '15+', label: t('homepage.hero.stats.years') },
-                      { value: '500+', label: t('homepage.hero.stats.branches') },
+                      { value: "1,250+", label: isVi ? "Nhà hàng đang hoạt động" : "Active Restaurants" },
+                      { value: "5.2M+", label: isVi ? "Đơn hàng xử lý" : "Orders Processed" },
+                      { value: "99.95%", label: isVi ? "Uptime SLA" : "Uptime SLA" },
                     ].map((stat, index) => (
-                      <Col key={index} xs={8} lg={8}>
-                        <motion.div
-                          variants={statsVariants}
-                          custom={index}
-                          style={{
-                            display: 'flex',
-                            flexDirection: 'column', // Always column for cleaner stat look
-                            alignItems: isStacked ? 'center' : 'flex-start',
-                            gap: 2
-                          }}
-                        >
-                          <span style={{ color: 'var(--primary)', fontSize: isMobile ? 20 : 28, fontWeight: 700 }}>{stat.value}</span>
-                          <span style={{ color: 'var(--text-muted)', fontSize: isMobile ? 11 : 13, textAlign: 'center' }}>{stat.label}</span>
-                        </motion.div>
+                      <Col key={index} xs={8}>
+                        <Flex vertical align={isStacked ? "center" : "flex-start"} gap={4}>
+                          <span style={{ color: "var(--primary)", fontSize: isMobile ? 20 : 26, fontWeight: 800, lineHeight: 1.1 }}>
+                            {stat.value}
+                          </span>
+                          <span style={{ color: "var(--text-muted)", fontSize: isMobile ? 11 : 13, lineHeight: 1.2 }}>
+                            {stat.label}
+                          </span>
+                        </Flex>
                       </Col>
                     ))}
                   </Row>
@@ -289,215 +299,338 @@ const HeroSection: React.FC = () => {
             </motion.div>
           </Col>
 
-          {/* Right Column - Dashboard Mockup - Hidden on small mobile, visible on tablet */}
-          <Col xs={24} lg={12} style={{ display: isMobile ? 'none' : 'block' }}>
+          {/* Right Column (Dual SaaS Mockup with real-time feedback loops) */}
+          <Col xs={24} lg={13} style={{ display: isMobile ? "none" : "block" }}>
             <motion.div
-              variants={cardVariants}
+              variants={rightVisualVariants}
               initial="hidden"
-              animate={isAnimationReady ? 'visible' : 'hidden'}
-            >
-              <Card
+              animate={isAnimationReady ? "visible" : "hidden"}
+              style={{ position: "relative", height: 480, width: "100%" }}>
+              
+              {/* Desktop Dashboard Mockup */}
+              <div
                 style={{
-                  background: 'var(--card)',
-                  borderRadius: 24,
-                  border: '1px solid var(--border)',
-                  boxShadow: '0 20px 60px rgba(0, 0, 0, 0.08)',
-                }}
-                styles={{ body: { padding: 24 } }}
-              >
-                <Flex vertical gap={20} style={{ width: '100%' }}>
-                  {/* Header */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text strong style={{ fontSize: 18, color: 'var(--text)' }}>{t('homepage.hero.dashboard.title')}</Text>
-                    <div
-                      style={{
-                        width: 32,
-                        height: 32,
-                        background: 'linear-gradient(135deg, var(--primary) 0%, #CC2D08 100%)',
-                        borderRadius: 8,
-                      }}
-                    />
-                  </div>
+                  position: "absolute",
+                  left: 0,
+                  top: 20,
+                  width: "80%",
+                  background: "var(--card)",
+                  borderRadius: 16,
+                  border: "1px solid var(--border)",
+                  boxShadow: "0 20px 40px rgba(0, 0, 0, 0.08)",
+                  overflow: "hidden",
+                  zIndex: 1,
+                  transition: "all 0.3s ease",
+                }}>
+                {/* Browser Toolbar */}
+                <Flex
+                  align="center"
+                  justify="space-between"
+                  style={{
+                    background: "var(--surface)",
+                    padding: "10px 16px",
+                    borderBottom: "1px solid var(--border)",
+                  }}>
+                  <Flex gap={6}>
+                    <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#ef4444" }} />
+                    <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#eab308" }} />
+                    <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#22c55e" }} />
+                  </Flex>
+                  <Text style={{ fontSize: 11, color: "var(--text-muted)", opacity: 0.7, fontFamily: "monospace" }}>
+                    dashboard.xfoodi.vn
+                  </Text>
+                  <LaptopOutlined style={{ fontSize: 14, color: "var(--text-muted)" }} />
+                </Flex>
 
-                  {/* Chart Area */}
-                  <Card
-                    style={{
-                      background: 'var(--card)',
-                      border: `1px solid var(--border)`,
-                      borderRadius: 12,
-                    }}
-                    styles={{ body: { padding: 16 } }}
-                  >
-                    <Text strong style={{ color: 'var(--text)', display: 'block', marginBottom: 8 }}>{t('homepage.hero.dashboard.revenue_7_days')}</Text>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', height: 140 }}>
-                      {[32, 52, 44, 68, 60, 80, 72].map((h, i) => (
-                        <div
-                          key={i}
-                          style={{
-                            flex: 1,
-                            height: `${h}%`,
-                            minHeight: 20,
-                            borderRadius: 8,
-                            background: 'linear-gradient(180deg, #FF6B3B 0%, var(--primary) 100%)',
-                            boxShadow: '0 6px 18px rgba(255, 56, 11, 0.25)',
-                          }}
-                        />
-                      ))}
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, color: 'var(--text-muted)', fontSize: 12 }}>
-                      {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map((d) => <span key={d}>{d}</span>)}
-                    </div>
-                  </Card>
+                {/* Dashboard Inner Content */}
+                <div style={{ padding: 20 }}>
+                  <Flex justify="space-between" align="center" style={{ marginBottom: 16 }}>
+                    <Text strong style={{ fontSize: 14, color: "var(--text)" }}>Restaurant Portal</Text>
+                    <Tag color="processing" style={{ borderRadius: 4, fontSize: 11 }}>Live KOT Panel</Tag>
+                  </Flex>
 
-                  {/* Metrics */}
-                  <Row gutter={16}>
+                  {/* Stat Cards */}
+                  <Row gutter={12} style={{ marginBottom: 20 }}>
                     <Col span={12}>
-                      <Card size="small" style={{ borderRadius: 12, background: 'var(--card)', border: `1px solid var(--border)` }}>
-                        <Text style={{ fontSize: 12, textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-                          {t('homepage.hero.dashboard.revenue')}
+                      <div style={{ background: "var(--surface)", padding: "10px 14px", borderRadius: 8, border: "1px solid var(--border)" }}>
+                        <Text style={{ fontSize: 11, color: "var(--text-muted)", display: "block" }}>Doanh thu hôm nay</Text>
+                        <Text strong style={{ fontSize: 16, color: "var(--text)" }}>
+                          ₫{revenue.toLocaleString("vi-VN")}
                         </Text>
-                        <Title level={4} style={{ margin: '8px 0 0', color: 'var(--primary)' }}>
-                          ₫2.4M
-                        </Title>
-                      </Card>
+                      </div>
                     </Col>
                     <Col span={12}>
-                      <Card size="small" style={{ borderRadius: 12, background: 'var(--card)', border: `1px solid var(--border)` }}>
-                        <Text style={{ fontSize: 12, textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-                          {t('homepage.hero.dashboard.orders')}
+                      <div style={{ background: "var(--surface)", padding: "10px 14px", borderRadius: 8, border: "1px solid var(--border)" }}>
+                        <Text style={{ fontSize: 11, color: "var(--text-muted)", display: "block" }}>Tổng đơn đặt</Text>
+                        <Text strong style={{ fontSize: 16, color: "var(--text)" }}>
+                          {orderCount} đơn
                         </Text>
-                        <Title level={4} style={{ margin: '8px 0 0', color: 'var(--primary)' }}>
-                          148
-                        </Title>
-                      </Card>
+                      </div>
                     </Col>
                   </Row>
 
-                  {/* Table Preview */}
-                  <Card size="small" style={{ borderRadius: 12, background: 'var(--card)', border: `1px solid var(--border)` }}>
-                    <Text strong style={{ display: 'block', marginBottom: 12, color: 'var(--text)' }}>
-                      <FileTextOutlined style={{ marginRight: 6 }} /> {t('homepage.hero.dashboard.recent_orders')}
+                  {/* Active Orders List */}
+                  <div>
+                    <Text strong style={{ fontSize: 12, color: "var(--text-muted)", display: "block", marginBottom: 8 }}>
+                      Đơn hàng gần đây
                     </Text>
-                    <Flex vertical gap={12} style={{ width: '100%' }}>
-                      {[
-                        { table: 'A02', total: 'đ750.000', status: t('staff.orders.status.pending'), color: 'var(--primary)', bar: 88 },
-                        { table: 'B01', total: 'đ1.25M', status: t('staff.orders.status.served'), color: '#52c41a', bar: 72 },
-                        { table: 'VIP01', total: 'đ3.48M', status: t('staff.tables.status.occupied'), color: 'var(--primary)', bar: 64 },
-                      ].map((order, i) => (
-                        <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Text strong style={{ color: 'var(--text)', fontSize: 14 }}>{order.table}</Text>
-                            <Text style={{ color: 'var(--text-muted)', fontSize: 13 }}>{order.total}</Text>
-                            <span style={{ color: order.color, fontSize: 12, fontWeight: 700 }}>{order.status}</span>
-                          </div>
-                          <div
+                    <Flex vertical gap={8}>
+                      <AnimatePresence initial={false}>
+                        {recentOrders.map((ord) => (
+                          <motion.div
+                            key={ord.id}
+                            initial={{ opacity: 0, y: -10, height: 0 }}
+                            animate={{ opacity: 1, y: 0, height: "auto" }}
+                            exit={{ opacity: 0, y: 10, height: 0 }}
+                            transition={{ duration: 0.3 }}
                             style={{
-                              height: 8,
-                              borderRadius: 999,
-                              background: 'var(--border)',
-                              overflow: 'hidden',
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: `${order.bar}%`,
-                                height: '100%',
-                                background: order.color,
-                                borderRadius: 999,
-                              }}
-                            />
-                          </div>
-                        </div>
-                      ))}
+                              background: "var(--surface)",
+                              padding: "8px 12px",
+                              borderRadius: 8,
+                              border: "1px solid var(--border)",
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                            }}>
+                            <Flex vertical>
+                              <Text strong style={{ fontSize: 12, color: "var(--text)" }}>{ord.item}</Text>
+                              <Text style={{ fontSize: 10, color: "var(--text-muted)" }}>{ord.table} · Đơn #{ord.id}</Text>
+                            </Flex>
+                            <Flex align="center" gap={8}>
+                              <Text style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>₫{ord.price}</Text>
+                              <Tag
+                                color={
+                                  ord.status === "Mới"
+                                    ? "red"
+                                    : ord.status === "Bếp làm"
+                                    ? "orange"
+                                    : "green"
+                                }
+                                style={{ margin: 0, borderRadius: 4, fontSize: 10 }}>
+                                {ord.status}
+                              </Tag>
+                            </Flex>
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
                     </Flex>
-                  </Card>
-                </Flex>
-              </Card>
+                  </div>
+                </div>
+              </div>
+
+              {/* Overlapping Mobile Menu QR Mockup */}
+              <div
+                style={{
+                  position: "absolute",
+                  right: 20,
+                  bottom: 10,
+                  width: 230,
+                  background: "#111827",
+                  border: "6px solid #374151",
+                  borderRadius: 32,
+                  boxShadow: "0 24px 48px rgba(0, 0, 0, 0.25)",
+                  overflow: "hidden",
+                  zIndex: 2,
+                  height: 380,
+                  display: "flex",
+                  flexDirection: "column",
+                  color: "#ffffff"
+                }}>
+                {/* Phone Notch */}
+                <div style={{
+                  height: 18,
+                  width: 100,
+                  background: "#374151",
+                  margin: "0 auto",
+                  borderRadius: "0 0 10px 10px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center"
+                }} />
+
+                {/* Mobile App Header */}
+                <div style={{ padding: "12px 16px 8px", borderBottom: "1px solid #1f2937", background: "#1f2937" }}>
+                  <Flex justify="space-between" align="center">
+                    <Flex align="center" gap={6}>
+                      <ShopOutlined style={{ color: "var(--primary)", fontSize: 14 }} />
+                      <span style={{ fontSize: 11, color: "#ffffff", fontWeight: 700 }}>Phở Hùng QR</span>
+                    </Flex>
+                    <span style={{ fontSize: 10, color: "#9ca3af" }}>Bàn 04</span>
+                  </Flex>
+                </div>
+
+                {/* Mobile Menu List */}
+                <div style={{ flex: 1, padding: 12, overflow: "hidden", display: "flex", verticalAlign: "top", flexDirection: "column", gap: 10 }}>
+                  {/* Item 1 */}
+                  <div style={{
+                    background: "#1f2937",
+                    borderRadius: 8,
+                    padding: 8,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    position: "relative"
+                  }}>
+                    <Flex vertical>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: "#ffffff" }}>Phở bò tái chín</span>
+                      <span style={{ fontSize: 10, color: "#9ca3af" }}>₫65.000</span>
+                    </Flex>
+                    
+                    {/* Simulated finger click pointer */}
+                    {mockupStep === 1 && (
+                      <motion.div
+                        initial={{ scale: 0.8, opacity: 0 }}
+                        animate={{ scale: [0.8, 1.2, 1], opacity: 1 }}
+                        transition={{ duration: 0.5 }}
+                        style={{
+                          position: "absolute",
+                          right: -10,
+                          top: 15,
+                          zIndex: 10,
+                          width: 24,
+                          height: 24,
+                          background: "rgba(255, 90, 44, 0.4)",
+                          border: "2px solid var(--primary)",
+                          borderRadius: "50%",
+                          pointerEvents: "none"
+                        }}
+                      />
+                    )}
+
+                    <Button
+                      type="primary"
+                      size="small"
+                      style={{
+                        fontSize: 9,
+                        height: 22,
+                        background: mockupStep >= 2 ? "#10b981" : "var(--primary)",
+                        border: "none",
+                        borderRadius: 4,
+                        fontWeight: 700
+                      }}>
+                      {mockupStep >= 2 ? "Đã chọn" : "Thêm"}
+                    </Button>
+                  </div>
+
+                  {/* Item 2 */}
+                  <div style={{ background: "#1f2937", borderRadius: 8, padding: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <Flex vertical>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: "#ffffff" }}>Bún bò Huế</span>
+                      <span style={{ fontSize: 10, color: "#9ca3af" }}>₫65.000</span>
+                    </Flex>
+                    <Button size="small" style={{ fontSize: 9, height: 22, background: "transparent", color: "#ffffff", borderColor: "#4b5563", borderRadius: 4 }}>
+                      Thêm
+                    </Button>
+                  </div>
+
+                  {/* Item 3 */}
+                  <div style={{ background: "#1f2937", borderRadius: 8, padding: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <Flex vertical>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: "#ffffff" }}>Trà đào cam sả</span>
+                      <span style={{ fontSize: 10, color: "#9ca3af" }}>₫25.000</span>
+                    </Flex>
+                    <Button size="small" style={{ fontSize: 9, height: 22, background: "transparent", color: "#ffffff", borderColor: "#4b5563", borderRadius: 4 }}>
+                      Thêm
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Floating Payment Action */}
+                <AnimatePresence>
+                  {mockupStep >= 3 && (
+                    <motion.div
+                      initial={{ y: 50, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      exit={{ y: 50, opacity: 0 }}
+                      style={{
+                        position: "absolute",
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        background: "#1f2937",
+                        padding: 12,
+                        borderTop: "1px solid #374151"
+                      }}>
+                      <Flex justify="space-between" align="center" style={{ marginBottom: 6 }}>
+                        <span style={{ fontSize: 11, color: "#ffffff" }}>Tổng: 1 món</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--primary)" }}>₫65.000</span>
+                      </Flex>
+                      <Button
+                        type="primary"
+                        block
+                        size="small"
+                        icon={mockupStep === 4 ? <CheckCircleOutlined /> : <QrcodeOutlined />}
+                        style={{
+                          fontSize: 10,
+                          height: 28,
+                          background: mockupStep === 4 ? "#10b981" : "var(--primary)",
+                          border: "none"
+                        }}>
+                        {mockupStep === 4 ? "Đã Thanh Toán (PayOS)" : "Quét PayOS chuyển khoản"}
+                      </Button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </motion.div>
           </Col>
         </Row>
-
-        {/* Trusted By - Inside Hero */}
-        <motion.div
-          variants={trustedByVariants}
-          initial="hidden"
-          animate={isAnimationReady ? 'visible' : 'hidden'}
-          style={{
-            marginTop: 48,
-            paddingTop: 32,
-            borderTop: '1px solid var(--border)',
-            textAlign: 'center',
-          }}
-        >
-          <Text
-            style={{
-              color: 'var(--text-muted)',
-              fontSize: 12,
-              fontWeight: 600,
-              textTransform: 'uppercase',
-              letterSpacing: 1.5,
-            }}
-          >
-            {t('homepage.hero.trusted_by')}
-          </Text>
-          <motion.div
-            initial="hidden"
-            animate={isAnimationReady ? 'visible' : 'hidden'}
-            variants={{
-              hidden: { opacity: 1 },
-              visible: {
-                opacity: 1,
-                transition: {
-                  staggerChildren: 0.08,
-                  delayChildren: 1.2,
-                },
-              },
-            }}
-            style={{
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              gap: 24,
-              marginTop: 20,
-              flexWrap: 'wrap',
-            }}
-          >
-            {['Golden Gate', 'Redsun', 'ThaiExpress', 'Phở 24', 'Highlands', 'King BBQ'].map((brand, index) => (
-              <motion.span
-                key={index}
-                variants={{
-                  hidden: { opacity: 0, y: 20 },
-                  visible: {
-                    opacity: 1,
-                    y: 0,
-                    transition: {
-                      duration: 0.4,
-                      ease: [0.25, 0.4, 0.25, 1],
-                    },
-                  },
-                }}
-                style={{
-                  color: 'var(--text-muted)',
-                  fontWeight: 600,
-                  fontSize: 14,
-                  padding: '8px 16px',
-                  background: 'var(--card)',
-                  borderRadius: 8,
-                }}
-              >
-                {brand}
-              </motion.span>
-            ))}
-          </motion.div>
-        </motion.div>
       </div>
 
-      {/* Tenant Request Form Modal */}
+      {/* Full-width Partners Bar */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          background: "var(--surface)",
+          borderTop: "1px solid var(--border)",
+          borderBottom: "1px solid var(--border)",
+          padding: "20px 16px",
+          zIndex: 1,
+        }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto", textAlign: "center" }}>
+          <Text
+            style={{
+              color: "var(--text-muted)",
+              fontSize: 11,
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: 2,
+              display: "block",
+              marginBottom: 12,
+            }}>
+            {isVi ? "Được tin dùng bởi các thương hiệu hàng đầu" : "TRUSTED BY LEADING BRANDS"}
+          </Text>
+          <Flex gap={24} wrap="wrap" justify="center" align="middle">
+            {["🍜 Phở Hùng", "🍣 Sushi House", "☕ Coffee Bean", "🍕 Pizza Home", "🍰 Sweet & Salt", "🍗 Chicken Hub"].map((brand, index) => (
+              <span
+                key={index}
+                style={{
+                  color: "var(--text)",
+                  fontWeight: 700,
+                  fontSize: 13,
+                  opacity: 0.8,
+                  padding: "6px 16px",
+                  background: "var(--card)",
+                  borderRadius: 12,
+                  border: "1px solid var(--border)",
+                  boxShadow: "var(--shadow-sm)",
+                }}>
+                {brand}
+              </span>
+            ))}
+          </Flex>
+        </div>
+      </div>
+
+      {/* Request Form Modal */}
       <TenantRequestForm
         visible={modalVisible}
         onCancel={() => setModalVisible(false)}
         onSuccess={() => {
-          console.log('Tenant request submitted successfully');
+          console.log("Tenant request submitted");
         }}
       />
     </section>

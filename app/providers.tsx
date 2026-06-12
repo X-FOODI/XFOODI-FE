@@ -38,9 +38,12 @@ export default function Providers({ children }: { children: React.ReactNode }) {
         <I18nProvider>
             <AuthProvider>
                 <ToastProvider>
-                    <AntdProvider>{children}</AntdProvider>
+                    <AntdProvider>
+                        {children}
+                    </AntdProvider>
                 </ToastProvider>
             </AuthProvider>
         </I18nProvider>
     );
 }
+
