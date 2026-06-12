@@ -15,7 +15,9 @@ function getCookieDomain(): string {
   
   // If it's localhost or a subdomain of localhost
   if (hostname === 'localhost' || hostname.endsWith('.localhost')) {
-    return '; domain=.localhost';
+    // Chrome, Edge, and Firefox reject domain=.localhost.
+    // We must omit the domain attribute to make the cookie host-only.
+    return '';
   }
   
   // Otherwise, extract the base domain
