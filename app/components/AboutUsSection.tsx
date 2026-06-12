@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowRightOutlined, GlobalOutlined, HeartOutlined, RocketOutlined, UsergroupAddOutlined } from '@ant-design/icons';
+import { ArrowRightOutlined, ShopOutlined, ShoppingCartOutlined, HeartOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { Button, Card, Col, Row, Space, Typography } from 'antd';
 import { motion } from 'framer-motion';
 import React from 'react';
@@ -31,10 +31,10 @@ const AboutUsSection: React.FC = () => {
     };
 
     const stats = [
-        { label: t('homepage.about.stats.restaurants', 'Restaurants Empowered'), value: '10k+', icon: <RocketOutlined /> },
-        { label: t('homepage.about.stats.countries', 'Countries Supported'), value: '25+', icon: <GlobalOutlined /> },
-        { label: t('homepage.about.stats.chefs', 'Happy Chefs'), value: '50k+', icon: <HeartOutlined /> },
-        { label: t('homepage.about.stats.team', 'Team Members'), value: '100+', icon: <UsergroupAddOutlined /> },
+        { label: t('homepage.about.stats.restaurants', 'Restaurants Empowered'), value: '1,250+', icon: <ShopOutlined /> },
+        { label: t('homepage.about.stats.countries', 'Daily Orders'), value: '5.2M+', icon: <ShoppingCartOutlined /> },
+        { label: t('homepage.about.stats.chefs', 'Regular Customers'), value: '230k+', icon: <HeartOutlined /> },
+        { label: t('homepage.about.stats.team', 'Satisfied Feedback'), value: '99.95%', icon: <CheckCircleOutlined /> },
     ];
 
     return (
