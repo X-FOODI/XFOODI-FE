@@ -15,29 +15,11 @@ import {
 } from "@ant-design/icons";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
-// ── Validation ────────────────────────────────────────────────────────────────
+// ── Strength indicator ─────────────────────────────────────────────────────────
 
-function validateCurrentPassword(v: string) {
-  if (!v) return "Current password is required.";
-  return "";
-}
-
-function validateNewPassword(v: string) {
-  if (!v) return "New password is required.";
-  if (v.length < 6) return "Password must be at least 6 characters.";
-  return "";
-}
-
-function validateConfirm(newPwd: string, confirm: string) {
-  if (!confirm) return "Please confirm your new password.";
-  if (confirm !== newPwd) return "Passwords do not match.";
-  return "";
-}
-
-// ── Password strength ─────────────────────────────────────────────────────────
-
-function getStrength(pwd: string): { score: number; label: string; color: string } {
+function getStrength(pwd: string, t: any): { score: number; label: string; color: string } {
   if (!pwd) return { score: 0, label: "", color: "" };
   let score = 0;
   if (pwd.length >= 6) score++;
@@ -45,10 +27,10 @@ function getStrength(pwd: string): { score: number; label: string; color: string
   if (/[A-Z]/.test(pwd)) score++;
   if (/[0-9]/.test(pwd)) score++;
   if (/[^A-Za-z0-9]/.test(pwd)) score++;
-  if (score <= 1) return { score, label: "Weak", color: "#f87171" };
-  if (score <= 2) return { score, label: "Fair", color: "#fbbf24" };
-  if (score <= 3) return { score, label: "Good", color: "#60a5fa" };
-  return { score, label: "Strong", color: "#34d399" };
+  if (score <= 1) return { score, label: t("change_password_page.password_weak", "Weak"), color: "#f87171" };
+  if (score <= 2) return { score, label: t("change_password_page.password_fair", "Fair"), color: "#fbbf24" };
+  if (score <= 3) return { score, label: t("change_password_page.password_good", "Good"), color: "#60a5fa" };
+  return { score, label: t("change_password_page.password_strong", "Strong"), color: "#34d399" };
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -82,7 +64,8 @@ const inputStyle: React.CSSProperties = {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function ChangePasswordPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { t } = useTranslation();
+  const { user, loading: authLoading, updateUser } = useAuth();
   const { showToast } = useToast();
   const router = useRouter();
 
@@ -121,9 +104,22 @@ export default function ChangePasswordPage() {
   }, [user, authLoading, router]);
 
   const validate = (v: FormValues): FormValues => ({
-    currentPassword: validateCurrentPassword(v.currentPassword),
-    newPassword: validateNewPassword(v.newPassword),
-    confirmPassword: validateConfirm(v.newPassword, v.confirmPassword),
+    currentPassword:
+      user?.hasPassword !== false
+        ? !v.currentPassword
+          ? t("change_password_page.validation.required_current", "Current password is required.")
+          : ""
+        : "",
+    newPassword: !v.newPassword
+      ? t("change_password_page.validation.required_new", "New password is required.")
+      : v.newPassword.length < 8
+      ? t("change_password_page.validation.password_min", "Password must be at least 8 characters.")
+      : "",
+    confirmPassword: !v.confirmPassword
+      ? t("change_password_page.validation.required_confirm", "Please confirm your new password.")
+      : v.confirmPassword !== v.newPassword
+      ? t("change_password_page.validation.password_mismatch", "Passwords do not match.")
+      : "",
   });
 
   const handleChange = (field: FieldKey, value: string) => {
@@ -150,23 +146,36 @@ export default function ChangePasswordPage() {
     setLoading(true);
     try {
       await userService.changePassword({
-        currentPassword: values.currentPassword,
+        currentPassword: user?.hasPassword !== false ? values.currentPassword : "",
         newPassword: values.newPassword,
         confirmPassword: values.confirmPassword,
       });
+
+      // Update the local user session to reflect that they now have a password configured
+      if (user) {
+        updateUser({ ...user, hasPassword: true });
+      }
+
       setSuccess(true);
-      showToast("success", "Password changed", "Your password has been updated successfully.");
+      showToast(
+        "success",
+        user?.hasPassword !== false
+          ? t("change_password_page.alerts.success", "Password Changed")
+          : t("change_password_page.alerts.create_success", "Password Set"),
+        t("change_password_page.alerts.success", "Your password has been updated successfully.")
+      );
+      
       // Redirect back to profile after short delay
       setTimeout(() => router.push("/profile"), 1800);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to change password.";
-      showToast("error", "Update failed", msg);
+      const msg = err instanceof Error ? err.message : t("change_password_page.validation.update_failed", "Failed to change password.");
+      showToast("error", t("customer_page.profile.validation.update_failed", "Update failed"), msg);
     } finally {
       setLoading(false);
     }
   };
 
-  const strength = getStrength(values.newPassword);
+  const strength = getStrength(values.newPassword, t);
 
   // ── Loading auth ──────────────────────────────────────────────────────────
 
@@ -190,8 +199,14 @@ export default function ChangePasswordPage() {
           <div style={{ width: "4rem", height: "4rem", borderRadius: "50%", background: "rgba(52,211,153,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <CheckCircleOutlined style={{ fontSize: "2rem", color: "#34d399" }} />
           </div>
-          <h2 style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--text)", margin: 0 }}>Password Updated</h2>
-          <p style={{ fontSize: "0.875rem", color: "var(--text-muted)", margin: 0 }}>Redirecting you back to profile…</p>
+          <h2 style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--text)", margin: 0 }}>
+            {user?.hasPassword !== false
+              ? t("change_password_page.alerts.success", "Password Updated")
+              : t("change_password_page.alerts.create_success", "Password Configured")}
+          </h2>
+          <p style={{ fontSize: "0.875rem", color: "var(--text-muted)", margin: 0 }}>
+            {t("change_password_page.redirecting", "Redirecting you back to profile…")}
+          </p>
           <div style={{ width: "1.5rem", height: "1.5rem", borderRadius: "50%", border: "2px solid var(--primary)", borderTopColor: "transparent", animation: "spin 0.8s linear infinite" }} />
           <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
@@ -202,9 +217,31 @@ export default function ChangePasswordPage() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   const fields: { key: FieldKey; label: string; icon: React.ReactNode; placeholder: string; autoComplete: string }[] = [
-    { key: "currentPassword", label: "Current Password", icon: <LockOutlined />, placeholder: "Enter your current password", autoComplete: "current-password" },
-    { key: "newPassword", label: "New Password", icon: <KeyOutlined />, placeholder: "At least 6 characters", autoComplete: "new-password" },
-    { key: "confirmPassword", label: "Confirm New Password", icon: <SafetyOutlined />, placeholder: "Re-enter new password", autoComplete: "new-password" },
+    ...(user.hasPassword !== false
+      ? [
+          {
+            key: "currentPassword" as FieldKey,
+            label: t("change_password_page.current_password_label", "Current Password"),
+            icon: <LockOutlined />,
+            placeholder: t("change_password_page.current_password_placeholder", "Enter current password"),
+            autoComplete: "current-password",
+          },
+        ]
+      : []),
+    {
+      key: "newPassword" as FieldKey,
+      label: t("change_password_page.new_password_label", "New Password"),
+      icon: <KeyOutlined />,
+      placeholder: t("change_password_page.new_password_placeholder", "Enter new password"),
+      autoComplete: "new-password",
+    },
+    {
+      key: "confirmPassword" as FieldKey,
+      label: t("change_password_page.confirm_password_label", "Confirm New Password"),
+      icon: <SafetyOutlined />,
+      placeholder: t("change_password_page.confirm_password_placeholder", "Confirm new password"),
+      autoComplete: "new-password",
+    },
   ];
 
   return (
@@ -221,10 +258,14 @@ export default function ChangePasswordPage() {
             onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
           >
             <ArrowLeftOutlined />
-            <span>Back to Profile</span>
+            <span>{t("customer_page.profile.back", "Back to Profile")}</span>
           </button>
           <span style={{ color: "var(--border)" }}>/</span>
-          <span style={{ fontSize: "0.875rem", fontWeight: 500, color: "var(--text)" }}>Change Password</span>
+          <span style={{ fontSize: "0.875rem", fontWeight: 500, color: "var(--text)" }}>
+            {user.hasPassword !== false
+              ? t("change_password_page.title", "Change Password")
+              : t("change_password_page.create_title", "Set Password")}
+          </span>
         </div>
       </div>
 
@@ -237,10 +278,16 @@ export default function ChangePasswordPage() {
             <div style={{ width: "2.75rem", height: "2.75rem", borderRadius: "0.75rem", background: "var(--primary-soft)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--primary)", fontSize: "1.25rem", flexShrink: 0 }}>
               <LockOutlined />
             </div>
-            <h1 style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--text)", margin: 0 }}>Change Password</h1>
+            <h1 style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--text)", margin: 0 }}>
+              {user.hasPassword !== false
+                ? t("change_password_page.title", "Change Password")
+                : t("change_password_page.create_title", "Set Password")}
+            </h1>
           </div>
           <p style={{ fontSize: "0.875rem", color: "var(--text-muted)", margin: 0, paddingLeft: "3.625rem" }}>
-            Choose a strong password to keep your account secure.
+            {user.hasPassword !== false
+              ? t("change_password_page.subtitle", "Update your password to keep your account secure")
+              : t("change_password_page.create_subtitle", "Create a new password for your account to enable standard email/password login.")}
           </p>
         </div>
 
@@ -309,7 +356,9 @@ export default function ChangePasswordPage() {
                   {key === "newPassword" && values.newPassword && (
                     <div style={{ marginTop: "0.5rem" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem" }}>
-                        <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Password strength</span>
+                        <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                          {t("change_password_page.password_strong", "Password strength")}
+                        </span>
                         <span style={{ fontSize: "0.75rem", fontWeight: 600, color: strength.color }}>{strength.label}</span>
                       </div>
                       <div style={{ height: "0.375rem", borderRadius: "9999px", background: "var(--border)", overflow: "hidden" }}>
@@ -321,7 +370,7 @@ export default function ChangePasswordPage() {
                   {/* Confirm match indicator */}
                   {key === "confirmPassword" && values.confirmPassword && !errors.confirmPassword && touched.confirmPassword && (
                     <p style={{ marginTop: "0.25rem", fontSize: "0.75rem", color: "#34d399", fontWeight: 500, display: "flex", alignItems: "center", gap: "0.25rem" }}>
-                      <CheckCircleOutlined /> Passwords match
+                      <CheckCircleOutlined /> {t("change_password_page.passwords_match", "Passwords match")}
                     </p>
                   )}
                 </div>
@@ -356,9 +405,14 @@ export default function ChangePasswordPage() {
               onMouseLeave={(e) => { if (!loading) (e.currentTarget as HTMLButtonElement).style.background = "var(--primary)"; }}
             >
               {loading ? (
-                <><LoadingOutlined style={{ fontSize: "1rem" }} /> Updating…</>
+                <><LoadingOutlined style={{ fontSize: "1rem" }} /> {t("change_password_page.saving", "Updating…")}</>
               ) : (
-                <><KeyOutlined style={{ fontSize: "1rem" }} /> Update Password</>
+                <>
+                  <KeyOutlined style={{ fontSize: "1rem" }} />{" "}
+                  {user.hasPassword !== false
+                    ? t("change_password_page.change_btn", "Update Password")
+                    : t("change_password_page.create_btn", "Set Password")}
+                </>
               )}
             </button>
 
@@ -370,7 +424,7 @@ export default function ChangePasswordPage() {
               onMouseEnter={(e) => (e.currentTarget.style.color = "var(--primary)")}
               onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
             >
-              Cancel — go back to profile
+              {t("customer_page.profile.cancel", "Cancel")}
             </button>
           </form>
         </div>
@@ -378,14 +432,14 @@ export default function ChangePasswordPage() {
         {/* Security tips */}
         <div style={{ marginTop: "1.25rem", borderRadius: "0.875rem", border: "1px solid var(--border)", background: "var(--surface)", padding: "1rem 1.25rem" }}>
           <p style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--text)", marginBottom: "0.5rem" }}>
-            Tips for a strong password
+            {t("change_password_page.tips_title", "Tips for a strong password")}
           </p>
           <ul style={{ margin: 0, paddingLeft: "1.25rem", display: "flex", flexDirection: "column", gap: "0.25rem" }}>
             {[
-              "At least 6 characters long",
-              "Mix uppercase and lowercase letters",
-              "Include numbers and special characters",
-              "Avoid using personal information",
+              t("change_password_page.tips_length", "At least 8 characters long"),
+              t("change_password_page.tips_letters", "Mix uppercase and lowercase letters"),
+              t("change_password_page.tips_numbers", "Include numbers and special characters"),
+              t("change_password_page.tips_personal", "Avoid using personal information"),
             ].map((tip) => (
               <li key={tip} style={{ fontSize: "0.8125rem", color: "var(--text-muted)" }}>{tip}</li>
             ))}

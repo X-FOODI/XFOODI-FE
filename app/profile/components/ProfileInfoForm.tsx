@@ -11,40 +11,41 @@ import {
   UserOutlined,
 } from "@ant-design/icons";
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { User } from "@/lib/services/authService";
 
 // ── Validation ────────────────────────────────────────────────────────────────
 
-function validateFullName(value: string): string {
-  if (!value.trim()) return "Full name is required.";
-  if (value.trim().length < 2) return "Full name must be at least 2 characters.";
-  if (value.trim().length > 100) return "Full name must be at most 100 characters.";
+function validateFullName(value: string, t: any): string {
+  if (!value.trim()) return t("customer_page.profile.validation.name_required", "Full name is required.");
+  if (value.trim().length < 2) return t("customer_page.profile.validation.name_min", "Full name must be at least 2 characters.");
+  if (value.trim().length > 100) return t("customer_page.profile.validation.name_max", "Full name must be at most 100 characters.");
   return "";
 }
 
-function validatePhone(value: string): string {
+function validatePhone(value: string, t: any): string {
   if (!value.trim()) return "";
   const phoneRegex = /^(\+84|0)(3[2-9]|5[6-9]|7[0|6-9]|8[0-9]|9[0-9])[0-9]{7}$/;
   if (!phoneRegex.test(value.replace(/\s/g, ""))) {
-    return "Invalid phone number. Use a valid Vietnamese number (e.g. 0912345678).";
+    return t("customer_page.profile.validation.phone_invalid", "Invalid phone number. Use a valid Vietnamese number (e.g. 0912345678).");
   }
   return "";
 }
 
-function validateDateOfBirth(value: string): string {
+function validateDateOfBirth(value: string, t: any): string {
   if (!value) return "";
   const date = new Date(value);
-  if (isNaN(date.getTime())) return "Invalid date.";
-  if (date > new Date()) return "Date of birth cannot be in the future.";
+  if (isNaN(date.getTime())) return t("customer_page.profile.validation.dob_invalid", "Invalid date.");
+  if (date > new Date()) return t("customer_page.profile.validation.dob_future", "Date of birth cannot be in the future.");
   const minDate = new Date();
   minDate.setFullYear(minDate.getFullYear() - 120);
-  if (date < minDate) return "Please enter a valid date of birth.";
+  if (date < minDate) return t("customer_page.profile.validation.dob_too_old", "Please enter a valid date of birth.");
   return "";
 }
 
-function validateAddress(value: string): string {
+function validateAddress(value: string, t: any): string {
   if (!value.trim()) return "";
-  if (value.trim().length > 255) return "Address must be at most 255 characters.";
+  if (value.trim().length > 255) return t("customer_page.profile.validation.address_max", "Address must be at most 255 characters.");
   return "";
 }
 
@@ -65,13 +66,6 @@ interface ProfileInfoFormProps {
   loading: boolean;
   onSubmit: (values: ProfileFormValues) => Promise<void>;
 }
-
-const GENDER_OPTIONS = [
-  { value: "", label: "Prefer not to say" },
-  { value: "MALE", label: "Male" },
-  { value: "FEMALE", label: "Female" },
-  { value: "OTHER", label: "Other" },
-];
 
 // ── Shared input style (uses CSS variables — works in both light & dark) ──────
 // Avoids Tailwind dark: classes that get overridden by globals.css utility overrides.
@@ -104,6 +98,15 @@ const inputDisabledStyle: React.CSSProperties = {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function ProfileInfoForm({ user, loading, onSubmit }: ProfileInfoFormProps) {
+  const { t } = useTranslation();
+
+  const GENDER_OPTIONS = [
+    { value: "", label: t("customer_page.profile.gender_prefer_not_to_say", "Prefer not to say") },
+    { value: "MALE", label: t("customer_page.profile.gender_male", "Male") },
+    { value: "FEMALE", label: t("customer_page.profile.gender_female", "Female") },
+    { value: "OTHER", label: t("customer_page.profile.gender_other", "Other") },
+  ];
+
   const [values, setValues] = useState<ProfileFormValues>({
     fullName: user.fullName || user.name || "",
     phoneNumber: user.phoneNumber || "",
@@ -132,11 +135,11 @@ export default function ProfileInfoForm({ user, loading, onSubmit }: ProfileInfo
   }, [user]);
 
   const validate = (v: ProfileFormValues): ProfileFormValues => ({
-    fullName: validateFullName(v.fullName),
-    phoneNumber: validatePhone(v.phoneNumber),
+    fullName: validateFullName(v.fullName, t),
+    phoneNumber: validatePhone(v.phoneNumber, t),
     gender: "",
-    dateOfBirth: validateDateOfBirth(v.dateOfBirth),
-    address: validateAddress(v.address),
+    dateOfBirth: validateDateOfBirth(v.dateOfBirth, t),
+    address: validateAddress(v.address, t),
   });
 
   const handleChange = (field: FieldKey, value: string) => {
@@ -210,7 +213,7 @@ export default function ProfileInfoForm({ user, loading, onSubmit }: ProfileInfo
         {/* Full Name */}
         <div>
           <label htmlFor="fullName" style={labelStyle}>
-            Full Name <span style={{ color: "#f87171" }}>*</span>
+            {t("customer_page.profile.name_label", "Full Name")} <span style={{ color: "#f87171" }}>*</span>
           </label>
           <div style={{ position: "relative" }}>
             <span style={iconStyle}><UserOutlined /></span>
@@ -221,7 +224,7 @@ export default function ProfileInfoForm({ user, loading, onSubmit }: ProfileInfo
               onChange={(e) => handleChange("fullName", e.target.value)}
               onBlur={() => handleBlur("fullName")}
               disabled={loading}
-              placeholder="Your full name"
+              placeholder={t("customer_page.profile.name_placeholder", "Your full name")}
               autoComplete="name"
               style={getStyle("fullName")}
             />
@@ -232,7 +235,7 @@ export default function ProfileInfoForm({ user, loading, onSubmit }: ProfileInfo
         {/* Phone Number */}
         <div>
           <label htmlFor="phoneNumber" style={labelStyle}>
-            Phone Number
+            {t("customer_page.profile.phone_label", "Phone Number")}
           </label>
           <div style={{ position: "relative" }}>
             <span style={iconStyle}><PhoneOutlined /></span>
@@ -255,9 +258,9 @@ export default function ProfileInfoForm({ user, loading, onSubmit }: ProfileInfo
       {/* ── Email — read-only ── */}
       <div>
         <label htmlFor="email" style={labelStyle}>
-          Email{" "}
+          {t("customer_page.profile.email_label", "Email")}{" "}
           <span style={{ fontSize: "0.75rem", fontWeight: 400, color: "var(--text-muted)" }}>
-            (cannot be changed)
+            {t("customer_page.profile.cannot_be_changed", "(cannot be changed)")}
           </span>
         </label>
         <div style={{ position: "relative" }}>
@@ -278,7 +281,7 @@ export default function ProfileInfoForm({ user, loading, onSubmit }: ProfileInfo
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Gender */}
         <div>
-          <label htmlFor="gender" style={labelStyle}>Gender</label>
+          <label htmlFor="gender" style={labelStyle}>{t("customer_page.profile.gender_label", "Gender")}</label>
           <div style={{ position: "relative" }}>
             <span style={iconStyle}><ManOutlined /></span>
             <select
@@ -316,7 +319,7 @@ export default function ProfileInfoForm({ user, loading, onSubmit }: ProfileInfo
 
         {/* Date of Birth */}
         <div>
-          <label htmlFor="dateOfBirth" style={labelStyle}>Date of Birth</label>
+          <label htmlFor="dateOfBirth" style={labelStyle}>{t("customer_page.profile.dob_label", "Date of Birth")}</label>
           <div style={{ position: "relative" }}>
             <span style={iconStyle}><CalendarOutlined /></span>
             <input
@@ -339,7 +342,7 @@ export default function ProfileInfoForm({ user, loading, onSubmit }: ProfileInfo
 
       {/* ── Address ── */}
       <div>
-        <label htmlFor="address" style={labelStyle}>Address</label>
+        <label htmlFor="address" style={labelStyle}>{t("customer_page.profile.address_label", "Address")}</label>
         <div style={{ position: "relative" }}>
           <span style={{ ...iconStyle, top: "0.75rem", bottom: "auto" }}>
             <EnvironmentOutlined />
@@ -350,7 +353,7 @@ export default function ProfileInfoForm({ user, loading, onSubmit }: ProfileInfo
             onChange={(e) => handleChange("address", e.target.value)}
             onBlur={() => handleBlur("address")}
             disabled={loading}
-            placeholder="Street, District, City"
+            placeholder={t("customer_page.profile.address_placeholder", "Street, District, City")}
             rows={2}
             style={{
               ...getStyle("address"),
@@ -374,9 +377,9 @@ export default function ProfileInfoForm({ user, loading, onSubmit }: ProfileInfo
           className="w-full flex items-center justify-center gap-2 py-3 px-6 rounded-xl font-semibold text-sm text-white bg-[var(--primary)] hover:bg-[#ff5722] transition-all duration-200 shadow-[0_4px_14px_0_rgba(255,56,11,0.35)] hover:shadow-[0_6px_20px_rgba(255,56,11,0.25)] hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:transform-none disabled:shadow-none"
         >
           {loading ? (
-            <><LoadingOutlined className="text-base" />Saving…</>
+            <><LoadingOutlined className="text-base" />{t("customer_page.profile.saving", "Saving...")}</>
           ) : (
-            <><SaveOutlined className="text-base" />Save Changes</>
+            <><SaveOutlined className="text-base" />{t("customer_page.profile.save_changes", "Save Changes")}</>
           )}
         </button>
       </div>

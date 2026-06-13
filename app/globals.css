@@ -3,7 +3,8 @@
 @tailwind utilities;
 
 :root {
-  --primary: #FF380B;
+  --primary: #FF5A2C;
+  --secondary: #FFF4EF;
   --bg-light-base: #FFFFFF;
   --bg-dark-base: #0A0E14;
 
@@ -15,8 +16,8 @@
 
   --light-surface: #F9FAFB;
   --light-card: #FFFFFF;
-  --dark-surface: #1A1F2E;
-  --dark-card: #151A24;
+  --dark-surface: #111827;
+  --dark-card: #1E293B;
 
   /* =========================================================
    * Layering (Light Mode) - Use light surface/card by default
@@ -32,17 +33,17 @@
   --card: var(--light-card);
   --border: #E5E7EB;
 
-  /* Accessible â€œon colorâ€ tokens (can be auto-adjusted by JS) */
+  /* Accessible “on color” tokens (can be auto-adjusted by JS) */
   --text-inverse: #FFFFFF;
   --on-primary: var(--text-inverse);
   --reservation-hero-description: color-mix(in srgb, var(--text-inverse), transparent 12%);
 
-  --primary-soft: color-mix(in srgb, var(--primary), transparent 85%);
-  --primary-faint: color-mix(in srgb, var(--primary), transparent 94%);
-  --primary-glow: color-mix(in srgb, var(--primary), transparent 72%);
-  --primary-border: color-mix(in srgb, var(--primary), transparent 70%);
-  --primary-hover: color-mix(in srgb, var(--primary), black 10%);
-  --primary-tint: color-mix(in srgb, var(--primary), white 35%);
+  --primary-soft: color-mix(in srgb, var(--primary), transparent 90%);
+  --primary-faint: color-mix(in srgb, var(--primary), transparent 95%);
+  --primary-glow: color-mix(in srgb, var(--primary), transparent 75%);
+  --primary-border: color-mix(in srgb, var(--primary), transparent 80%);
+  --primary-hover: color-mix(in srgb, var(--primary), black 8%);
+  --primary-tint: color-mix(in srgb, var(--primary), white 30%);
 
   /* Neutrals derived from mode tokens */
   --stroke-subtle: color-mix(in srgb, var(--text), transparent 88%);
@@ -50,15 +51,15 @@
   --pattern-dot: color-mix(in srgb, var(--text), transparent 92%);
 
   /* Semantic colors (centralized; components must use vars) */
-  --danger: #ff4d4f;
+  --danger: #ef4444;
   --danger-soft: color-mix(in srgb, var(--danger), transparent 85%);
   --danger-border: color-mix(in srgb, var(--danger), transparent 65%);
 
-  --success: #52c41a;
+  --success: #10B981;
   --success-soft: color-mix(in srgb, var(--success), transparent 85%);
   --success-border: color-mix(in srgb, var(--success), transparent 65%);
 
-  --warning: #faad14;
+  --warning: #f59e0b;
   --warning-soft: color-mix(in srgb, var(--warning), transparent 85%);
   --warning-border: color-mix(in srgb, var(--warning), transparent 65%);
   --text-on-warning: #111111;
@@ -82,6 +83,7 @@
    * Layering (Dark Mode) - Use dark surface/card
    * ========================================================= */
   --bg-base: var(--bg-dark-base);
+  --secondary: #1F1512;
 
   /* Text */
   --text: var(--text-dark-dynamic);
@@ -9582,3 +9584,58 @@ html.reservation-overlay-open .ant-select-dropdown {
 .dashboard-animate-in-delay-2 { animation-delay: 0.1s; }
 .dashboard-animate-in-delay-3 { animation-delay: 0.15s; }
 .dashboard-animate-in-delay-4 { animation-delay: 0.2s; }
+
+/* =========================================================
+ * CopilotKit Custom Theme Customization (Light/Dark Mode)
+ * ========================================================= */
+:root {
+  --copilot-kit-primary-color: var(--primary);
+  --copilot-kit-background-color: var(--card);
+  --copilot-kit-text-color: var(--text);
+  --copilot-kit-border-color: var(--border);
+  --copilot-kit-muted-text-color: var(--text-muted);
+  --copilot-kit-secondary-color: var(--surface);
+  --copilot-kit-card-background-color: var(--card);
+  --copilot-kit-card-border-color: var(--border);
+}
+
+[data-theme="dark"] {
+  --copilot-kit-primary-color: var(--primary);
+  --copilot-kit-background-color: var(--card);
+  --copilot-kit-text-color: var(--text);
+  --copilot-kit-border-color: var(--border);
+  --copilot-kit-muted-text-color: var(--text-muted);
+  --copilot-kit-secondary-color: var(--surface);
+  --copilot-kit-card-background-color: var(--card);
+  --copilot-kit-card-border-color: var(--border);
+}
+
+/* Specific component overrides for premium integration */
+.copilotKitWindow, .copilotKitPopup {
+  background-color: var(--card) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text) !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15) !important;
+}
+
+.copilotKitHeader {
+  background-color: var(--surface) !important;
+  border-bottom: 1px solid var(--border) !important;
+  color: var(--text) !important;
+}
+
+.copilotKitButton {
+  background-color: var(--primary) !important;
+  box-shadow: 0 4px 12px rgba(255, 56, 11, 0.3) !important;
+}
+
+.copilotKitMessageUser {
+  background-color: var(--primary-soft) !important;
+  color: var(--text) !important;
+}
+
+.copilotKitMessageAssistant {
+  background-color: var(--surface) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border) !important;
+}

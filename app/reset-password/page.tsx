@@ -154,7 +154,7 @@ function ResetPasswordPageContent() {
       });
 
       message.success(t('reset_password_page.alerts.success'));
-      window.location.href = '/login-email';
+      window.location.href = '/login';
     } catch (error: any) {
       const errorMessage = error.message || 'Failed to reset password. Please try again.';
       message.error(errorMessage);

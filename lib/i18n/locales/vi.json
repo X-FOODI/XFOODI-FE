@@ -3074,24 +3074,30 @@
   "homepage": {
     "header": {
       "logo_alt": "Logo nhà hàng",
-      "brand": "Nhà hàng",
+      "brand": "XFoodi",
       "product": "Sản phẩm",
       "workflow": "Quy trình",
+      "restaurants": "Nhà hàng",
       "about": "Về chúng tôi",
       "testimonials": "Khách hàng",
       "contact": "Liên hệ",
       "staff": "Staff",
       "login": "Đăng nhập",
-      "signup": "Đăng ký"
+      "signup": "Đăng ký",
+      "view_profile": "Xem hồ sơ",
+      "admin_dashboard": "Trang quản trị",
+      "restaurant_dashboard": "Trang nhà hàng",
+      "open_restaurant": "Mở nhà hàng",
+      "logout": "Đăng xuất"
     },
     "hero": {
-      "tag": "Nền tảng vận hành nhà hàng toàn diện",
-      "title": "Tối ưu vận hành nhà hàng với XFoodi",
-      "description": "Quản lý đặt bàn, order, bếp, kho và báo cáo trên một nền tảng duy nhất.",
-      "get_started": "Bắt đầu ngay",
-      "watch_demo": "Xem Demo",
+      "tag": "Nền tảng Multi-Tenant SaaS F&B #1",
+      "title": "Biến mỗi nhà hàng thành một nền tảng riêng",
+      "description": "Tạo website, menu QR, đặt món, CRM khách hàng và marketing tự động chỉ trong vài phút.",
+      "get_started": "Dùng thử miễn phí",
+      "watch_demo": "Xem demo nhà hàng",
       "stats": {
-        "brands": "Thương hiệu",
+        "brands": "Thương hiệu tin dùng",
         "years": "Năm kinh nghiệm",
         "branches": "Chi nhánh"
       },
@@ -3102,13 +3108,19 @@
         "orders": "Đơn hàng",
         "recent_orders": "Đơn hàng gần đây"
       },
-      "trusted_by": "Được tin dùng bởi các thương hiệu hàng đầu"
+      "trusted_by": "Được tin dùng bởi các đối tác hàng đầu"
     },
     "about": {
-      "tag": "Câu chuyện của chúng tôi",
-      "title_prefix": "Cách mạng hóa ",
-      "title_highlight": "Ngành Ẩm thực",
-      "description": "Nền tảng Nhà hàng ra đời với sứ mệnh đơn giản: trao quyền cho các chủ nhà hàng bằng công nghệ cho cảm giác tự nhiên như tay nghề của họ. Chúng tôi thu hẹp khoảng cách giữa lòng hiếu khách truyền thống và hiệu quả hiện đại, giúp bạn tập trung vào điều quan trọng nhất—món ăn ngon và khách hàng hài lòng.",
+      "tag": "SỨ MỆNH & CHỈ SỐ",
+      "title_prefix": "Hàng nghìn nhà hàng đã ",
+      "title_highlight": "tin tưởng XFoodi",
+      "description": "Từ quán cafe bình dân đến chuỗi nhà hàng lớn, XFoodi giúp chủ quán tối ưu quy trình vận hành và tăng trưởng bền vững nhờ công nghệ đám mây cô lập dữ liệu.",
+      "stats": {
+        "restaurants": "Nhà hàng đang hoạt động",
+        "countries": "Đơn hàng xử lý",
+        "chefs": "Khách hàng cuối",
+        "team": "Tỷ lệ Uptime"
+      },
       "mission": {
         "title": "Sứ mệnh Dẫn lối",
         "desc": "Tận tâm vì sự phát triển của bạn"
@@ -3117,43 +3129,37 @@
         "title": "Đổi mới Đi đầu",
         "desc": "Luôn đón đầu xu hướng"
       },
-      "cta": "Tham gia cùng chúng tôi",
-      "stats": {
-        "restaurants": "Nhà hàng Tin dùng",
-        "countries": "Quốc gia Hỗ trợ",
-        "chefs": "Đầu bếp Hài lòng",
-        "team": "Thành viên Đội ngũ"
-      }
+      "cta": "Tham gia cộng đồng"
     },
     "features": {
-      "tag": "Tính năng",
-      "title_prefix": "Tính năng nổi bật của ",
-      "brand": "Nhà hàng",
-      "description": "Tất cả công cụ bạn cần để vận hành nhà hàng – trong một giao diện trực quan.",
+      "tag": "Tính năng nổi bật",
+      "title_prefix": "Tất cả công cụ bạn cần, ",
+      "brand": "trong một nơi",
+      "description": "Tối ưu hóa quy trình, tăng hiệu suất hoạt động và mang lại trải nghiệm tuyệt vời cho thực khách.",
       "items": {
         "analytics": {
-          "title": "Analytics",
-          "description": "Xem dữ liệu bán hàng chảy vào biểu đồ và báo cáo theo thời gian thực."
+          "title": "Báo cáo realtime",
+          "description": "Theo dõi doanh thu, món bán chạy, hiệu suất phục vụ theo thời gian thực."
         },
         "tables": {
-          "title": "Tables",
-          "description": "Quan sát sơ đồ bàn và trạng thái phục vụ tức thì trên toàn bộ khu vực."
+          "title": "Sơ đồ bàn thông minh",
+          "description": "Quản lý tình trạng bàn trống, đang dùng bữa hay đang dọn dẹp trực quan."
         },
         "menu": {
-          "title": "Menu",
-          "description": "Admin tạo món, chỉnh menu và khách nhìn thấy thay đổi ngay lập tức."
+          "title": "Thực đơn số hóa",
+          "description": "Tự động cập nhật món ăn, giá bán và trạng thái tồn kho tức thì."
         },
         "reservations": {
-          "title": "Reservations",
-          "description": "Customer đặt bàn, Admin xử lý và Staff check-in theo luồng rõ ràng."
+          "title": "Đặt bàn trực tuyến",
+          "description": "Khách chọn vị trí, bàn yêu thích trên sơ đồ 3D thực tế ảo."
         },
         "customer": {
-          "title": "Customer",
-          "description": "Theo dõi lịch sử đơn hàng, khách quay lại và dữ liệu loyalty của từng khách."
+          "title": "Chăm sóc khách hàng (CRM)",
+          "description": "Tích hợp hệ thống loyalty, tích điểm và phân hạng thành viên tự động."
         },
         "staff_ops": {
-          "title": "Staff Ops",
-          "description": "KDS và quy trình vận hành cho Staff, Kitchen và Admin trong một màn hình."
+          "title": "Vận hành tinh gọn",
+          "description": "Kết nối luồng gọi món từ khách đến nhà bếp và quầy thu ngân tức thì."
         },
         "table_management": {
           "title": "Quản lý đặt bàn thông minh",
@@ -3183,47 +3189,47 @@
       }
     },
     "workflow": {
-      "title": "Cách Nền tảng Nhà hàng vận hành trong nhà hàng của bạn",
-      "description": "Từ lúc khách đặt bàn đến khi chốt bill, mọi bước đều được Nền tảng Nhà hàng hỗ trợ.",
+      "title": "Lên sàn trong 3 bước đơn giản",
+      "description": "Không cần thiết lập phức tạp — nhà hàng của bạn có thể sẵn sàng phục vụ khách hàng chỉ sau 10 phút.",
       "steps": {
         "setup": {
           "title": "Thiết lập nhà hàng & menu",
-          "description": "Cấu hình thông tin nhà hàng, tạo menu, thiết lập bàn ghế và phân quyền nhân viên chỉ trong vài phút."
+          "description": "Khởi tạo menu, bàn và phân quyền nhân viên chỉ trong 10 phút."
         },
         "operation": {
-          "title": "Vận hành & đồng bộ realtime",
-          "description": "Nhận order, xử lý thanh toán, gửi lệnh xuống bếp tự động. Mọi thay đổi được cập nhật ngay lập tức trên tất cả thiết bị."
+          "title": "In QR Code và kích hoạt",
+          "description": "Mỗi bàn có một mã QR riêng. Khách scan là gọi món, xem thực đơn ngay tại bàn."
         },
         "analysis": {
-          "title": "Phân tích & tối ưu",
-          "description": "Xem báo cáo chi tiết về doanh thu, món bán chạy, chi phí. Sử dụng dữ liệu để ra quyết định kinh doanh thông minh hơn."
+          "title": "Vận hành & Tăng trưởng",
+          "description": "Kiểm soát mọi order từ nhà bếp đến quầy thanh toán. Thống kê báo cáo doanh thu theo thời gian thực."
         }
       }
     },
     "testimonials": {
-      "title": "Nhà hàng nói gì về Nền tảng Nhà hàng?",
-      "description": "Hàng trăm chủ nhà hàng và quản lý đã tin tưởng Nền tảng Nhà hàng để tối ưu vận hành của họ.",
+      "title": "Nhà hàng thực, kết quả thực",
+      "description": "Xem các chủ nhà hàng chia sẻ về cách XFoodi đã giúp họ tối ưu quy trình và tăng trưởng doanh thu.",
       "items": {
         "nam": {
-          "role": "Owner, Nhà hàng Hải Sản 123",
-          "quote": "Nền tảng Nhà hàng đã thay đổi hoàn toàn cách chúng tôi vận hành. Từ việc đặt bàn đến quản lý kho, mọi thứ đều được tự động hóa và chính xác hơn rất nhiều."
+          "role": "Chủ nhà hàng Seafood 123",
+          "quote": "XFoodi đã giúp chúng tôi tự động hóa hoàn toàn từ khâu đặt bàn đến gọi món qua QR. Nhân viên phục vụ nhàn hơn, ít sai sót hơn và doanh số tăng rõ rệt."
         },
         "huong": {
-          "role": "Manager, Chuỗi Phở 24h",
-          "quote": "Trước đây tôi phải mất hàng giờ để tổng hợp báo cáo từ 5 chi nhánh. Giờ với Nền tảng Nhà hàng, tất cả dữ liệu đều có sẵn trên dashboard trong vài cú click."
+          "role": "Quản lý chuỗi Phở 24h",
+          "quote": "Báo cáo đa chi nhánh của XFoodi cực kỳ chính xác và cập nhật theo thời gian thực. Tôi có thể nắm bắt doanh thu bất kỳ lúc nào ngay trên điện thoại."
         },
         "tuan": {
-          "role": "Owner, Quán Cơm Tấm Sài Gòn",
-          "quote": "Giao diện đơn giản, nhân viên học rất nhanh. Hệ thống ổn định, chưa bao giờ gặp lỗi trong giờ cao điểm. Recommend cho mọi nhà hàng!"
+          "role": "Sáng lập Cơm Tấm Sài Gòn",
+          "quote": "Khách hàng của chúng tôi rất thích tự quét QR để gọi món và xem hóa đơn. Tính năng này giúp giảm thời gian chờ đợi đáng kể trong giờ cao điểm."
         },
         "lan": {
-          "role": "Manager, Cafe & Bistro Xanh",
-          "quote": "Chúng tôi yêu tính năng đồng bộ realtime. Order từ app đến bếp chỉ trong 1 giây, khách hàng rất hài lòng về tốc độ phục vụ."
+          "role": "Chủ Cafe & Bistro Xanh",
+          "quote": "Trợ lý AI gợi ý món của XFoodi hoạt động rất thông minh. Khách hàng cảm thấy được chăm sóc chu đáo và gọi thêm nhiều món hơn."
         }
       }
     },
     "footer": {
-      "tagline": "Nền tảng vận hành nhà hàng thế hệ mới. Giúp bạn quản lý mọi khía cạnh của nhà hàng trên một hệ thống duy nhất.",
+      "tagline": "Nền tảng vận hành và tối ưu doanh thu thế hệ mới cho mọi mô hình F&B. Giúp bạn số hóa quy trình và kết nối khách hàng hiệu quả.",
       "columns": {
         "product": {
           "title": "Sản phẩm",
@@ -3235,8 +3241,8 @@
         "resources": {
           "title": "Tài nguyên",
           "blog": "Blog",
-          "help_center": "Trung tâm trợ giúp",
-          "faqs": "FAQs",
+          "help_center": "Trung tâm hỗ trợ",
+          "faqs": "Câu hỏi thường gặp",
           "documentation": "Tài liệu"
         },
         "company": {
@@ -3250,14 +3256,159 @@
           "title": "Pháp lý",
           "privacy": "Chính sách bảo mật",
           "terms": "Điều khoản dịch vụ",
-          "cookies": "Chính sách Cookie",
+          "cookies": "Chính sách cookie",
           "gdpr": "GDPR"
         }
       },
-      "copyright": "© {year} Nền tảng Nhà hàng. All rights reserved.",
+      "copyright": "© {year} XFoodi. Bảo lưu mọi quyền.",
       "privacy": "Bảo mật",
       "terms": "Điều khoản",
       "cookies": "Cookies"
+    },
+    "cta": {
+      "badge": "Miễn phí 14 ngày",
+      "title": "Tạo website nhà hàng của bạn trong 5 phút",
+      "description": "Thiết lập hệ thống vận hành tự động và chuyên nghiệp từ A-Z mà không cần đội ngũ kỹ thuật hỗ trợ.",
+      "primary_btn": "Dùng thử miễn phí 14 ngày",
+      "secondary_btn": "Liên hệ tư vấn",
+      "check1": "Domain riêng",
+      "check2": "QR Menu",
+      "check3": "CRM khách hàng",
+      "check4": "Marketing tự động",
+      "check5": "Không cần đội kỹ thuật"
+    },
+    "features_alt": {
+      "tag": "TÍNH NĂNG CỐT LÕI",
+      "title": "Mọi công cụ vận hành nằm trong tay bạn",
+      "description": "Không chỉ là phần mềm quản lý, XFoodi cung cấp bộ giải pháp toàn diện giúp tự động hóa luồng trải nghiệm khách hàng.",
+      "qr_menu": {
+        "title": "QR Menu thông minh",
+        "desc": "Khách hàng quét mã QR tại bàn để gọi món, xem hóa đơn và thanh toán online qua PayOS động mà không cần tải ứng dụng hay đợi phục vụ.",
+        "bullet1": "Quét QR gọi món tức thì",
+        "bullet2": "Thanh toán PayOS động",
+        "bullet3": "Trải nghiệm mượt mà, không cài đặt"
+      },
+      "crm": {
+        "title": "CRM & Khách hàng thân thiết",
+        "desc": "Lưu trữ lịch sử ăn uống, tự động tích điểm, phân hạng thành viên và tạo các chương trình tri ân để giữ chân khách hàng trung thành.",
+        "bullet1": "Lưu lịch sử khách hàng",
+        "bullet2": "Tự động tích điểm thành viên",
+        "bullet3": "Phân nhóm chăm sóc cá nhân hóa"
+      },
+      "marketing": {
+        "title": "Marketing Tự động (Remarketing)",
+        "desc": "Thiết lập các kịch bản gửi voucher sinh nhật, tin nhắn SMS/Email chăm sóc khách cũ và các chiến dịch remarketing thúc đẩy tỷ lệ quay lại.",
+        "bullet1": "Voucher chúc mừng sinh nhật tự động",
+        "bullet2": "Remarketing SMS & Email",
+        "bullet3": "Đo lường hiệu quả chuyển đổi"
+      }
+    },
+    "journey": {
+      "tag": "HÀNH TRÌNH TRẢI NGHIỆM",
+      "title": "Luồng hoạt động liền mạch 360°",
+      "description": "Xem cách thực khách và nhà bếp của bạn kết nối mượt mà qua hệ thống tự động của XFoodi.",
+      "steps": {
+        "customer": "Khách hàng",
+        "scan": "Quét QR",
+        "view": "Xem menu",
+        "order": "Đặt món",
+        "pay": "Thanh toán",
+        "crm": "CRM lưu dữ liệu",
+        "marketing": "Marketing tự động"
+      }
+    },
+    "multitenant": {
+      "tag": "KIẾN TRÚC HỆ THỐNG",
+      "title": "Một nền tảng - Hàng nghìn nhà hàng độc lập",
+      "description": "XFoodi sử dụng công nghệ Multi-Tenant SaaS giúp cô lập dữ liệu hoàn toàn. Mỗi nhà hàng vận hành như một thực thể độc lập với cấu hình riêng biệt.",
+      "platform": "Nền tảng XFoodi",
+      "isolation": "Mỗi nhà hàng có:",
+      "domain": "Domain/Subdomain riêng",
+      "menu": "Thực đơn & Giá bán riêng",
+      "customers": "Cơ sở dữ liệu khách hàng riêng",
+      "orders": "Quản lý đơn hàng độc lập"
+    },
+    "case_studies": {
+      "tag": "KHÁCH HÀNG TIÊU BIỂU",
+      "title": "Được tin dùng bởi các thương hiệu hàng đầu",
+      "description": "Khám phá cách các đối tác F&B tối ưu quy trình và tăng trưởng cùng XFoodi.",
+      "quote": "Nhận xét",
+      "view_story": "Đọc Case Study"
+    },
+    "pricing": {
+      "tag": "BẢNG GIÁ DỊCH VỤ",
+      "title": "Chi phí tối giản, hiệu quả tối đa",
+      "description": "Không có chi phí ẩn. Chọn gói dịch vụ phù hợp nhất với quy mô nhà hàng của bạn.",
+      "toggle_monthly": "Thanh toán hàng tháng",
+      "toggle_yearly": "Thanh toán hàng năm (Tiết kiệm 20%)",
+      "period_mo": "/tháng",
+      "period_yr": "/năm",
+      "contact": "Liên hệ",
+      "btn_primary": "Dùng thử miễn phí",
+      "btn_secondary": "Liên hệ ngay",
+      "starter": {
+        "title": "Starter",
+        "price": "299.000",
+        "price_yr": "239.000",
+        "desc": "Giải pháp cơ bản cho quán nhỏ khởi đầu số hóa",
+        "features": [
+          "Website nhà hàng cơ bản",
+          "QR Menu tại bàn",
+          "Quản lý đơn hàng & bàn trống",
+          "Lưu trữ thông tin CRM khách"
+        ]
+      },
+      "business": {
+        "title": "Business",
+        "price": "999.000",
+        "price_yr": "799.000",
+        "desc": "Tối ưu hóa vận hành và tự động hóa marketing",
+        "features": [
+          "Tất cả tính năng Starter",
+          "Kết nối Tên miền riêng (Custom Domain)",
+          "Loyalty & Tích điểm thành viên",
+          "Marketing Tự động (SMS, Email)",
+          "Báo cáo phân tích nâng cao (Realtime)"
+        ]
+      },
+      "enterprise": {
+        "title": "Enterprise",
+        "desc": "Giải pháp tùy biến hạ tầng riêng cho chuỗi lớn",
+        "features": [
+          "Tất cả tính năng Business",
+          "Máy chủ & CSDL độc lập hoàn toàn",
+          "Tích hợp hệ thống POS & Kế toán riêng",
+          "Hỗ trợ kỹ thuật 24/7 chuyên biệt",
+          "Cam kết SLA Uptime 99.95%"
+        ]
+      }
+    },
+    "faq": {
+      "tag": "FAQ",
+      "title": "Giải đáp thắc mắc",
+      "description": "Tìm câu trả lời nhanh cho các câu hỏi phổ biến về nền tảng.",
+      "items": [
+        {
+          "q": "XFoodi hoạt động như thế nào?",
+          "a": "XFoodi là nền tảng Multi-tenant SaaS dành riêng cho F&B. Sau khi đăng ký, bạn sẽ nhận được một website riêng, hệ thống quản lý order bếp, sơ đồ bàn, menu số hóa và hệ thống CRM marketing tự động tích hợp sẵn."
+        },
+        {
+          "q": "Tôi có thể dùng tên miền riêng (domain) không?",
+          "a": "Có, ở gói Business và Enterprise, bạn có thể dễ dàng kết nối tên miền riêng của nhà hàng (ví dụ: phohung.com) thay vì sử dụng tên miền phụ của XFoodi."
+        },
+        {
+          "q": "PayOS hoạt động như thế nào trên XFoodi?",
+          "a": "Chúng tôi tích hợp cổng thanh toán PayOS để tạo mã QR thanh toán động cho mỗi hóa đơn. Thực khách chỉ cần quét mã QR bằng ứng dụng ngân hàng để thanh toán, tiền chuyển thẳng vào tài khoản của nhà hàng và bàn tự động chuyển sang trạng thái trống."
+        },
+        {
+          "q": "Hệ thống có chạy được trên điện thoại và máy tính bảng không?",
+          "a": "Có, toàn bộ hệ thống quản trị, màn hình order bếp, quản lý phục vụ đều được thiết kế responsive hoạt động mượt mà trên mọi thiết bị: Desktop, Laptop, Máy tính bảng và Điện thoại di động."
+        },
+        {
+          "q": "Dữ liệu nhà hàng của tôi có được an toàn không?",
+          "a": "Chúng tôi áp dụng kiến trúc Multi-Tenant với cơ sở dữ liệu cô lập nghiêm ngặt giữa các nhà hàng (tenants). Dữ liệu khách hàng, menu, doanh thu và báo cáo của bạn được đảm bảo an toàn tuyệt đối và không bị lẫn lộn với bất kỳ đối thủ nào."
+        }
+      ]
     }
   },
   "restaurant": {
@@ -3413,10 +3564,46 @@
       "cancel": "Hủy",
       "name_label": "Họ và tên",
       "phone_label": "Số điện thoại",
+      "account_settings": "Cài đặt tài khoản",
+      "account_settings_desc": "Quản lý thông tin cá nhân và bảo mật tài khoản của bạn.",
+      "profile_information": "Thông tin cá nhân",
+      "security": "Bảo mật",
+      "security_desc": "Giữ tài khoản của bạn an toàn bằng cách sử dụng mật khẩu mạnh và duy nhất.",
+      "change_password": "Đổi mật khẩu",
+      "change_password_desc": "Cập nhật mật khẩu tài khoản của bạn",
+      "back": "Quay lại",
+      "email_label": "Email",
+      "cannot_be_changed": "(không thể thay đổi)",
+      "gender_label": "Giới tính",
+      "gender_prefer_not_to_say": "Không muốn tiết lộ",
+      "gender_male": "Nam",
+      "gender_female": "Nữ",
+      "gender_other": "Khác",
+      "dob_label": "Ngày sinh",
+      "address_label": "Địa chỉ",
+      "address_placeholder": "Đường, Quận/Huyện, Tỉnh/Thành phố",
+      "saving": "Đang lưu...",
+      "name_placeholder": "Họ và tên của bạn",
       "validation": {
         "required_fields": "Vui lòng điền đầy đủ thông tin!",
         "update_success": "Cập nhật thành công!",
-        "update_failed": "Cập nhật thất bại"
+        "update_failed": "Cập nhật thất bại",
+        "name_required": "Họ và tên là bắt buộc.",
+        "name_min": "Họ và tên phải có ít nhất 2 ký tự.",
+        "name_max": "Họ và tên tối đa 100 ký tự.",
+        "phone_invalid": "Số điện thoại không hợp lệ. Vui lòng sử dụng số điện thoại Việt Nam hợp lệ (ví dụ: 0912345678).",
+        "dob_invalid": "Ngày sinh không hợp lệ.",
+        "dob_future": "Ngày sinh không thể ở tương lai.",
+        "dob_too_old": "Vui lòng nhập ngày sinh hợp lệ.",
+        "address_max": "Địa chỉ tối đa 255 ký tự."
+      },
+      "toast": {
+        "update_success_title": "Cập nhật hồ sơ",
+        "update_success_desc": "Thông tin của bạn đã được lưu lại.",
+        "update_failed_desc": "Cập nhật hồ sơ thất bại.",
+        "avatar_success_title": "Cập nhật ảnh đại diện",
+        "avatar_success_desc": "Ảnh đại diện của bạn đã được thay đổi.",
+        "avatar_failed_desc": "Cập nhật ảnh đại diện thất bại."
       }
     },
     "cart_modal": {
@@ -3738,6 +3925,8 @@
     "change_password_page": {
       "title": "Đổi Mật khẩu",
       "subtitle": "Cập nhật mật khẩu để bảo mật tài khoản của bạn",
+      "create_title": "Tạo Mật khẩu",
+      "create_subtitle": "Tạo mật khẩu mới cho tài khoản của bạn để có thể đăng nhập bằng email.",
       "current_password_label": "Mật khẩu hiện tại",
       "current_password_placeholder": "Nhập mật khẩu hiện tại",
       "new_password_label": "Mật khẩu mới",
@@ -3745,6 +3934,7 @@
       "confirm_password_label": "Xác nhận Mật khẩu mới",
       "confirm_password_placeholder": "Xác nhận mật khẩu mới",
       "change_btn": "ĐỔI MẬT KHẨU",
+      "create_btn": "TẠO MẬT KHẨU",
       "back_to_dashboard": "Quay lại Dashboard",
       "password_strong": "Mật khẩu mạnh",
       "passwords_match": "Mật khẩu khớp",
@@ -3758,7 +3948,8 @@
         "password_mismatch": "Mật khẩu không khớp"
       },
       "alerts": {
-        "success": "Đổi mật khẩu thành công!\n\nMật khẩu của bạn đã được cập nhật."
+        "success": "Đổi mật khẩu thành công!\n\nMật khẩu của bạn đã được cập nhật.",
+        "create_success": "Tạo mật khẩu thành công!\n\nMật khẩu của bạn đã được thiết lập."
       }
     }
   },

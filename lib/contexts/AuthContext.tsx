@@ -13,7 +13,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   isAuthReady: boolean;
-  login: (credentials: LoginCredentials) => Promise<User>;
+  login: (credentials: LoginCredentials) => Promise<User | { requires2FA: true; tempToken: string }>;
   loginWithGoogle: (googleToken: string, rememberMe?: boolean) => Promise<User>;
   logout: () => void;
   /** Update the in-memory user state and persist to storage after a profile update. */
@@ -61,10 +61,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
 
-  const login = async (credentials: LoginCredentials): Promise<User> => {
+  const login = async (credentials: LoginCredentials): Promise<User | { requires2FA: true; tempToken: string }> => {
     try {
       const data = await authService.login(credentials);
-      setUser(data);
+      if (data && 'requires2FA' in data) {
+        return data;
+      }
+      setUser(data as User);
       return data;
     } catch (error) {
       throw error;
@@ -81,6 +84,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = () => {
+    // Invalidate server-side session (fire-and-forget to avoid blocking UI)
+    authService.logoutServer().catch(() => {});
     authService.logout();
     setUser(null);
   };

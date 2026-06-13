@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_ROUTES } from '../constants/apiRoutes';
+import { setAuthCookie, clearAuthCookie } from '../utils/authCookies';
 
 // Get initial base URL based on current host
 // This is called once during module initialization
@@ -44,6 +45,11 @@ axiosInstance.interceptors.request.use(
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
+
+      // Add tenant domain header
+      const host = window.location.host;
+      const hostWithoutPort = host.includes(':') ? host.split(':')[0] : host;
+      config.headers['X-Tenant-Domain'] = hostWithoutPort;
     }
     // When sending FormData, do not set Content-Type so the browser/axios can set
     // multipart/form-data with the correct boundary. Otherwise server gets
@@ -56,20 +62,7 @@ axiosInstance.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-function setAuthCookie(token: string, rememberMe: boolean) {
-  if (typeof document === 'undefined') return;
-  if (rememberMe) {
-    const maxAge = 8 * 60 * 60; // 8 hours in seconds
-    document.cookie = `accessToken=${token}; path=/; max-age=${maxAge}; SameSite=Lax`;
-    return;
-  }
-  document.cookie = `accessToken=${token}; path=/; SameSite=Lax`;
-}
 
-function clearAuthCookie() {
-  if (typeof document === 'undefined') return;
-  document.cookie = 'accessToken=; path=/; max-age=0; SameSite=Lax';
-}
 
 axiosInstance.interceptors.response.use(
   (response) => response,
@@ -92,23 +85,30 @@ axiosInstance.interceptors.response.use(
         const refreshToken = refreshTokenFromLocal || refreshTokenFromSession;
         const useSession = !refreshTokenFromLocal && !!refreshTokenFromSession;
 
-        if (!refreshToken) throw new Error('No refresh token available');
+        if (!refreshToken) {
+          // No refresh token at all — session is broken, logout silently
+          console.warn('[axiosInstance] No refresh token found, logging out...');
+          throw new Error('No refresh token — session expired');
+        }
 
         // Call refresh token API
         const response = await axiosInstance.post(API_ROUTES.AUTH.REFRESH_TOKEN, { refreshToken });
         if (response.data.success) {
-          const { accessToken } = response.data.data;
+          const { accessToken, refreshToken: newRefreshToken } = response.data.data;
           // Ghi lai accessToken vao dung storage tuong ung
           if (useSession) {
             sessionStorage.setItem('accessToken', accessToken);
+            if (newRefreshToken) sessionStorage.setItem('refreshToken', newRefreshToken);
           } else {
             localStorage.setItem('accessToken', accessToken);
+            if (newRefreshToken) localStorage.setItem('refreshToken', newRefreshToken);
           }
           // Đồng bộ cookie để middleware SSR không redirect sai về /login
           setAuthCookie(accessToken, !useSession);
           originalRequest.headers.Authorization = `Bearer ${accessToken}`;
           return axiosInstance(originalRequest);
         }
+        throw new Error('Refresh token response was not successful');
       } catch (refreshError) {
         if (typeof window !== 'undefined') {
           // Xoa ca hai storage khi refresh that bai
@@ -125,10 +125,7 @@ axiosInstance.interceptors.response.use(
           if (!windowPath.startsWith('/your-reservation')) {
             const currentPath = `${windowPath}${window.location.search || ''}`;
             const encodedRedirect = encodeURIComponent(currentPath || '/');
-            const loginPath =
-              windowPath.startsWith('/admin') || windowPath.startsWith('/staff')
-                ? '/login-email'
-                : '/login';
+            const loginPath = '/login';
 
             window.location.href = `${loginPath}?redirect=${encodedRedirect}`;
           }

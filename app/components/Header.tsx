@@ -12,6 +12,7 @@ import { useThemeMode } from "../theme/AntdProvider";
 import { usePageTransition } from "./PageTransition";
 import ThemeToggle from "./ThemeToggle";
 import SocialHeaderExtras from "@/components/social/SocialHeaderExtras";
+import { Security as SecurityIcon, Storefront as StorefrontIcon } from "@mui/icons-material";
 
 const { Header: AntHeader } = Layout;
 
@@ -24,7 +25,7 @@ const Header: React.FC = () => {
   const pathname = usePathname();
   const isSocialActive = pathname === "/social" || pathname?.startsWith("/social/");
 
-  const tenantName = "XFoodi";
+  const tenantName = tenant?.name || "XFoodi";
   const tenantLogoUrl =
     tenant?.logoUrl?.trim() || "/images/logo/xfoodi-logo.png";
 
@@ -36,6 +37,10 @@ const Header: React.FC = () => {
     {
       key: "workflow",
       label: <a href="#workflow">{t("homepage.header.workflow")}</a>,
+    },
+    {
+      key: "restaurants",
+      label: <a href="#restaurants">{t("homepage.header.restaurants", "Restaurants")}</a>,
     },
     {
       key: "about",
@@ -71,6 +76,9 @@ const Header: React.FC = () => {
   const [mounted, setMounted] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [displayName, setDisplayName] = useState<string>("");
+  const [userEmail, setUserEmail] = useState<string>("");
+  const [userAvatar, setUserAvatar] = useState<string>("");
+  const [userRoles, setUserRoles] = useState<string[]>([]);
   const { isAnimationReady } = usePageTransition();
   const { mode } = useThemeMode();
 
@@ -86,10 +94,14 @@ const Header: React.FC = () => {
     };
 
     const syncAuth = () => {
-      const token = localStorage.getItem("accessToken");
+      const token = localStorage.getItem("accessToken") || sessionStorage.getItem("accessToken");
       const user = authService.getCurrentUser();
       setIsAuthenticated(!!token);
       setDisplayName(user?.name || user?.fullName || "");
+      setUserEmail(user?.email || "");
+      setUserAvatar(user?.avatar || "");
+      const roles = user?.roles || (user?.role ? [user.role] : []);
+      setUserRoles(roles);
     };
 
     handleResize();
@@ -105,6 +117,10 @@ const Header: React.FC = () => {
     };
   }, []);
 
+  const initials = displayName
+    ? displayName.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()
+    : "U";
+
   const handleLogout = async () => {
     try {
       await authService.logoutServer();
@@ -114,8 +130,14 @@ const Header: React.FC = () => {
     authService.logout();
     setIsAuthenticated(false);
     setDisplayName("");
+    setUserEmail("");
     window.location.href = "/";
   };
+
+  const hasRole = (role: string) =>
+    userRoles.some((r) => r.toLowerCase() === role.toLowerCase());
+  const isAdmin = hasRole("Admin") || hasRole("SuperAdmin") || hasRole("System Admin");
+  const isOwner = hasRole("Owner");
 
   const userMenuItems = [
     {
@@ -123,14 +145,46 @@ const Header: React.FC = () => {
       icon: <ProfileOutlined />,
       label: <Link href="/profile">{t("homepage.header.view_profile", "View Profile")}</Link>,
     },
-    {
-      key: "dashboard",
-      icon: <UserOutlined />,
-      label: <Link href="/admin">{t("homepage.header.dashboard", "Dashboard")}</Link>,
-    },
-    {
-      type: "divider" as const,
-    },
+    // Admin Dashboard — chỉ hiện cho Admin
+    ...(isAdmin ? [{
+      key: "admin-dashboard",
+      icon: (
+        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ display: "inline" }}>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2m0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        </svg>
+      ),
+      label: (
+        <Link href="/admin/dashboard">
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <SecurityIcon sx={{ fontSize: 14 }} />
+            {t("homepage.header.admin_dashboard", "Admin Dashboard")}
+          </span>
+        </Link>
+      ),
+    }] : []),
+    // Restaurant Dashboard — chỉ hiện cho Owner
+    ...(isOwner ? [{
+      key: "restaurant-dashboard",
+      icon: (
+        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ display: "inline" }}>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+            d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+        </svg>
+      ),
+      label: <Link href="/restaurant/dashboard">{t("homepage.header.restaurant_dashboard", "Restaurant Dashboard")}</Link>,
+    }] : []),
+    // Nếu là Customer và chưa có nhà hàng — hiện link đăng ký
+    ...(!isAdmin && !isOwner ? [{
+      key: "open-restaurant",
+      icon: (
+        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ display: "inline" }}>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+        </svg>
+      ),
+      label: <Link href="/register-restaurant">{t("homepage.header.open_restaurant", "Register Restaurant")}</Link>,
+    }] : []),
+    { type: "divider" as const },
     {
       key: "logout",
       icon: <LogoutOutlined />,
@@ -249,10 +303,65 @@ const Header: React.FC = () => {
             <Space size={12}>
               <SocialHeaderExtras />
               {isAuthenticated ? (
-                <Dropdown menu={{ items: userMenuItems }} placement="bottomRight" trigger={['click']}>
-                  <Button type="primary" shape="round" style={{ fontWeight: 600 }}>
-                    {displayName || t("homepage.header.dashboard", "Dashboard")}
-                  </Button>
+                <Dropdown
+                  menu={{ items: userMenuItems }}
+                  placement="bottomRight"
+                  trigger={['click']}
+                  popupRender={(menu) => (
+                    <div style={{
+                      background: mode === "dark" ? "#141927" : "#ffffff",
+                      borderRadius: "12px",
+                      boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
+                      border: mode === "dark" ? "1px solid rgba(255,255,255,0.08)" : "1px solid #f0f0f0",
+                      overflow: "hidden",
+                    }}>
+                      <div style={{
+                        padding: "12px 16px",
+                        borderBottom: mode === "dark" ? "1px solid rgba(255,255,255,0.08)" : "1px solid #f0f0f0"
+                      }}>
+                        <div style={{ fontWeight: 600, fontSize: "14px", color: mode === "dark" ? "#ffffff" : "#111111", marginBottom: 2 }}>
+                          {displayName || "User"}
+                        </div>
+                        <div style={{ fontSize: "12px", color: mode === "dark" ? "#9ca3af" : "#6b7280" }}>
+                          {userEmail || "user@example.com"}
+                        </div>
+                      </div>
+                      {React.cloneElement(menu as React.ReactElement<any>, {
+                        style: { boxShadow: "none", border: "none", background: "transparent" }
+                      })}
+                    </div>
+                  )}
+                >
+                  <button
+                    aria-label="User menu"
+                    style={{
+                      width: 38,
+                      height: 38,
+                      borderRadius: "50%",
+                      overflow: "hidden",
+                      border: "2px solid var(--primary, #ff5722)",
+                      padding: 0,
+                      cursor: "pointer",
+                      background: "var(--primary-soft, rgba(255,87,34,0.15))",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                      transition: "border-color 0.2s",
+                    }}
+                  >
+                    {userAvatar ? (
+                      <img
+                        src={userAvatar}
+                        alt={displayName}
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      />
+                    ) : (
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "var(--primary, #ff5722)", userSelect: "none" }}>
+                        {initials}
+                      </span>
+                    )}
+                  </button>
                 </Dropdown>
               ) : (
                 <Link href="/login">
@@ -367,11 +476,27 @@ const Header: React.FC = () => {
                   {t("homepage.header.view_profile", "View Profile")}
                 </Button>
               </Link>
-              <Link href="/admin" style={{ width: '100%' }}>
-                <Button type="primary" block size="large" icon={<UserOutlined />} style={{ fontWeight: 600 }}>
-                  {displayName || t("homepage.header.dashboard", "Dashboard")}
-                </Button>
-              </Link>
+              {isAdmin && (
+                <Link href="/admin/dashboard" style={{ width: '100%' }}>
+                  <Button block size="large" icon={<SecurityIcon sx={{ fontSize: 14 }} />} style={{ fontWeight: 500 }}>
+                    {t("homepage.header.admin_dashboard", "Admin Dashboard")}
+                  </Button>
+                </Link>
+              )}
+              {isOwner && (
+                <Link href="/restaurant/dashboard" style={{ width: '100%' }}>
+                  <Button type="primary" block size="large" style={{ fontWeight: 600 }}>
+                    {t("homepage.header.restaurant_dashboard", "Restaurant Dashboard")}
+                  </Button>
+                </Link>
+              )}
+              {!isAdmin && !isOwner && (
+                <Link href="/register-restaurant" style={{ width: '100%' }}>
+                  <Button block size="large" style={{ fontWeight: 500 }}>
+                    {t("homepage.header.open_restaurant", "Register Restaurant")}
+                  </Button>
+                </Link>
+              )}
               <Button block danger size="large" icon={<LogoutOutlined />} style={{ fontWeight: 500 }} onClick={handleLogout}>
                 {t("homepage.header.logout", "Logout")}
               </Button>

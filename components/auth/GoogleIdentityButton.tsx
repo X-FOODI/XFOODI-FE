@@ -4,7 +4,6 @@ import { GoogleIcon } from "@/components/auth/social/GoogleIcon";
 import { socialAuthButtonClassName } from "@/components/auth/social/SocialAuthButton";
 import { useAuth } from "@/lib/contexts/AuthContext";
 import type { User } from "@/lib/services/authService";
-import { GoogleLogin } from "@react-oauth/google";
 import { App } from "antd";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -28,8 +27,6 @@ export function GoogleIdentityButton({
   const { loginWithGoogle } = useAuth();
   const { message } = App.useApp();
   const [busy, setBusy] = useState(false);
-  const [buttonWidth, setButtonWidth] = useState(320);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   const rememberRef = useRef(rememberMe);
   const loginWithGoogleRef = useRef(loginWithGoogle);
@@ -47,62 +44,82 @@ export function GoogleIdentityButton({
     onAuthenticatedRef.current = onAuthenticated;
   }, [onAuthenticated]);
 
+  // Listen to message events from the Google OAuth callback popup
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
+    const handleMessage = async (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
 
-    const updateWidth = () => {
-      const w = Math.floor(el.getBoundingClientRect().width);
-      if (w > 0) setButtonWidth(w);
+      if (event.data?.type === "GOOGLE_OAUTH_ERROR") {
+        const fallback =
+          t("login_email_page.google_login_error") ||
+          "Đăng nhập Google thất bại. Vui lòng thử lại.";
+        message.error(event.data.error || fallback);
+        setBusy(false);
+        return;
+      }
+
+      if (event.data?.type === "GOOGLE_OAUTH_TOKEN") {
+        const idToken = event.data.token;
+        if (!idToken) return;
+
+        setBusy(true);
+        try {
+          const user = await loginWithGoogleRef.current(
+            idToken,
+            rememberRef.current
+          );
+          onAuthenticatedRef.current(user);
+        } catch (err: unknown) {
+          const fallback =
+            t("login_email_page.google_login_error") ||
+            "Đăng nhập Google thất bại. Vui lòng thử lại.";
+          const msg =
+            err instanceof Error && err.message.trim()
+              ? err.message.trim()
+              : fallback;
+          message.error(msg);
+          console.error("Google login error:", err);
+        } finally {
+          setBusy(false);
+        }
+      }
     };
 
-    updateWidth();
-    const ro = new ResizeObserver(updateWidth);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [t, message]);
 
   if (!GOOGLE_CLIENT_ID) {
     return null;
   }
 
-  const handleSuccess = async (credentialResponse: { credential?: string }) => {
-    const credential = credentialResponse?.credential;
-    if (!credential) {
-      message.error(
-        t("login_email_page.google_invalid_token") ||
-          "Phản hồi Google không hợp lệ. Vui lòng thử lại."
-      );
-      return;
-    }
+  const handleGoogleClick = () => {
+    if (disabled || busy) return;
 
-    setBusy(true);
-    try {
-      const user = await loginWithGoogleRef.current(
-        credential,
-        rememberRef.current
-      );
-      onAuthenticatedRef.current(user);
-    } catch (err: unknown) {
-      const fallback =
-        t("login_email_page.google_login_error") ||
-        "Đăng nhập Google thất bại. Vui lòng thử lại.";
-      const msg =
-        err instanceof Error && err.message.trim()
-          ? err.message.trim()
-          : fallback;
-      message.error(msg);
-      console.error("Google login error:", err);
-    } finally {
+    // Open Google OAuth popup window centered on the screen
+    const width = 500;
+    const height = 650;
+    const left = window.screenX + (window.outerWidth - width) / 2;
+    const top = window.screenY + (window.outerHeight - height) / 2;
+
+    const nonce = Math.random().toString(36).substring(2);
+    // Use the dedicated callback page so the popup doesn't load the full app.
+    // This URL must be registered as an Authorized Redirect URI in Google Cloud Console.
+    const callbackUrl = `${window.location.origin}/auth/google/callback`;
+    const redirectUri = encodeURIComponent(callbackUrl);
+    const googleUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${redirectUri}&response_type=id_token&scope=openid%20email%20profile&nonce=${nonce}`;
+
+    setBusy(true); // show spinner immediately while popup opens
+    const popup = window.open(
+      googleUrl,
+      "google-login-popup",
+      `width=${width},height=${height},left=${left},top=${top},status=no,resizable=yes,scrollbars=yes`
+    );
+
+    // If the popup was blocked, reset busy state
+    if (!popup || popup.closed) {
       setBusy(false);
     }
-  };
-
-  const handleError = () => {
-    message.warning(
-      t("login_email_page.google_popup_closed") ||
-        "Đã hủy đăng nhập Google hoặc không thể hoàn tất."
-    );
   };
 
   const label =
@@ -116,53 +133,26 @@ export function GoogleIdentityButton({
   const inactive = disabled || busy;
 
   return (
-    <div
-      ref={containerRef}
-      className="google-oauth-btn-wrap relative w-full h-12 min-h-[3rem]"
+    <button
+      type="button"
+      onClick={handleGoogleClick}
+      disabled={inactive}
       aria-busy={busy || undefined}
-      aria-disabled={inactive || undefined}
+      className={`${socialAuthButtonClassName} cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed`}
     >
-      <div
-        className={`${socialAuthButtonClassName} relative z-[1] pointer-events-none select-none`}
-        aria-hidden
-      >
-        {busy ? (
-          <span
-            className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-gray-300 border-t-gray-800"
-            aria-hidden
-          />
-        ) : (
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center">
-            <GoogleIcon />
-          </span>
-        )}
-        <span className="social-auth-btn__label min-w-0 flex-1 truncate text-center text-sm font-medium text-gray-800">
-          {label}
+      {busy ? (
+        <span
+          className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-gray-300 border-t-gray-800"
+          aria-hidden
+        />
+      ) : (
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center">
+          <GoogleIcon />
         </span>
-      </div>
-
-      {!inactive && (
-        <div
-          className="absolute inset-0 z-[2] overflow-hidden rounded-xl opacity-0 cursor-pointer [&>div]:!h-full [&>div]:!w-full [&_iframe]:!h-12 [&_iframe]:!min-h-[3rem] [&_iframe]:!w-full"
-          aria-label={label}
-        >
-          <GoogleLogin
-            onSuccess={handleSuccess}
-            onError={handleError}
-            useOneTap={false}
-            ux_mode="popup"
-            theme="outline"
-            size="large"
-            shape="rectangular"
-            text="continue_with"
-            width={buttonWidth}
-            containerProps={{
-              className: "h-full w-full flex items-stretch justify-stretch",
-              style: { height: "100%", width: "100%" },
-            }}
-          />
-        </div>
       )}
-    </div>
+      <span className="social-auth-btn__label min-w-0 flex-1 truncate text-center text-sm font-semibold text-gray-800">
+        {label}
+      </span>
+    </button>
   );
 }
