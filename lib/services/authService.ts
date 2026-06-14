@@ -77,8 +77,6 @@ export interface GenericResponse {
   error?: string;
 }
 
-
-
 /** Google JWT payload only — not verified; used as fallback when API omits user.email. */
 function decodeGoogleCredentialEmail(idToken: string): string | undefined {
   try {
