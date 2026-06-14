@@ -196,7 +196,7 @@ export default function RegisterPage() {
       // Handle old flow (auto-login or manual login)
       else if (result.requireLogin) {
         message.success(result.message || 'Registration successful! Please login with your credentials.');
-        window.location.href = '/login-email';
+        window.location.href = '/login';
       } else {
         message.success(t('register_page.alerts.submitted', {
           firstName: formData.firstName,

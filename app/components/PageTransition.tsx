@@ -199,7 +199,7 @@ const PageTransition: React.FC<PageTransitionProps> = ({
                     fontFamily: 'system-ui, -apple-system, sans-serif',
                   }}
                 >
-                  R
+                  X
                 </motion.span>
               </motion.div>
             </motion.div>
@@ -223,7 +223,7 @@ const PageTransition: React.FC<PageTransitionProps> = ({
                   letterSpacing: -0.5,
                 }}
               >
-                Rest
+                X
               </motion.span>
               <motion.span
                 animate={{
@@ -240,7 +240,7 @@ const PageTransition: React.FC<PageTransitionProps> = ({
                   letterSpacing: -0.5,
                 }}
               >
-                X
+                Foodi
               </motion.span>
             </motion.div>
 

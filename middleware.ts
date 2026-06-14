@@ -25,7 +25,6 @@ export function middleware(req: NextRequest) {
   // Public routes accessible on any domain (no auth needed)
   const PUBLIC_ROUTES = new Set([
     "/login",
-    "/login-email",
     "/register",
     "/forgot-password",
     "/restaurant",
@@ -162,7 +161,7 @@ export function middleware(req: NextRequest) {
     // ── Protect /admin/* — require auth token in cookie ──
     if (pathname.startsWith('/admin')) {
       if (!hasAuthToken) {
-        const loginUrl = new URL('/login-email', req.url);
+        const loginUrl = new URL('/login', req.url);
         // Pass redirect so login page can send user back after login
         loginUrl.searchParams.set('redirect', pathname);
         return NextResponse.redirect(loginUrl);

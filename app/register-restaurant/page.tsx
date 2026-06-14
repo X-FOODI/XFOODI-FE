@@ -117,7 +117,7 @@ export default function RegisterRestaurantPage() {
   useEffect(() => {
     if (!isAuthReady) return;
     if (!user) {
-      router.replace("/login-email?redirect=/register-restaurant");
+      router.replace("/login?redirect=/register-restaurant");
       return;
     }
     restaurantApplicationService

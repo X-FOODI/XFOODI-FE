@@ -125,10 +125,7 @@ axiosInstance.interceptors.response.use(
           if (!windowPath.startsWith('/your-reservation')) {
             const currentPath = `${windowPath}${window.location.search || ''}`;
             const encodedRedirect = encodeURIComponent(currentPath || '/');
-            const loginPath =
-              windowPath.startsWith('/admin') || windowPath.startsWith('/staff')
-                ? '/login-email'
-                : '/login';
+            const loginPath = '/login';
 
             window.location.href = `${loginPath}?redirect=${encodedRedirect}`;
           }

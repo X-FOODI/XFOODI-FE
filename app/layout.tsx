@@ -2,9 +2,10 @@ import I18nProvider from "@/components/I18nProvider";
 import { GoogleOAuthAppProvider } from "@/components/providers/GoogleOAuthAppProvider";
 import TenantFavicon from "@/components/TenantFavicon";
 import { AuthProvider } from "@/lib/contexts/AuthContext";
-// import { CartProvider } from "@/lib/contexts/CartContext"; // TODO: Re-enable when cart services are ready
+import { CartProvider } from "@/lib/contexts/CartContext";
 import { TenantProvider } from "@/lib/contexts/TenantContext";
 import { ToastProvider } from "@/lib/contexts/ToastContext";
+import { ChatAssistant } from "@/components/ui/ChatAssistant";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Suspense } from "react";
@@ -144,7 +145,12 @@ export default function RootLayout({
             <GoogleOAuthAppProvider>
               <AuthProvider>
                 <ToastProvider>
-                  <AntdProvider>{children}</AntdProvider>
+                  <AntdProvider>
+                    <CartProvider>
+                      {children}
+                      <ChatAssistant />
+                    </CartProvider>
+                  </AntdProvider>
                 </ToastProvider>
               </AuthProvider>
             </GoogleOAuthAppProvider>
