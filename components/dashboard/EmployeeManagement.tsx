@@ -130,14 +130,14 @@ export default function EmployeeManagement({
           listData = (res as any).items;
           totalCount = (res as any).total ?? listData.length;
           pagesCount = (res as any).totalPages ?? 1;
-        } else if (res.data) {
-          if (Array.isArray(res.data)) {
-            listData = res.data;
-            totalCount = res.data.length;
-          } else if (res.data.items && Array.isArray(res.data.items)) {
-            listData = res.data.items;
-            totalCount = res.data.total ?? listData.length;
-            pagesCount = res.data.totalPages ?? 1;
+        } else if ((res as any).data) {
+          if (Array.isArray((res as any).data)) {
+            listData = (res as any).data;
+            totalCount = (res as any).data.length;
+          } else if ((res as any).data.items && Array.isArray((res as any).data.items)) {
+            listData = (res as any).data.items;
+            totalCount = (res as any).data.total ?? listData.length;
+            pagesCount = (res as any).data.totalPages ?? 1;
           }
         }
       }
