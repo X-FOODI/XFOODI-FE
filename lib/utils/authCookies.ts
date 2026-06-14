@@ -35,4 +35,3 @@ export function clearAdminAuthCookie() {
   if (typeof document === 'undefined') return;
   document.cookie = 'adminAccessToken=; path=/; max-age=0; SameSite=Lax';
 }
-
