@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_ROUTES } from '../constants/apiRoutes';
+import { setAuthCookie, clearAuthCookie } from '../utils/authCookies';
 
 // Get initial base URL based on current host
 // This is called once during module initialization
@@ -61,41 +62,7 @@ axiosInstance.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-function getCookieDomain(): string {
-  if (typeof window === 'undefined') return '';
-  const host = window.location.hostname;
-  if (host === 'localhost' || host === '127.0.0.1') {
-    return '';
-  }
-  if (host.endsWith('.localhost')) {
-    return 'localhost';
-  }
-  const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'xfoodi.website';
-  if (host.endsWith(BASE_DOMAIN)) {
-    return BASE_DOMAIN;
-  }
-  return '';
-}
 
-function setAuthCookie(token: string, rememberMe: boolean) {
-  if (typeof document === 'undefined') return;
-  const domain = getCookieDomain();
-  const domainStr = domain ? `; domain=.${domain}` : '';
-  if (rememberMe) {
-    const maxAge = 8 * 60 * 60; // 8 hours in seconds
-    document.cookie = `accessToken=${token}; path=/; max-age=${maxAge}; SameSite=Lax${domainStr}`;
-    return;
-  }
-  document.cookie = `accessToken=${token}; path=/; SameSite=Lax${domainStr}`;
-}
-
-function clearAuthCookie() {
-  if (typeof document === 'undefined') return;
-  const domain = getCookieDomain();
-  const domainStr = domain ? `; domain=.${domain}` : '';
-  document.cookie = `accessToken=; path=/; max-age=0; SameSite=Lax${domainStr}`;
-  document.cookie = 'accessToken=; path=/; max-age=0; SameSite=Lax';
-}
 
 axiosInstance.interceptors.response.use(
   (response) => response,
@@ -118,23 +85,30 @@ axiosInstance.interceptors.response.use(
         const refreshToken = refreshTokenFromLocal || refreshTokenFromSession;
         const useSession = !refreshTokenFromLocal && !!refreshTokenFromSession;
 
-        if (!refreshToken) throw new Error('No refresh token available');
+        if (!refreshToken) {
+          // No refresh token at all — session is broken, logout silently
+          console.warn('[axiosInstance] No refresh token found, logging out...');
+          throw new Error('No refresh token — session expired');
+        }
 
         // Call refresh token API
         const response = await axiosInstance.post(API_ROUTES.AUTH.REFRESH_TOKEN, { refreshToken });
         if (response.data.success) {
-          const { accessToken } = response.data.data;
+          const { accessToken, refreshToken: newRefreshToken } = response.data.data;
           // Ghi lai accessToken vao dung storage tuong ung
           if (useSession) {
             sessionStorage.setItem('accessToken', accessToken);
+            if (newRefreshToken) sessionStorage.setItem('refreshToken', newRefreshToken);
           } else {
             localStorage.setItem('accessToken', accessToken);
+            if (newRefreshToken) localStorage.setItem('refreshToken', newRefreshToken);
           }
           // Đồng bộ cookie để middleware SSR không redirect sai về /login
           setAuthCookie(accessToken, !useSession);
           originalRequest.headers.Authorization = `Bearer ${accessToken}`;
           return axiosInstance(originalRequest);
         }
+        throw new Error('Refresh token response was not successful');
       } catch (refreshError) {
         if (typeof window !== 'undefined') {
           // Xoa ca hai storage khi refresh that bai

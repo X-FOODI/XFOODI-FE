@@ -2,6 +2,7 @@
 
 import axiosInstance from './axiosInstance';
 import { API_ROUTES } from '../constants/apiRoutes';
+import { setAuthCookie, clearAuthCookie, clearAdminAuthCookie } from '../utils/authCookies';
 
 export interface LoginCredentials {
   email: string;
@@ -54,6 +55,7 @@ export interface User {
   gender?: 'MALE' | 'FEMALE' | 'OTHER' | string;
   dateOfBirth?: string; // ISO date string e.g. "1995-08-20"
   address?: string;
+  hasPassword?: boolean;
 }
 
 export interface AuthResponse {
@@ -73,44 +75,6 @@ export interface GenericResponse {
   success: boolean;
   message?: string;
   error?: string;
-}
-
-// ── Cookie helpers (middleware runs server-side, needs cookie not localStorage) ──
-function getCookieDomain(): string {
-  if (typeof window === 'undefined') return '';
-  const host = window.location.hostname;
-  if (host === 'localhost' || host === '127.0.0.1') {
-    return '';
-  }
-  if (host.endsWith('.localhost')) {
-    return 'localhost';
-  }
-  const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'xfoodi.website';
-  if (host.endsWith(BASE_DOMAIN)) {
-    return BASE_DOMAIN;
-  }
-  return '';
-}
-
-function setAuthCookie(token: string, rememberMe: boolean) {
-  if (typeof document === 'undefined') return;
-  const domain = getCookieDomain();
-  const domainStr = domain ? `; domain=.${domain}` : '';
-  if (rememberMe) {
-    const maxAge = 8 * 60 * 60; // 8 hours in seconds
-    document.cookie = `accessToken=${token}; path=/; max-age=${maxAge}; SameSite=Lax${domainStr}`;
-    return;
-  }
-  // Session cookie (cleared when browser closes)
-  document.cookie = `accessToken=${token}; path=/; SameSite=Lax${domainStr}`;
-}
-
-function clearAuthCookie() {
-  if (typeof document === 'undefined') return;
-  const domain = getCookieDomain();
-  const domainStr = domain ? `; domain=.${domain}` : '';
-  document.cookie = `accessToken=; path=/; max-age=0; SameSite=Lax${domainStr}`;
-  document.cookie = 'accessToken=; path=/; max-age=0; SameSite=Lax';
 }
 
 /** Google JWT payload only — not verified; used as fallback when API omits user.email. */
@@ -504,11 +468,14 @@ const authService = {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('userInfo');
+    localStorage.removeItem('adminAccessToken');
     sessionStorage.removeItem('accessToken');
     sessionStorage.removeItem('refreshToken');
     sessionStorage.removeItem('userInfo');
+    sessionStorage.removeItem('adminAccessToken');
     // Xóa cookie để middleware biết user đã logout
     clearAuthCookie();
+    clearAdminAuthCookie();
   },
 
   // Get current user
