@@ -76,18 +76,18 @@ export function middleware(req: NextRequest) {
   const accessToken = req.cookies.get('accessToken')?.value;
   const hasAuthToken = !!accessToken;
   
-  const adminAccessToken = req.cookies.get('adminAccessToken')?.value;
+  const adminAccessToken = req.cookies.get('adminAccessToken')?.value || req.cookies.get('accessToken')?.value;
   const hasAdminAuthToken = !!adminAccessToken;
 
   // Super Admin domain (admin.xfoodi.com or admin.localhost)
   if (isAdminDomain) {
-    // Canonical login path: /login (rewrite to admin login page)
+    // Canonical login path: /login (serve the login page directly)
     if (pathname === '/login') {
-      // If already logged in, go to home (which will redirect to /tenants)
+      // If already logged in, redirect to the dashboard
       if (hasAdminAuthToken) {
-        return NextResponse.redirect(new URL('/tenants', req.url));
+        return NextResponse.redirect(new URL('/admin/dashboard', req.url));
       }
-      return NextResponse.rewrite(new URL('/login-admin', req.url));
+      return NextResponse.next();
     }
 
     // Backward compatibility: redirect /login-admin to /login
@@ -95,14 +95,19 @@ export function middleware(req: NextRequest) {
       return NextResponse.redirect(new URL('/login', req.url));
     }
 
+    // Redirect /tenants to dashboard since /tenants page doesn't exist
+    if (pathname === '/tenants' || pathname.startsWith('/tenants/')) {
+      return NextResponse.redirect(new URL('/admin/dashboard', req.url));
+    }
+
     // Require admin token for all other paths on the admin domain
     if (!hasAdminAuthToken) {
       return NextResponse.redirect(new URL('/login', req.url));
     }
 
-    // Redirect root to /tenants
+    // Redirect root to dashboard
     if (pathname === '/') {
-      return NextResponse.redirect(new URL('/tenants', req.url));
+      return NextResponse.redirect(new URL('/admin/dashboard', req.url));
     }
     
     return NextResponse.next();

@@ -61,18 +61,39 @@ axiosInstance.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+function getCookieDomain(): string {
+  if (typeof window === 'undefined') return '';
+  const host = window.location.hostname;
+  if (host === 'localhost' || host === '127.0.0.1') {
+    return '';
+  }
+  if (host.endsWith('.localhost')) {
+    return 'localhost';
+  }
+  const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'xfoodi.website';
+  if (host.endsWith(BASE_DOMAIN)) {
+    return BASE_DOMAIN;
+  }
+  return '';
+}
+
 function setAuthCookie(token: string, rememberMe: boolean) {
   if (typeof document === 'undefined') return;
+  const domain = getCookieDomain();
+  const domainStr = domain ? `; domain=.${domain}` : '';
   if (rememberMe) {
     const maxAge = 8 * 60 * 60; // 8 hours in seconds
-    document.cookie = `accessToken=${token}; path=/; max-age=${maxAge}; SameSite=Lax`;
+    document.cookie = `accessToken=${token}; path=/; max-age=${maxAge}; SameSite=Lax${domainStr}`;
     return;
   }
-  document.cookie = `accessToken=${token}; path=/; SameSite=Lax`;
+  document.cookie = `accessToken=${token}; path=/; SameSite=Lax${domainStr}`;
 }
 
 function clearAuthCookie() {
   if (typeof document === 'undefined') return;
+  const domain = getCookieDomain();
+  const domainStr = domain ? `; domain=.${domain}` : '';
+  document.cookie = `accessToken=; path=/; max-age=0; SameSite=Lax${domainStr}`;
   document.cookie = 'accessToken=; path=/; max-age=0; SameSite=Lax';
 }
 

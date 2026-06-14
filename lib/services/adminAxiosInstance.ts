@@ -61,7 +61,8 @@ adminAxiosInstance.interceptors.request.use(
         }
 
         // Doc adminAccessToken tu ca hai storage (rememberMe=true -> localStorage, rememberMe=false -> sessionStorage)
-        const token = localStorage.getItem('adminAccessToken') || sessionStorage.getItem('adminAccessToken');
+        const token = localStorage.getItem('adminAccessToken') || sessionStorage.getItem('adminAccessToken') ||
+                      localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
