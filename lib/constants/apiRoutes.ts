@@ -53,4 +53,12 @@ export const API_ROUTES = {
     LIST: '/restaurants',
     BY_SLUG: (slug: string) => `/restaurants/${slug}`,
   },
+  EMPLOYEES: {
+    LIST: '/employees',
+    DETAIL: (id: string) => `/employees/${id}`,
+    CREATE: '/employees',
+    UPDATE: (id: string) => `/employees/${id}`,
+    DELETE: (id: string) => `/employees/${id}`,
+    RESET_PASSWORD: (id: string) => `/employees/${id}/reset-password`,
+  },
 };
