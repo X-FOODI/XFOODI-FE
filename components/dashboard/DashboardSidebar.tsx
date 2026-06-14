@@ -219,17 +219,7 @@ export default function DashboardSidebar({
     {
       label: "Quản lý",
       items: [
-        {
-          id: "categories",
-          label: "Danh mục",
-          path: "/restaurant/menu/categories",
-          icon: (
-            <svg className="dashboard-sidebar-item-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-            </svg>
-          ),
-        },
+
         {
           id: "menu",
           label: "Thực đơn",
@@ -360,9 +350,30 @@ export default function DashboardSidebar({
             )}
             <ul className="space-y-0.5">
               {section.items.map((item) => {
+                const [itemBasePath, itemQuery] = item.path.split("?");
+                
+                let isQueryMatch = true;
+                if (typeof window !== "undefined") {
+                  const currentParams = new URLSearchParams(window.location.search);
+                  if (itemQuery) {
+                    const itemParams = new URLSearchParams(itemQuery);
+                    for (const [key, val] of itemParams.entries()) {
+                      if (currentParams.get(key) !== val) {
+                        isQueryMatch = false;
+                        break;
+                      }
+                    }
+                  } else {
+                    // If this item has no query parameters, it should only match if the current URL
+                    // has no active query parameter that matches other items (like tab=categories)
+                    if (currentParams.get("tab")) {
+                      isQueryMatch = false;
+                    }
+                  }
+                }
+
                 const isActive =
-                  pathname === item.path ||
-                  (pathname !== item.path && pathname.startsWith(`${item.path}/`));
+                  pathname === itemBasePath && isQueryMatch;
                 return (
                   <li key={item.id}>
                     <Link

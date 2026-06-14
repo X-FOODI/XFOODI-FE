@@ -11,6 +11,10 @@ import { useTenant } from "@/lib/contexts/TenantContext";
 import axiosInstance from "@/lib/services/axiosInstance";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+const getQrDownloadUrl = (qrText: string) => {
+  const base = BACKEND_URL.endsWith("/api") ? BACKEND_URL.slice(0, -4) : BACKEND_URL;
+  return `${base}/api/upload/qr?text=${encodeURIComponent(qrText)}`;
+};
 
 interface Floor {
   id: string;
@@ -949,16 +953,26 @@ export default function TablesManagementPage() {
                               </span>
                             </td>
                             <td className="py-3.5 px-4 text-sm">
-                              <Tooltip title="Tải xuống QR Code cho bàn này">
+                              <div className="flex flex-col gap-1">
+                                <Tooltip title="Tải xuống QR Code cho bàn này">
+                                  <a
+                                    href={getQrDownloadUrl(t.qrCodeUrl)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-500 hover:underline text-xs flex items-center gap-1 font-bold"
+                                  >
+                                    📥 QR Code
+                                  </a>
+                                </Tooltip>
                                 <a
-                                  href={`${BACKEND_URL}/api/upload/qr?text=${encodeURIComponent(t.qrCodeUrl)}`}
+                                  href={t.qrCodeUrl}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="text-blue-500 hover:underline text-xs flex items-center gap-1 font-bold"
+                                  className="text-emerald-500 hover:underline text-xs flex items-center gap-1 font-bold"
                                 >
-                                  📥 QR Code
+                                  🔗 Mở Menu Bàn
                                 </a>
-                              </Tooltip>
+                              </div>
                             </td>
                             <td className="py-3.5 px-4 text-sm">
                               <div className="flex gap-2">
@@ -1197,14 +1211,22 @@ export default function TablesManagementPage() {
               )}
 
               {/* Advanced info: QR Code detail */}
-              <div className="text-center pt-3 border-t" style={{ borderColor: "var(--border)" }}>
+              <div className="text-center pt-3 border-t flex flex-col gap-2" style={{ borderColor: "var(--border)" }}>
                 <a
-                  href={`${BACKEND_URL}/api/upload/qr?text=${encodeURIComponent(sessionActionTable.qrCodeUrl)}`}
+                  href={getQrDownloadUrl(sessionActionTable.qrCodeUrl)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-xs text-blue-500 hover:underline font-bold"
                 >
                   📥 Nhấp để tải xuống QR Code của bàn ăn này
+                </a>
+                <a
+                  href={sessionActionTable.qrCodeUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-[#FF5A2C] hover:underline font-bold"
+                >
+                  🔗 Đi tới trang gọi món (Menu) của bàn
                 </a>
               </div>
             </div>

@@ -53,4 +53,22 @@ export const API_ROUTES = {
     LIST: '/restaurants',
     BY_SLUG: (slug: string) => `/restaurants/${slug}`,
   },
+  RESERVATIONS: {
+    LIST: '/reservations',
+    CREATE: '/reservations',
+    MY: '/reservations/my',
+    CHECK_TABLES: '/reservations/check-tables',
+    BY_CODE: (code: string) => `/reservations/code/${code}`,
+    DETAIL: (id: string) => `/reservations/${id}`,
+    UPDATE_STATUS: (id: string) => `/reservations/${id}/status`,
+    CHECKIN: (code: string) => `/reservations/checkin/${code}`,
+    CANCEL: (id: string) => `/reservations/${id}/cancel`,
+  },
+  PAYMENTS: {
+    LIST: '/payments',
+    DETAIL: (id: string) => `/payments/${id}`,
+    CASH: '/payments/cash',
+    TRANSFER_INFO: '/payments/transfer-info',
+    SEPAY_WEBHOOK: '/payments/sepay-webhook',
+  },
 };
