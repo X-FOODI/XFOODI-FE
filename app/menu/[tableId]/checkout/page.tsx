@@ -189,6 +189,8 @@ export default function CustomerCheckoutPage() {
         floorName: table.floor.name,
         restaurantId: table.restaurant.id,
         type: "CASH_CHECKOUT",
+        orderId: activeOrder.id,
+        orderReference: activeOrder.reference,
         message: `Bàn ${table.code} yêu cầu thanh toán tiền mặt (Đơn: ${activeOrder.reference})`,
       });
 
@@ -357,7 +359,7 @@ export default function CustomerCheckoutPage() {
                 }`}
               >
                 <QrCode className="w-5 h-5" />
-                <span className="text-xs font-bold">Chuyển khoản VietQR</span>
+                <span className="text-xs font-bold">Chuyển khoản ngân hàng</span>
               </button>
               <button 
                 onClick={() => setPaymentMethod("cash")}

@@ -4,6 +4,8 @@ import reservationService, { Reservation } from "@/lib/services/reservationServi
 import { useAuth } from "@/lib/contexts/AuthContext";
 import { useTenant } from "@/lib/contexts/TenantContext";
 import { useToast } from "@/lib/contexts/ToastContext";
+import DashboardHeader from "@/components/dashboard/DashboardHeader";
+import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -134,7 +136,13 @@ export default function ReservationsPage() {
   };
 
   return (
-    <div style={{ padding: "24px", minHeight: "100vh", background: "var(--bg-base)" }}>
+    <div className="flex flex-col h-screen overflow-hidden" style={{ background: "var(--bg-base)" }}>
+      <DashboardHeader role="restaurant" restaurantName={tenant?.name ?? ""} userName={user?.fullName ?? user?.name ?? ""} />
+      <div className="flex flex-1 overflow-hidden">
+        <DashboardSidebar role="restaurant" restaurantName={tenant?.name ?? ""} userName={user?.fullName ?? user?.name ?? ""} userEmail={user?.email ?? ""} />
+        <main className="flex-1 overflow-y-auto" style={{ background: "var(--bg-base)" }}>
+          <div style={{ padding: "24px" }}>
+
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
         <div>
@@ -238,6 +246,9 @@ export default function ReservationsPage() {
           onClose={() => setCheckInTarget(null)}
         />
       )}
+    </div>
+        </main>
+      </div>
     </div>
   );
 }
