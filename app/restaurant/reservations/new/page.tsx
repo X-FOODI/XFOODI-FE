@@ -2,6 +2,7 @@
 
 import reservationService, { AvailableTable } from "@/lib/services/reservationService";
 import paymentService, { TransferInfo } from "@/lib/services/paymentService";
+import PaymentDeadlineCountdown from "@/components/reservations/PaymentDeadlineCountdown";
 import { useAuth } from "@/lib/contexts/AuthContext";
 import { useTenant } from "@/lib/contexts/TenantContext";
 import { useToast } from "@/lib/contexts/ToastContext";
@@ -9,6 +10,7 @@ import { Button } from "antd";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Header } from "@/components/layout/Header";
 
 // ── Step indicator ─────────────────────────────────────────────────────────────
 const STEPS = ["Thời gian & Khách", "Chọn bàn", "Thông tin", "Xác nhận & Cọc"];
@@ -113,12 +115,6 @@ function SePayQR({ info, onSuccess, onSkip }: {
       <p style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 20 }}>
         Đang chờ xác nhận thanh toán{dots}
       </p>
-
-      <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-        <Button onClick={onSkip} style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
-          Bỏ qua, đặt cọc sau
-        </Button>
-      </div>
     </div>
   );
 }
@@ -145,16 +141,34 @@ export default function NewReservationPage() {
   // Step 2 — personal info
   const [name, setName] = useState(user?.fullName || user?.name || "");
   const [phone, setPhone] = useState(user?.phoneNumber || "");
+  const [email, setEmail] = useState(user?.email || "");
   const [requests, setRequests] = useState("");
+
+  useEffect(() => {
+    if (user) {
+      setName((prev) => prev || user.fullName || user.name || "");
+      setPhone((prev) => prev || user.phoneNumber || "");
+      setEmail((prev) => prev || user.email || "");
+    }
+  }, [user]);
 
   // Step 3 — result
   const [createdId, setCreatedId] = useState("");
   const [createdCode, setCreatedCode] = useState("");
+  const [createdReservation, setCreatedReservation] = useState<any>(null);
   const [transferInfo, setTransferInfo] = useState<TransferInfo | null>(null);
   const [depositPaid, setDepositPaid] = useState(false);
 
   const brandColor = tenant?.primaryColor || "#FF380B";
   const restaurantId = tenant?.id || user?.restaurantId || "";
+
+  // Estimate deposit amount (25k per seat capacity of selected tables, or per guest if auto-arranged)
+  const estimatedDeposit = selectedTableIds.length > 0
+    ? selectedTableIds.reduce((sum, id) => {
+        const tbl = availableTables.find((t) => t.id === id);
+        return sum + (tbl ? tbl.seatingCapacity * 25000 : 0);
+      }, 0)
+    : guests * 25000;
 
   // ── Step 0 → 1: check available tables ──────────────────────────────────────
   const handleCheckTables = async () => {
@@ -178,6 +192,10 @@ export default function NewReservationPage() {
   // ── Step 3: submit reservation ───────────────────────────────────────────────
   const handleSubmit = async () => {
     if (!restaurantId) { showToast("error", "Lỗi", "Không xác định được nhà hàng"); return; }
+    if (!email || !email.trim()) {
+      showToast("error", "Lỗi", "Vui lòng nhập địa chỉ email để nhận thông tin đặt bàn");
+      return;
+    }
     setLoading(true);
     try {
       const isoTime = new Date(`${date}T${time}:00`).toISOString();
@@ -187,9 +205,13 @@ export default function NewReservationPage() {
         time: isoTime,
         specialRequests: requests || undefined,
         tableIds: selectedTableIds,
+        fullName: name,
+        phoneNumber: phone,
+        email: email.trim(),
       });
       setCreatedId(res.id);
       setCreatedCode(res.confirmationCode || "");
+      setCreatedReservation(res);
       showToast("success", "Đặt bàn thành công", `Mã xác nhận: ${res.confirmationCode}`);
 
       // Auto-get transfer info if deposit > 0
@@ -221,10 +243,11 @@ export default function NewReservationPage() {
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg-base)", paddingTop: 80 }}>
+    <div style={{ minHeight: "100vh", background: "var(--bg-base)" }}>
+      <Header />
       <div style={{ maxWidth: 640, margin: "0 auto", padding: "24px 16px" }}>
 
-        {/* Header */}
+        {/* Breadcrumbs */}
         <div style={{ marginBottom: 24, display: "flex", alignItems: "center", gap: 12 }}>
           <Link href="/" style={{ color: "var(--text-muted)", fontSize: 13, textDecoration: "none" }}>← Trang chủ</Link>
           <span style={{ color: "var(--border)" }}>/</span>
@@ -232,6 +255,53 @@ export default function NewReservationPage() {
         </div>
 
         <StepBar current={step} />
+
+        {!user && step < 3 && (
+          <div 
+            style={{
+              padding: "16px 20px",
+              borderRadius: 20,
+              background: `${brandColor}0D`,
+              border: `1px solid ${brandColor}30`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 16,
+              marginBottom: 24,
+              boxShadow: "0 4px 12px rgba(0,0,0,0.02)"
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <span style={{ fontSize: 24 }}>🎁</span>
+              <div>
+                <p style={{ margin: 0, fontWeight: 700, color: "var(--text)", fontSize: 14 }}>Tích lũy điểm thưởng!</p>
+                <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--text-muted)", lineHeight: 1.4 }}>
+                  Đăng nhập để nhận ưu đãi và tích lũy điểm thưởng khi đặt bàn.
+                </p>
+              </div>
+            </div>
+            <button 
+              onClick={() => router.push(`/login?redirect=${encodeURIComponent('/restaurant/reservations/new')}`)}
+              style={{
+                padding: "8px 16px",
+                borderRadius: 10,
+                background: brandColor,
+                border: "none",
+                color: "#fff",
+                fontWeight: 700,
+                fontSize: 12,
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+                boxShadow: `0 4px 12px ${brandColor}30`,
+                transition: "transform 0.1s"
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.02)"}
+              onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
+            >
+              Đăng nhập
+            </button>
+          </div>
+        )}
 
         <div style={{ background: "var(--card)", borderRadius: 20, border: "1px solid var(--border)", padding: 28, boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
 
@@ -279,8 +349,13 @@ export default function NewReservationPage() {
               </p>
 
               {availableTables.length === 0 ? (
-                <div style={{ textAlign: "center", padding: 32, color: "var(--text-muted)" }}>
-                  😔 Không có bàn trống cho thời điểm này. Vui lòng chọn giờ khác.
+                <div style={{ padding: 20, background: "var(--surface)", border: "1px dashed var(--border)", borderRadius: 12, textAlign: "center", marginBottom: 20 }}>
+                  <p style={{ margin: "0 0 8px 0", fontWeight: 700, color: "var(--text)", fontSize: 15 }}>
+                    Không tìm thấy bàn đơn lẻ cho {guests} người
+                  </p>
+                  <p style={{ margin: 0, color: "var(--text-muted)", fontSize: 13, lineHeight: 1.5 }}>
+                    Đừng lo lắng! Nhà hàng sẽ tự động ghép bàn hoặc bố trí không gian phù hợp cho nhóm của bạn. Bạn chỉ cần bấm tiếp tục để hoàn tất đặt cọc và giữ chỗ.
+                  </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-3">
@@ -301,7 +376,7 @@ export default function NewReservationPage() {
                 <Button onClick={() => setStep(0)} style={{ flex: 1, borderRadius: 10, height: 44 }}>← Quay lại</Button>
                 <Button type="primary" onClick={() => setStep(2)} disabled={availableTables.length > 0 && selectedTableIds.length === 0}
                   style={{ flex: 2, background: brandColor, borderColor: brandColor, borderRadius: 10, height: 44, fontWeight: 700 }}>
-                  {selectedTableIds.length > 0 ? `Tiếp tục (${selectedTableIds.length} bàn)` : "Bỏ qua chọn bàn →"}
+                  {availableTables.length === 0 ? "Tiếp tục đặt bàn →" : (selectedTableIds.length > 0 ? `Tiếp tục (${selectedTableIds.length} bàn)` : "Bỏ qua chọn bàn →")}
                 </Button>
               </div>
             </div>
@@ -315,11 +390,12 @@ export default function NewReservationPage() {
               {[
                 { label: "Họ tên", value: name, setter: setName, type: "text", placeholder: "Nguyễn Văn A" },
                 { label: "Số điện thoại", value: phone, setter: setPhone, type: "tel", placeholder: "0905 123 456" },
+                { label: "Địa chỉ Email (Nhận mã đặt bàn)", value: email, setter: setEmail, type: "email", placeholder: "example@gmail.com", disabled: !!user },
               ].map((f) => (
                 <div key={f.label}>
                   <label style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: 6 }}>{f.label}</label>
-                  <input type={f.type} value={f.value} placeholder={f.placeholder} onChange={(e) => f.setter(e.target.value)}
-                    style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text)", fontSize: 14 }} />
+                  <input type={f.type} value={f.value} placeholder={f.placeholder} onChange={(e) => f.setter(e.target.value)} disabled={f.disabled}
+                    style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--border)", background: f.disabled ? "rgba(0,0,0,0.05)" : "var(--surface)", color: "var(--text)", fontSize: 14 }} />
                 </div>
               ))}
 
@@ -337,11 +413,14 @@ export default function NewReservationPage() {
                 {selectedTableIds.length > 0 && (
                   <p style={{ margin: "4px 0", color: "var(--text-muted)" }}>🪑 {selectedTableIds.length} bàn đã chọn</p>
                 )}
+                <p style={{ margin: "8px 0 0", color: "var(--text-muted)", borderTop: "1px dashed var(--border)", paddingTop: 8 }}>
+                  💰 Tiền đặt cọc (bắt buộc): <strong style={{ color: brandColor, fontSize: 15 }}>{estimatedDeposit.toLocaleString("vi-VN")}đ</strong>
+                </p>
               </div>
 
               <div style={{ display: "flex", gap: 10 }}>
                 <Button onClick={() => setStep(1)} style={{ flex: 1, borderRadius: 10, height: 44 }}>← Quay lại</Button>
-                <Button type="primary" loading={loading} onClick={handleSubmit} disabled={!name || !phone}
+                <Button type="primary" loading={loading} onClick={handleSubmit} disabled={!name || !phone || !email}
                   style={{ flex: 2, background: brandColor, borderColor: brandColor, borderRadius: 10, height: 44, fontWeight: 700 }}>
                   Xác nhận đặt bàn
                 </Button>
@@ -368,6 +447,28 @@ export default function NewReservationPage() {
                     <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>Mã xác nhận</p>
                     <p style={{ margin: "4px 0 0", fontSize: 28, fontWeight: 900, color: brandColor, fontFamily: "monospace", letterSpacing: "0.1em" }}>{createdCode}</p>
                   </div>
+
+                  {/* Payment deadline countdown */}
+                  {createdReservation?.paymentDeadline && !depositPaid && (
+                    <PaymentDeadlineCountdown
+                      deadline={createdReservation.paymentDeadline}
+                      onExpired={() => showToast("warning", "Hết hạn cọc", "Đặt bàn có thể đã bị hủy do hết hạn thanh toán cọc")}
+                    />
+                  )}
+
+                  {/* QR Code display */}
+                  {createdReservation?.metadata?.qrCodeUrl && (
+                    <div style={{ textAlign: "center", marginBottom: 20 }}>
+                      <img
+                        src={createdReservation.metadata.qrCodeUrl}
+                        alt={`QR Check-in ${createdCode}`}
+                        style={{ width: 160, height: 160, borderRadius: 12, border: "1px solid var(--border)", display: "block", margin: "0 auto 8px" }}
+                      />
+                      <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>
+                        Khách hàng có thể quét QR này để check-in
+                      </p>
+                    </div>
+                  )}
 
                   <div style={{ display: "flex", gap: 10, flexDirection: "column" }}>
                     <Button type="primary" block size="large" onClick={() => router.push("/")}
