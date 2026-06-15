@@ -9,6 +9,7 @@ import { Button } from "antd";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Header } from "@/components/layout/Header";
 
 // ── Step indicator ─────────────────────────────────────────────────────────────
 const STEPS = ["Thời gian & Khách", "Chọn bàn", "Thông tin", "Xác nhận & Cọc"];
@@ -221,10 +222,11 @@ export default function NewReservationPage() {
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg-base)", paddingTop: 80 }}>
+    <div style={{ minHeight: "100vh", background: "var(--bg-base)" }}>
+      <Header />
       <div style={{ maxWidth: 640, margin: "0 auto", padding: "24px 16px" }}>
 
-        {/* Header */}
+        {/* Breadcrumbs */}
         <div style={{ marginBottom: 24, display: "flex", alignItems: "center", gap: 12 }}>
           <Link href="/" style={{ color: "var(--text-muted)", fontSize: 13, textDecoration: "none" }}>← Trang chủ</Link>
           <span style={{ color: "var(--border)" }}>/</span>
