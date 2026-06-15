@@ -31,9 +31,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const initializeAuth = async () => {
       try {
         // Đọc user từ cả localStorage và sessionStorage (hỗ trợ rememberMe=false)
-        const user = authService.getCurrentUser();
-        if (user) {
-          setUser(user);
+        let currentUser = authService.getCurrentUser();
+        
+        // Nếu không có user trong storage nhưng có cookie accessToken (do chuyển subdomain), phục hồi lại session
+        if (!currentUser && typeof document !== 'undefined') {
+          const cookieToken = document.cookie
+            .split('; ')
+            .find(row => row.trim().startsWith('accessToken='))
+            ?.split('=')[1];
+            
+          if (cookieToken) {
+            localStorage.setItem('accessToken', cookieToken);
+            // Lấy thông tin user từ server
+            const serverUser = await authService.getCurrentUserFromServer();
+            if (serverUser) {
+              currentUser = serverUser;
+            }
+          }
+        }
+
+        if (currentUser) {
+          setUser(currentUser);
         } else {
           setUser(null);
         }

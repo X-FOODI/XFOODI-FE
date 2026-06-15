@@ -12,6 +12,9 @@ import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DishTable from "@/components/restaurant/menu/DishTable";
 import DishModal from "@/components/restaurant/menu/DishModal";
+import CategoryTable from "@/components/restaurant/menu/CategoryTable";
+import CategoryModal from "@/components/restaurant/menu/CategoryModal";
+import MenuPreview from "@/components/restaurant/menu/MenuPreview";
 import axiosInstance from "@/lib/services/axiosInstance";
 
 interface RestaurantInfo {
@@ -28,27 +31,47 @@ export default function DishMenuPage() {
   // ── Restaurant context ──
   const [restaurantInfo, setRestaurantInfo] = useState<RestaurantInfo | null>(null);
 
+  // ── Active Tab state (syncs with URL query parameter ?tab=categories) ──
+  const [activeTab, setActiveTab] = useState<"dishes" | "categories" | "preview">("dishes");
+
   // ── Categories & Dishes state ──
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]); // All categories (lookup)
+  const [categoriesList, setCategoriesList] = useState<Category[]>([]); // Paginated categories for Tab
+  const [totalCategories, setTotalCategories] = useState(0);
+  const [isCategoriesLoading, setIsCategoriesLoading] = useState(false);
+
   const [dishes, setDishes] = useState<Dish[]>([]);
   const [totalDishes, setTotalDishes] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isDishesLoading, setIsDishesLoading] = useState(false);
 
-  // ── Filters & Pagination ──
+  // ── Preview states ──
+  const [previewDishes, setPreviewDishes] = useState<Dish[]>([]);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+
+  // ── Dishes Filters & Pagination ──
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [status, setStatus] = useState("all");
   const [page, setPage] = useState(1);
   const LIMIT = 10;
 
-  // ── Modal state ──
+  // ── Categories Filters & Pagination ──
+  const [catSearch, setCatSearch] = useState("");
+  const [catStatus, setCatStatus] = useState("all");
+  const [catPage, setCatPage] = useState(1);
+
+  // ── Modal states ──
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [dishToEdit, setDishToEdit] = useState<Dish | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [categoryToEdit, setCategoryToEdit] = useState<Category | null>(null);
+  const [isCategorySubmitting, setIsCategorySubmitting] = useState(false);
+
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── Auth guard ──
+  // ── Auth guard & Fetch Restaurant ──
   useEffect(() => {
     if (!isAuthReady) return;
     if (!user) {
@@ -74,13 +97,36 @@ export default function DishMenuPage() {
       });
   }, [isAuthReady, user, router]);
 
-  // ── Fetch Categories (dropdown lookup) ──
-  const fetchCategories = useCallback(async () => {
+  // ── URL Query Sync ──
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get("tab");
+      if (tabParam === "categories") {
+        setActiveTab("categories");
+      } else if (tabParam === "preview") {
+        setActiveTab("preview");
+      } else {
+        setActiveTab("dishes");
+      }
+    }
+  }, [router]);
+
+  const handleTabChange = (tab: "dishes" | "categories" | "preview") => {
+    setActiveTab(tab);
+    let path = "/restaurant/menu";
+    if (tab === "categories") path = "/restaurant/menu?tab=categories";
+    else if (tab === "preview") path = "/restaurant/menu?tab=preview";
+    router.push(path);
+  };
+
+  // ── Fetch Categories Lookup (all categories for select options) ──
+  const fetchCategoriesLookup = useCallback(async () => {
     if (!restaurantInfo?.id) return;
     try {
       const res = await categoryService.list({
         page: 1,
-        limit: 100, // retrieve all for dropdown usage
+        limit: 100,
         restaurantId: restaurantInfo.id,
       });
       setCategories(res.data);
@@ -89,10 +135,32 @@ export default function DishMenuPage() {
     }
   }, [restaurantInfo?.id]);
 
+  // ── Fetch Paginated Categories ──
+  const fetchCategoriesTab = useCallback(async () => {
+    if (!restaurantInfo?.id) return;
+    setIsCategoriesLoading(true);
+    try {
+      const result = await categoryService.list({
+        page: catPage,
+        limit: LIMIT,
+        search: catSearch.trim() || undefined,
+        status: catStatus !== "all" ? catStatus : undefined,
+        restaurantId: restaurantInfo.id,
+      });
+      setCategoriesList(result.data);
+      setTotalCategories(result.total);
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || "Không thể tải danh sách danh mục";
+      showToast("error", "Lỗi tải dữ liệu", msg);
+    } finally {
+      setIsCategoriesLoading(false);
+    }
+  }, [restaurantInfo?.id, catPage, catSearch, catStatus, showToast]);
+
   // ── Fetch Dishes ──
   const fetchDishes = useCallback(async () => {
     if (!restaurantInfo?.id) return;
-    setIsLoading(true);
+    setIsDishesLoading(true);
     try {
       const result = await dishService.list({
         page,
@@ -108,24 +176,49 @@ export default function DishMenuPage() {
       const msg = err?.response?.data?.message || err?.message || "Không thể tải danh sách món ăn";
       showToast("error", "Lỗi tải dữ liệu", msg);
     } finally {
-      setIsLoading(false);
+      setIsDishesLoading(false);
     }
-  }, [restaurantInfo?.id, page, search, categoryId, status]);
+  }, [restaurantInfo?.id, page, search, categoryId, status, showToast]);
 
-  // Initial load
+  // ── Fetch All Dishes for Menu Preview ──
+  const fetchPreviewDishes = useCallback(async () => {
+    if (!restaurantInfo?.id) return;
+    setIsPreviewLoading(true);
+    try {
+      const result = await dishService.list({
+        page: 1,
+        limit: 200,
+        restaurantId: restaurantInfo.id,
+      });
+      setPreviewDishes(result.data);
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || "Không thể tải danh sách xem trước thực đơn";
+      showToast("error", "Lỗi tải dữ liệu", msg);
+    } finally {
+      setIsPreviewLoading(false);
+    }
+  }, [restaurantInfo?.id, showToast]);
+
+  // Refetch loops
   useEffect(() => {
     if (restaurantInfo?.id) {
-      fetchCategories();
+      fetchCategoriesLookup();
     }
-  }, [restaurantInfo?.id, fetchCategories]);
+  }, [restaurantInfo?.id, fetchCategoriesLookup]);
 
   useEffect(() => {
     if (restaurantInfo?.id) {
-      fetchDishes();
+      if (activeTab === "dishes") {
+        fetchDishes();
+      } else if (activeTab === "categories") {
+        fetchCategoriesTab();
+      } else if (activeTab === "preview") {
+        fetchPreviewDishes();
+      }
     }
-  }, [restaurantInfo?.id, fetchDishes]);
+  }, [restaurantInfo?.id, activeTab, fetchDishes, fetchCategoriesTab, fetchPreviewDishes]);
 
-  // Handlers for filters
+  // ── Dish Filter Handlers ──
   const handleSearchChange = (val: string) => {
     setSearch(val);
     setPage(1);
@@ -143,7 +236,20 @@ export default function DishMenuPage() {
     setPage(1);
   };
 
-  // CRUD Actions
+  // ── Category Filter Handlers ──
+  const handleCatSearchChange = (val: string) => {
+    setCatSearch(val);
+    setCatPage(1);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {}, 300);
+  };
+
+  const handleCatStatusChange = (val: string) => {
+    setCatStatus(val);
+    setCatPage(1);
+  };
+
+  // ── Dish CRUD Actions ──
   const handleOpenCreate = () => {
     setDishToEdit(null);
     setIsModalOpen(true);
@@ -191,6 +297,56 @@ export default function DishMenuPage() {
     }
   };
 
+  // ── Category CRUD Actions ──
+  const handleOpenCreateCategory = () => {
+    setCategoryToEdit(null);
+    setIsCategoryModalOpen(true);
+  };
+
+  const handleOpenEditCategory = (category: Category) => {
+    setCategoryToEdit(category);
+    setIsCategoryModalOpen(true);
+  };
+
+  const handleCategoryModalSubmit = async (data: any) => {
+    setIsCategorySubmitting(true);
+    try {
+      if (categoryToEdit) {
+        await categoryService.update(categoryToEdit.id, data, restaurantInfo?.id);
+        showToast("success", "Cập nhật thành công", `Danh mục "${data.name}" đã được cập nhật.`);
+      } else {
+        await categoryService.create(data, restaurantInfo?.id);
+        showToast("success", "Tạo thành công", `Danh mục "${data.name}" đã được tạo.`);
+      }
+      setIsCategoryModalOpen(false);
+      setCategoryToEdit(null);
+      setCatPage(1);
+      await fetchCategoriesTab();
+      await fetchCategoriesLookup(); // Update lookup for dropdowns
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || "Thao tác thất bại";
+      showToast("error", "Lỗi", msg);
+    } finally {
+      setIsCategorySubmitting(false);
+    }
+  };
+
+  const handleCategoryDelete = async (id: string) => {
+    try {
+      await categoryService.delete(id, restaurantInfo?.id);
+      showToast("success", "Đã xóa", "Danh mục đã được xóa thành công.");
+      if (categoriesList.length === 1 && catPage > 1) {
+        setCatPage((p) => p - 1);
+      } else {
+        await fetchCategoriesTab();
+        await fetchCategoriesLookup();
+      }
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || "Không thể xóa danh mục";
+      showToast("error", "Xóa thất bại", msg);
+    }
+  };
+
   // Guard Loading state
   if (!isAuthReady || !user) {
     return (
@@ -231,28 +387,37 @@ export default function DishMenuPage() {
             <div className="flex items-start justify-between gap-4 flex-wrap">
               <div>
                 <h1 className="text-2xl font-bold" style={{ color: "var(--text)" }}>
-                  Quản lý món ăn
+                  Quản lý thực đơn
                 </h1>
                 <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
-                  Xem và điều chỉnh các món ăn trong thực đơn của nhà hàng.
-                  {totalDishes > 0 && (
-                    <span className="ml-2 font-semibold" style={{ color: "var(--primary)" }}>
-                      ({totalDishes} món ăn)
-                    </span>
-                  )}
+                  Thiết lập và quản lý các món ăn cùng danh mục trong thực đơn của nhà hàng.
                 </p>
               </div>
 
-              <button
-                onClick={handleOpenCreate}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-md hover:opacity-90 active:scale-95 transition-all"
-                style={{ background: "var(--primary)" }}
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Thêm món ăn
-              </button>
+              {activeTab === "dishes" && (
+                <button
+                  onClick={handleOpenCreate}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-md hover:opacity-90 active:scale-95 transition-all"
+                  style={{ background: "var(--primary)" }}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Thêm món ăn
+                </button>
+              )}
+              {activeTab === "categories" && (
+                <button
+                  onClick={handleOpenCreateCategory}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-md hover:opacity-90 active:scale-95 transition-all"
+                  style={{ background: "var(--primary)" }}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Thêm danh mục
+                </button>
+              )}
             </div>
 
             {/* Quick Stats Panel */}
@@ -266,25 +431,25 @@ export default function DishMenuPage() {
                   bg: "var(--primary-soft)",
                 },
                 {
-                  label: "Món chay 🌿",
-                  value: dishes.filter((d) => d.isVegetarian).length,
-                  icon: "M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z",
+                  label: "Tổng số danh mục",
+                  value: totalCategories,
+                  icon: "M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10",
                   color: "#22c55e",
                   bg: "rgba(34,197,94,0.08)",
                 },
                 {
-                  label: "Món cay 🌶️",
-                  value: dishes.filter((d) => d.isSpicy).length,
-                  icon: "M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z",
-                  color: "#ef4444",
-                  bg: "rgba(239,68,68,0.08)",
+                  label: "Món chay 🌿",
+                  value: dishes.filter((d) => d.isVegetarian).length,
+                  icon: "M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z",
+                  color: "#eab308",
+                  bg: "rgba(234,179,8,0.08)",
                 },
                 {
                   label: "Món bán chạy ⭐",
                   value: dishes.filter((d) => d.isBestSeller).length,
                   icon: "M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.907c.961 0 1.36 1.248.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.77-.579-.371-1.81.588-1.81h4.907a1 1 0 00.95-.69l1.519-4.674z",
-                  color: "#eab308",
-                  bg: "rgba(234,179,8,0.08)",
+                  color: "#a855f7",
+                  bg: "rgba(168,85,247,0.08)",
                 },
               ].map((stat) => (
                 <div
@@ -312,33 +477,114 @@ export default function DishMenuPage() {
               ))}
             </div>
 
-            {/* Dish list / Table */}
-            <div
-              className="rounded-2xl border p-6 animate-fadeIn"
-              style={{ background: "var(--card)", borderColor: "var(--border)" }}
-            >
-              <DishTable
-                dishes={dishes}
-                isLoading={isLoading}
-                categories={categories}
-                onEdit={handleOpenEdit}
-                onDelete={handleDelete}
-                pagination={{
-                  total: totalDishes,
-                  page,
-                  limit: LIMIT,
-                  onPageChange: setPage,
+            {/* Tabs control */}
+            <div className="flex border-b" style={{ borderColor: "var(--border)" }}>
+              <button
+                type="button"
+                onClick={() => handleTabChange("dishes")}
+                className="px-6 py-3 text-sm font-bold border-b-2 transition-all"
+                style={{
+                  borderColor: activeTab === "dishes" ? "var(--primary)" : "transparent",
+                  color: activeTab === "dishes" ? "var(--primary)" : "var(--text-muted)",
                 }}
-                filters={{
-                  search,
-                  onSearchChange: handleSearchChange,
-                  categoryId,
-                  onCategoryChange: handleCategoryChange,
-                  status,
-                  onStatusChange: handleStatusChange,
+              >
+                Món ăn ({totalDishes})
+              </button>
+              <button
+                type="button"
+                onClick={() => handleTabChange("categories")}
+                className="px-6 py-3 text-sm font-bold border-b-2 transition-all"
+                style={{
+                  borderColor: activeTab === "categories" ? "var(--primary)" : "transparent",
+                  color: activeTab === "categories" ? "var(--primary)" : "var(--text-muted)",
                 }}
-              />
+              >
+                Danh mục ({totalCategories})
+              </button>
+              <button
+                type="button"
+                onClick={() => handleTabChange("preview")}
+                className="px-6 py-3 text-sm font-bold border-b-2 transition-all flex items-center gap-1.5"
+                style={{
+                  borderColor: activeTab === "preview" ? "var(--primary)" : "transparent",
+                  color: activeTab === "preview" ? "var(--primary)" : "var(--text-muted)",
+                }}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+                Giao diện menu
+              </button>
             </div>
+
+            {/* List / Table / Preview area */}
+            {activeTab === "dishes" && (
+              <div
+                className="rounded-2xl border p-6 animate-fadeIn"
+                style={{ background: "var(--card)", borderColor: "var(--border)" }}
+              >
+                <DishTable
+                  dishes={dishes}
+                  isLoading={isDishesLoading}
+                  categories={categories}
+                  onEdit={handleOpenEdit}
+                  onDelete={handleDelete}
+                  pagination={{
+                    total: totalDishes,
+                    page,
+                    limit: LIMIT,
+                    onPageChange: setPage,
+                  }}
+                  filters={{
+                    search,
+                    onSearchChange: handleSearchChange,
+                    categoryId,
+                    onCategoryChange: handleCategoryChange,
+                    status,
+                    onStatusChange: handleStatusChange,
+                  }}
+                />
+              </div>
+            )}
+
+            {activeTab === "categories" && (
+              <div
+                className="rounded-2xl border p-6 animate-fadeIn"
+                style={{ background: "var(--card)", borderColor: "var(--border)" }}
+              >
+                <CategoryTable
+                  categories={categoriesList}
+                  isLoading={isCategoriesLoading}
+                  onEdit={handleOpenEditCategory}
+                  onDelete={handleCategoryDelete}
+                  pagination={{
+                    total: totalCategories,
+                    page: catPage,
+                    limit: LIMIT,
+                    onPageChange: setCatPage,
+                  }}
+                  searchQuery={catSearch}
+                  onSearchChange={handleCatSearchChange}
+                  statusFilter={catStatus}
+                  onStatusFilterChange={handleCatStatusChange}
+                />
+              </div>
+            )}
+
+            {activeTab === "preview" && (
+              <div
+                className="rounded-2xl border p-6 animate-fadeIn"
+                style={{ background: "var(--card)", borderColor: "var(--border)" }}
+              >
+                <MenuPreview
+                  restaurantName={restaurantInfo?.name ?? ""}
+                  logoUrl={null}
+                  categories={categories}
+                  dishes={previewDishes}
+                  isLoading={isPreviewLoading}
+                />
+              </div>
+            )}
           </div>
         </main>
       </div>
@@ -354,6 +600,19 @@ export default function DishMenuPage() {
         dishToEdit={dishToEdit}
         categories={categories}
         isSubmitting={isSubmitting}
+      />
+
+      {/* Category Modal (Add / Edit) */}
+      <CategoryModal
+        isOpen={isCategoryModalOpen}
+        onClose={() => {
+          setIsCategoryModalOpen(false);
+          setCategoryToEdit(null);
+        }}
+        onSubmit={handleCategoryModalSubmit}
+        categoryToEdit={categoryToEdit}
+        categoriesList={categories}
+        isSubmitting={isCategorySubmitting}
       />
     </div>
   );
