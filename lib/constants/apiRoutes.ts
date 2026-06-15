@@ -80,4 +80,12 @@ export const API_ROUTES = {
     TOGGLE_PUBLISH: (id: string) => `/feedbacks/${id}/publish`,
     DELETE: (id: string) => `/feedbacks/${id}`,
   },
+  EMPLOYEES: {
+    LIST: '/employees',
+    DETAIL: (id: string) => `/employees/${id}`,
+    CREATE: '/employees',
+    UPDATE: (id: string) => `/employees/${id}`,
+    DELETE: (id: string) => `/employees/${id}`,
+    RESET_PASSWORD: (id: string) => `/employees/${id}/reset-password`,
+  },
 };
