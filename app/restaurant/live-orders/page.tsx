@@ -35,6 +35,7 @@ interface Order {
   customerName?: string | null;
   customerPhone?: string | null;
   customerEmail?: string | null;
+  isPaid?: boolean;
 }
 
 export default function LiveOrdersPage() {
@@ -269,10 +270,8 @@ export default function LiveOrdersPage() {
         delete next[cashModalOrder.id];
         return next;
       });
-      setIsCashModalOpen(false);
-      setCashModalOrder(null);
       // Show feedback popup
-      setFeedbackOrder({ id: cashModalOrder.id, reference: cashModalOrder.orderReference || cashModalOrder.id.slice(0, 8).toUpperCase() });
+      setFeedbackOrder({ id: cashModalOrder.id, reference: cashModalOrder.reference || cashModalOrder.id.slice(0, 8).toUpperCase() });
       if (selectedOrder?.id === cashModalOrder.id) {
         setSelectedOrder(null);
       }
