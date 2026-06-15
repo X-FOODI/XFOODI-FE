@@ -29,9 +29,15 @@ export async function GET(request: Request) {
       );
     }
 
-    const apiKey =
-      process.env.NEXT_PUBLIC_SERPAPI_KEY ||
-      'eb7be0084ef0b7abf1027545ccadb3b41ef2c8507394fb46bcb98ef9d639714b';
+    const apiKey = process.env.SERPAPI_KEY || process.env.NEXT_PUBLIC_SERPAPI_KEY;
+    
+    if (!apiKey) {
+      console.warn('SerpApi API key is not configured on the server.');
+      return NextResponse.json(
+        { success: false, message: 'SerpApi is not configured on the server' },
+        { status: 500 }
+      );
+    }
     
     const url = new URL('https://serpapi.com/search');
     url.searchParams.append('engine', 'google');
