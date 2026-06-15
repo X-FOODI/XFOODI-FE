@@ -84,7 +84,7 @@ export default function RestaurantDashboardPage() {
 
     const roles: string[] = user.roles || (user.role ? [user.role] : []);
     const isRestaurantRole = roles.includes("Owner") || roles.includes("Staff");
-    const isSystemAdmin = roles.includes("Admin") || roles.includes("SuperAdmin");
+    const isSystemAdmin = roles.includes("Admin") || roles.includes("SuperAdmin") || roles.includes("System Admin");
 
     if (!isRestaurantRole && !isSystemAdmin) {
       // Not a restaurant user — redirect to registration
@@ -92,7 +92,35 @@ export default function RestaurantDashboardPage() {
       return;
     }
 
-    // ✅ User has correct role → fetch restaurant info and show dashboard
+    // Check tenant access restriction:
+    // If user is Owner, their restaurantId must match current tenant ID (unless they are platform Admin/SuperAdmin)
+    if (!isSystemAdmin) {
+      if (!tenant) {
+        // Enforce subdomain access! If user is Owner, redirect to their subdomain dashboard.
+        if (user.restaurantSlug && typeof window !== "undefined") {
+          const host = window.location.host;
+          const protocol = window.location.protocol;
+          const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || "xfoodi.website";
+          const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1");
+          const targetTenantSubdomain = isLocalhost 
+            ? `${user.restaurantSlug}.localhost` 
+            : `${user.restaurantSlug}.${BASE_DOMAIN}`;
+          
+          const port = host.includes(":") ? `:${host.split(":")[1]}` : "";
+          window.location.href = `${protocol}//${targetTenantSubdomain}${port}/restaurant/dashboard`;
+          return;
+        }
+        // Tạm thời comment lại để có thể xem giao diện dashboard
+        // setUnauthorized(true);
+        // return;
+      }
+
+      if (tenant && user.restaurantId && user.restaurantId !== tenant.id) {
+        // Tạm thời comment lại để xem giao diện
+        // setUnauthorized(true);
+        // return;
+      }
+    }
     axiosInstance
       .get<{ success: boolean; data: RestaurantInfo }>("/restaurants/me")
       .then((res: { data: { success: boolean; data: RestaurantInfo } }) =>

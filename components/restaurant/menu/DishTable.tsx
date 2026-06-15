@@ -143,11 +143,24 @@ export default function DishTable({
 
                   {/* Name */}
                   <td className="px-4 py-3.5">
-                    <p className="font-bold text-sm" style={{ color: "var(--text)" }}>{dish.name}</p>
-                    {dish.description && (
-                      <p className="text-xs mt-0.5 max-w-[180px] truncate" style={{ color: "var(--text-muted)" }}
-                        title={dish.description}>{dish.description}</p>
-                    )}
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg overflow-hidden border flex-shrink-0" style={{ borderColor: "var(--border)" }}>
+                        {dish.imageUrl ? (
+                          <img src={dish.imageUrl} alt={dish.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-black/5 dark:bg-white/5 text-[10px]" style={{ color: "var(--text-muted)" }}>
+                            🍔
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-bold text-sm" style={{ color: "var(--text)" }}>{dish.name}</p>
+                        {dish.description && (
+                          <p className="text-xs mt-0.5 max-w-[180px] truncate" style={{ color: "var(--text-muted)" }}
+                            title={dish.description}>{dish.description}</p>
+                        )}
+                      </div>
+                    </div>
                   </td>
 
                   {/* Category */}

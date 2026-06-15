@@ -22,6 +22,7 @@ export default function DashboardHeader({
 }: DashboardHeaderProps) {
   const router = useRouter();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [theme, setTheme] = useState<"light" | "dark">("light");
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Resolve user from auth if props not passed
@@ -82,6 +83,29 @@ export default function DashboardHeader({
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [dropdownOpen]);
+
+  useEffect(() => {
+    // Initial load
+    const isDark = document.documentElement.classList.contains("dark");
+    setTheme(isDark ? "dark" : "light");
+  }, []);
+
+  const toggleTheme = () => {
+    const newTheme = theme === "light" ? "dark" : "light";
+    setTheme(newTheme);
+    localStorage.setItem("xfoodi-theme-mode", newTheme);
+    if (newTheme === "dark") {
+      document.documentElement.classList.add("dark");
+      document.documentElement.setAttribute("data-theme", "dark");
+      document.body.classList.add("dark");
+      document.body.setAttribute("data-theme", "dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+      document.documentElement.setAttribute("data-theme", "light");
+      document.body.classList.remove("dark");
+      document.body.setAttribute("data-theme", "light");
+    }
+  };
 
   const handleLogout = async () => {
     setDropdownOpen(false);
@@ -230,6 +254,44 @@ export default function DashboardHeader({
 
       {/* ── Right: Bell + User button ── */}
       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        
+        {/* Theme Toggle */}
+        <button
+          onClick={toggleTheme}
+          title={theme === "light" ? "Chuyển sang chế độ Tối" : "Chuyển sang chế độ Sáng"}
+          style={{
+            position: "relative",
+            width: "36px",
+            height: "36px",
+            border: "1px solid var(--border)",
+            borderRadius: "50%",
+            background: "var(--card)",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "var(--text-muted)",
+            transition: "all 0.15s ease",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "var(--surface)";
+            e.currentTarget.style.borderColor = "var(--primary, #ff5722)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "var(--card)";
+            e.currentTarget.style.borderColor = "var(--border)";
+          }}
+        >
+          {theme === "light" ? (
+            <svg width="17" height="17" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+            </svg>
+          ) : (
+            <svg width="17" height="17" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+          )}
+        </button>
 
         {/* Notification bell */}
         <button

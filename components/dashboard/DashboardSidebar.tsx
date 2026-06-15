@@ -182,12 +182,23 @@ export default function DashboardSidebar({
         },
         {
           id: "orders",
-          label: "Đơn hàng",
+          label: "Lịch sử đơn",
           path: "/restaurant/orders",
           icon: (
             <svg className="dashboard-sidebar-item-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+          ),
+        },
+        {
+          id: "live-orders",
+          label: "Màn hình Bếp",
+          path: "/restaurant/live-orders",
+          icon: (
+            <svg className="dashboard-sidebar-item-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
           ),
         },
@@ -213,22 +224,34 @@ export default function DashboardSidebar({
             </svg>
           ),
         },
+        {
+          id: "reservations",
+          label: "Đặt bàn",
+          path: "/restaurant/reservations",
+          icon: (
+            <svg className="dashboard-sidebar-item-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          ),
+        },
+        {
+          id: "payments",
+          label: "Thanh toán",
+          path: "/restaurant/payments",
+          icon: (
+            <svg className="dashboard-sidebar-item-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+            </svg>
+          ),
+        },
       ],
     },
     {
       label: "Quản lý",
       items: [
-        {
-          id: "categories",
-          label: "Danh mục",
-          path: "/restaurant/menu/categories",
-          icon: (
-            <svg className="dashboard-sidebar-item-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-            </svg>
-          ),
-        },
+
         {
           id: "menu",
           label: "Thực đơn",
@@ -276,6 +299,33 @@ export default function DashboardSidebar({
       ],
     },
     {
+      label: "Tài chính",
+      items: [
+        {
+          id: "wallet",
+          label: "Ví doanh thu",
+          path: "/restaurant/wallet",
+          icon: (
+            <svg className="dashboard-sidebar-item-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+            </svg>
+          ),
+        },
+        {
+          id: "payments",
+          label: "Thanh toán",
+          path: "/restaurant/payments",
+          icon: (
+            <svg className="dashboard-sidebar-item-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+          ),
+        },
+      ],
+    },
+    {
       label: "Hệ thống",
       items: [
         {
@@ -304,6 +354,7 @@ export default function DashboardSidebar({
       ],
     },
   ];
+
 
   const sections = role === "admin" ? adminSections : restaurantSections;
   const initials = userName.split(" ").slice(-1)[0]?.[0]?.toUpperCase() ?? "U";
@@ -359,9 +410,30 @@ export default function DashboardSidebar({
             )}
             <ul className="space-y-0.5">
               {section.items.map((item) => {
+                const [itemBasePath, itemQuery] = item.path.split("?");
+                
+                let isQueryMatch = true;
+                if (typeof window !== "undefined") {
+                  const currentParams = new URLSearchParams(window.location.search);
+                  if (itemQuery) {
+                    const itemParams = new URLSearchParams(itemQuery);
+                    for (const [key, val] of itemParams.entries()) {
+                      if (currentParams.get(key) !== val) {
+                        isQueryMatch = false;
+                        break;
+                      }
+                    }
+                  } else {
+                    // If this item has no query parameters, it should only match if the current URL
+                    // has no active query parameter that matches other items (like tab=categories)
+                    if (currentParams.get("tab")) {
+                      isQueryMatch = false;
+                    }
+                  }
+                }
+
                 const isActive =
-                  pathname === item.path ||
-                  (pathname !== item.path && pathname.startsWith(`${item.path}/`));
+                  pathname === itemBasePath && isQueryMatch;
                 return (
                   <li key={item.id}>
                     <Link

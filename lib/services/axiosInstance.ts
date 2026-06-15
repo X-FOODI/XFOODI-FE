@@ -42,14 +42,14 @@ axiosInstance.interceptors.request.use(
     // Token co the nam trong localStorage (rememberMe=true) hoac sessionStorage (rememberMe=false)
     if (typeof window !== 'undefined') {
       const token = localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken');
-      if (token) {
+      if (token && !config.headers.Authorization) {
         config.headers.Authorization = `Bearer ${token}`;
       }
 
       // Add tenant domain header
       const host = window.location.host;
       const hostWithoutPort = host.includes(':') ? host.split(':')[0] : host;
-      config.headers['X-Tenant-Domain'] = hostWithoutPort;
+      config.headers['X-Tenant-Domain'] = config.headers['X-Tenant-Domain'] || hostWithoutPort;
     }
     // When sending FormData, do not set Content-Type so the browser/axios can set
     // multipart/form-data with the correct boundary. Otherwise server gets
