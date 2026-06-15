@@ -69,6 +69,9 @@ export interface CreateReservationDto {
   time: string;
   specialRequests?: string;
   tableIds?: string[];
+  fullName?: string;
+  phoneNumber?: string;
+  email?: string;
 }
 
 export interface AvailableTable {

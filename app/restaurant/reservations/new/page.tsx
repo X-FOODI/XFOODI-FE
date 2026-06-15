@@ -146,7 +146,16 @@ export default function NewReservationPage() {
   // Step 2 — personal info
   const [name, setName] = useState(user?.fullName || user?.name || "");
   const [phone, setPhone] = useState(user?.phoneNumber || "");
+  const [email, setEmail] = useState(user?.email || "");
   const [requests, setRequests] = useState("");
+
+  useEffect(() => {
+    if (user) {
+      setName((prev) => prev || user.fullName || user.name || "");
+      setPhone((prev) => prev || user.phoneNumber || "");
+      setEmail((prev) => prev || user.email || "");
+    }
+  }, [user]);
 
   // Step 3 — result
   const [createdId, setCreatedId] = useState("");
@@ -179,6 +188,10 @@ export default function NewReservationPage() {
   // ── Step 3: submit reservation ───────────────────────────────────────────────
   const handleSubmit = async () => {
     if (!restaurantId) { showToast("error", "Lỗi", "Không xác định được nhà hàng"); return; }
+    if (!email || !email.trim()) {
+      showToast("error", "Lỗi", "Vui lòng nhập địa chỉ email để nhận thông tin đặt bàn");
+      return;
+    }
     setLoading(true);
     try {
       const isoTime = new Date(`${date}T${time}:00`).toISOString();
@@ -188,6 +201,9 @@ export default function NewReservationPage() {
         time: isoTime,
         specialRequests: requests || undefined,
         tableIds: selectedTableIds,
+        fullName: name,
+        phoneNumber: phone,
+        email: email.trim(),
       });
       setCreatedId(res.id);
       setCreatedCode(res.confirmationCode || "");
@@ -317,11 +333,12 @@ export default function NewReservationPage() {
               {[
                 { label: "Họ tên", value: name, setter: setName, type: "text", placeholder: "Nguyễn Văn A" },
                 { label: "Số điện thoại", value: phone, setter: setPhone, type: "tel", placeholder: "0905 123 456" },
+                { label: "Địa chỉ Email (Nhận mã đặt bàn)", value: email, setter: setEmail, type: "email", placeholder: "example@gmail.com", disabled: !!user },
               ].map((f) => (
                 <div key={f.label}>
                   <label style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: 6 }}>{f.label}</label>
-                  <input type={f.type} value={f.value} placeholder={f.placeholder} onChange={(e) => f.setter(e.target.value)}
-                    style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text)", fontSize: 14 }} />
+                  <input type={f.type} value={f.value} placeholder={f.placeholder} onChange={(e) => f.setter(e.target.value)} disabled={f.disabled}
+                    style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--border)", background: f.disabled ? "rgba(0,0,0,0.05)" : "var(--surface)", color: "var(--text)", fontSize: 14 }} />
                 </div>
               ))}
 
@@ -343,7 +360,7 @@ export default function NewReservationPage() {
 
               <div style={{ display: "flex", gap: 10 }}>
                 <Button onClick={() => setStep(1)} style={{ flex: 1, borderRadius: 10, height: 44 }}>← Quay lại</Button>
-                <Button type="primary" loading={loading} onClick={handleSubmit} disabled={!name || !phone}
+                <Button type="primary" loading={loading} onClick={handleSubmit} disabled={!name || !phone || !email}
                   style={{ flex: 2, background: brandColor, borderColor: brandColor, borderRadius: 10, height: 44, fontWeight: 700 }}>
                   Xác nhận đặt bàn
                 </Button>
