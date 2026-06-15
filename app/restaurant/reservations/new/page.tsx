@@ -114,12 +114,6 @@ function SePayQR({ info, onSuccess, onSkip }: {
       <p style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 20 }}>
         Đang chờ xác nhận thanh toán{dots}
       </p>
-
-      <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-        <Button onClick={onSkip} style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
-          Bỏ qua, đặt cọc sau
-        </Button>
-      </div>
     </div>
   );
 }
@@ -165,6 +159,14 @@ export default function NewReservationPage() {
 
   const brandColor = tenant?.primaryColor || "#FF380B";
   const restaurantId = tenant?.id || user?.restaurantId || "";
+
+  // Estimate deposit amount (25k per seat capacity of selected tables, or per guest if auto-arranged)
+  const estimatedDeposit = selectedTableIds.length > 0
+    ? selectedTableIds.reduce((sum, id) => {
+        const tbl = availableTables.find((t) => t.id === id);
+        return sum + (tbl ? tbl.seatingCapacity * 25000 : 0);
+      }, 0)
+    : guests * 25000;
 
   // ── Step 0 → 1: check available tables ──────────────────────────────────────
   const handleCheckTables = async () => {
@@ -297,8 +299,13 @@ export default function NewReservationPage() {
               </p>
 
               {availableTables.length === 0 ? (
-                <div style={{ textAlign: "center", padding: 32, color: "var(--text-muted)" }}>
-                  😔 Không có bàn trống cho thời điểm này. Vui lòng chọn giờ khác.
+                <div style={{ padding: 20, background: "var(--surface)", border: "1px dashed var(--border)", borderRadius: 12, textAlign: "center", marginBottom: 20 }}>
+                  <p style={{ margin: "0 0 8px 0", fontWeight: 700, color: "var(--text)", fontSize: 15 }}>
+                    Không tìm thấy bàn đơn lẻ cho {guests} người
+                  </p>
+                  <p style={{ margin: 0, color: "var(--text-muted)", fontSize: 13, lineHeight: 1.5 }}>
+                    Đừng lo lắng! Nhà hàng sẽ tự động ghép bàn hoặc bố trí không gian phù hợp cho nhóm của bạn. Bạn chỉ cần bấm tiếp tục để hoàn tất đặt cọc và giữ chỗ.
+                  </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-3">
@@ -319,7 +326,7 @@ export default function NewReservationPage() {
                 <Button onClick={() => setStep(0)} style={{ flex: 1, borderRadius: 10, height: 44 }}>← Quay lại</Button>
                 <Button type="primary" onClick={() => setStep(2)} disabled={availableTables.length > 0 && selectedTableIds.length === 0}
                   style={{ flex: 2, background: brandColor, borderColor: brandColor, borderRadius: 10, height: 44, fontWeight: 700 }}>
-                  {selectedTableIds.length > 0 ? `Tiếp tục (${selectedTableIds.length} bàn)` : "Bỏ qua chọn bàn →"}
+                  {availableTables.length === 0 ? "Tiếp tục đặt bàn →" : (selectedTableIds.length > 0 ? `Tiếp tục (${selectedTableIds.length} bàn)` : "Bỏ qua chọn bàn →")}
                 </Button>
               </div>
             </div>
@@ -356,6 +363,9 @@ export default function NewReservationPage() {
                 {selectedTableIds.length > 0 && (
                   <p style={{ margin: "4px 0", color: "var(--text-muted)" }}>🪑 {selectedTableIds.length} bàn đã chọn</p>
                 )}
+                <p style={{ margin: "8px 0 0", color: "var(--text-muted)", borderTop: "1px dashed var(--border)", paddingTop: 8 }}>
+                  💰 Tiền đặt cọc (bắt buộc): <strong style={{ color: brandColor, fontSize: 15 }}>{estimatedDeposit.toLocaleString("vi-VN")}đ</strong>
+                </p>
               </div>
 
               <div style={{ display: "flex", gap: 10 }}>
