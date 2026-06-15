@@ -415,7 +415,7 @@ export default function RestaurantLandingPage() {
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><Icon.Menu /> Xem Thực Đơn</span>
                       </Button>
                     </Link>
-                    <Link href="/customer">
+                    <Link href="/restaurant/reservations/new">
                       <Button size="large" shape="round"
                         style={{ height: 52, padding: "0 32px", fontWeight: 700, fontSize: 15, background: "rgba(255,255,255,0.1)", borderColor: "rgba(255,255,255,0.3)", color: "#fff" }}>
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>Đặt Bàn Online <Icon.Arrow /></span>
@@ -594,7 +594,7 @@ export default function RestaurantLandingPage() {
 
                   {/* CTA */}
                   <div style={{ paddingTop: 8 }}>
-                    <Link href="/customer">
+                    <Link href="/restaurant/reservations/new">
                       <Button type="primary" block size="large" shape="round"
                         style={{ background: brandColor, borderColor: brandColor, fontWeight: 700, height: 48 }}>
                         Đặt Bàn Ngay

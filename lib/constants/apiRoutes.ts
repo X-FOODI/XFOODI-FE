@@ -71,4 +71,13 @@ export const API_ROUTES = {
     TRANSFER_INFO: '/payments/transfer-info',
     SEPAY_WEBHOOK: '/payments/sepay-webhook',
   },
+  FEEDBACKS: {
+    LIST: '/feedbacks',
+    DETAIL: (id: string) => `/feedbacks/${id}`,
+    BY_ORDER: (orderId: string) => `/feedbacks/orders/${orderId}`,
+    CREATE: (orderId: string) => `/feedbacks/orders/${orderId}`,
+    UPDATE: (id: string) => `/feedbacks/${id}`,
+    TOGGLE_PUBLISH: (id: string) => `/feedbacks/${id}/publish`,
+    DELETE: (id: string) => `/feedbacks/${id}`,
+  },
 };

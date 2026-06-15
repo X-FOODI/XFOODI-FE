@@ -9,6 +9,7 @@ import { useAuth } from "@/lib/contexts/AuthContext";
 import { useTenant } from "@/lib/contexts/TenantContext";
 import axiosInstance from "@/lib/services/axiosInstance";
 import paymentService, { PaymentPurpose } from "@/lib/services/paymentService";
+import FeedbackModal from "@/components/feedback/FeedbackModal";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
@@ -61,6 +62,7 @@ export default function LiveOrdersPage() {
     orderReference?: string;
   }>>([]);
   const [pendingPayments, setPendingPayments] = useState<Record<string, boolean>>({});
+  const [feedbackOrder, setFeedbackOrder] = useState<{ id: string; reference: string } | null>(null);
 
   // Audio for notification
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -267,6 +269,10 @@ export default function LiveOrdersPage() {
         delete next[cashModalOrder.id];
         return next;
       });
+      setIsCashModalOpen(false);
+      setCashModalOrder(null);
+      // Show feedback popup
+      setFeedbackOrder({ id: cashModalOrder.id, reference: cashModalOrder.orderReference || cashModalOrder.id.slice(0, 8).toUpperCase() });
       if (selectedOrder?.id === cashModalOrder.id) {
         setSelectedOrder(null);
       }
@@ -853,6 +859,18 @@ export default function LiveOrdersPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Feedback Modal — hiện sau khi thanh toán xong */}
+      {feedbackOrder && (
+        <FeedbackModal
+          orderId={feedbackOrder.id}
+          orderReference={feedbackOrder.reference}
+          restaurantName={tenant?.name ?? ""}
+          brandColor={tenant?.primaryColor ?? "#FF380B"}
+          onClose={() => setFeedbackOrder(null)}
+          onSubmitted={() => setFeedbackOrder(null)}
+        />
       )}
 
       <style dangerouslySetInnerHTML={{__html: `
