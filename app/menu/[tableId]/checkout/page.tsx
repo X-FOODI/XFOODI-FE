@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { io } from "socket.io-client";
+import { useAuth } from "@/lib/contexts/AuthContext";
 
 interface TableInfo {
   id: string;
@@ -50,6 +51,7 @@ interface ActiveOrder {
 export default function CustomerCheckoutPage() {
   const params = useParams();
   const router = useRouter();
+  const { user } = useAuth();
   const tableId = params.tableId as string;
 
   // States
@@ -303,6 +305,29 @@ export default function CustomerCheckoutPage() {
 
         <div className="p-4 flex-1 space-y-5 overflow-y-auto">
           
+          {/* Loyalty Point Banner */}
+          {!user && (
+            <motion.div 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="p-3.5 rounded-2xl bg-amber-500/5 border border-amber-500/25 shadow-md flex items-center justify-between gap-3 text-xs backdrop-blur-md"
+            >
+              <div className="flex items-center gap-2.5 text-zinc-350">
+                <span className="text-xl">🎁</span>
+                <div className="text-left">
+                  <p className="font-bold text-white leading-tight">Tích lũy điểm thưởng!</p>
+                  <p className="text-[10px] text-zinc-450 mt-0.5">Đăng nhập để tích điểm cho hoá đơn này.</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => router.push(`/login?redirect=${encodeURIComponent(`/menu/${tableId}/checkout`)}`)}
+                className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-[10px] shadow-lg shadow-amber-500/10 transition-all active:scale-95 whitespace-nowrap"
+              >
+                Đăng nhập
+              </button>
+            </motion.div>
+          )}
+
           {/* ─── BILL SUMMARY ─── */}
           <div className="p-4 rounded-2xl bg-zinc-900/80 border border-zinc-800 space-y-4">
             <div className="flex items-center gap-2 border-b border-zinc-800 pb-3">

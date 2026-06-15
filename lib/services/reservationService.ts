@@ -39,6 +39,9 @@ export interface Reservation {
   specialRequests?: string;
   depositAmount: number;
   checkedInAt?: string;
+  completedAt?: string;
+  metadata?: { qrCodeUrl?: string | null; statusHistory?: any[] };
+  refunds?: RefundInfo[];
   createdAt: string;
   updatedAt: string;
   reservationStatusId: string;
@@ -94,6 +97,33 @@ export interface ReservationFilterParams {
   search?: string;
 }
 
+export interface UpdateReservationDto {
+  numberOfGuests?: number;
+  time?: string;
+  tableIds?: string[];
+  specialRequests?: string;
+}
+
+export type StatsPeriod = 'today' | 'this_week' | 'this_month';
+
+export interface ReservationStats {
+  totalReservations: number;
+  confirmedCount: number;
+  checkedInCount: number;
+  completedCount: number;
+  cancelledCount: number;
+  checkInRate: number;
+  totalDepositCollected: number;
+}
+
+export interface RefundInfo {
+  id: string;
+  amount: number;
+  status: string;
+  metadata?: any;
+  createdAt: string;
+}
+
 // ── Service ───────────────────────────────────────────────────────────────────
 function unwrap<T>(data: any): T {
   return (data?.data ?? data) as T;
@@ -146,6 +176,21 @@ const reservationService = {
 
   async cancel(id: string): Promise<Reservation> {
     const res = await axiosInstance.post(API_ROUTES.RESERVATIONS.CANCEL(id));
+    return unwrap<Reservation>(res.data);
+  },
+
+  async update(id: string, dto: UpdateReservationDto): Promise<Reservation> {
+    const res = await axiosInstance.patch(API_ROUTES.RESERVATIONS.UPDATE(id), dto);
+    return unwrap<Reservation>(res.data);
+  },
+
+  async getStats(restaurantId: string, period: StatsPeriod): Promise<ReservationStats> {
+    const res = await axiosInstance.get(API_ROUTES.RESERVATIONS.STATS, { params: { restaurantId, period } });
+    return unwrap<ReservationStats>(res.data);
+  },
+
+  async complete(id: string): Promise<Reservation> {
+    const res = await axiosInstance.post(API_ROUTES.RESERVATIONS.COMPLETE(id));
     return unwrap<Reservation>(res.data);
   },
 };

@@ -63,6 +63,9 @@ export const API_ROUTES = {
     UPDATE_STATUS: (id: string) => `/reservations/${id}/status`,
     CHECKIN: (code: string) => `/reservations/checkin/${code}`,
     CANCEL: (id: string) => `/reservations/${id}/cancel`,
+    UPDATE: (id: string) => `/reservations/${id}`,
+    STATS: '/reservations/stats',
+    COMPLETE: (id: string) => `/reservations/${id}/complete`,
   },
   PAYMENTS: {
     LIST: '/payments',
@@ -70,6 +73,7 @@ export const API_ROUTES = {
     CASH: '/payments/cash',
     TRANSFER_INFO: '/payments/transfer-info',
     SEPAY_WEBHOOK: '/payments/sepay-webhook',
+    POLL_PAYMENT: (paymentId: string) => `/payments/${paymentId}/status`,
   },
   FEEDBACKS: {
     LIST: '/feedbacks',

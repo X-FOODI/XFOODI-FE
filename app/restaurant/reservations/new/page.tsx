@@ -2,6 +2,7 @@
 
 import reservationService, { AvailableTable } from "@/lib/services/reservationService";
 import paymentService, { TransferInfo } from "@/lib/services/paymentService";
+import PaymentDeadlineCountdown from "@/components/reservations/PaymentDeadlineCountdown";
 import { useAuth } from "@/lib/contexts/AuthContext";
 import { useTenant } from "@/lib/contexts/TenantContext";
 import { useToast } from "@/lib/contexts/ToastContext";
@@ -154,6 +155,7 @@ export default function NewReservationPage() {
   // Step 3 — result
   const [createdId, setCreatedId] = useState("");
   const [createdCode, setCreatedCode] = useState("");
+  const [createdReservation, setCreatedReservation] = useState<any>(null);
   const [transferInfo, setTransferInfo] = useState<TransferInfo | null>(null);
   const [depositPaid, setDepositPaid] = useState(false);
 
@@ -209,6 +211,7 @@ export default function NewReservationPage() {
       });
       setCreatedId(res.id);
       setCreatedCode(res.confirmationCode || "");
+      setCreatedReservation(res);
       showToast("success", "Đặt bàn thành công", `Mã xác nhận: ${res.confirmationCode}`);
 
       // Auto-get transfer info if deposit > 0
@@ -252,6 +255,53 @@ export default function NewReservationPage() {
         </div>
 
         <StepBar current={step} />
+
+        {!user && step < 3 && (
+          <div 
+            style={{
+              padding: "16px 20px",
+              borderRadius: 20,
+              background: `${brandColor}0D`,
+              border: `1px solid ${brandColor}30`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 16,
+              marginBottom: 24,
+              boxShadow: "0 4px 12px rgba(0,0,0,0.02)"
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <span style={{ fontSize: 24 }}>🎁</span>
+              <div>
+                <p style={{ margin: 0, fontWeight: 700, color: "var(--text)", fontSize: 14 }}>Tích lũy điểm thưởng!</p>
+                <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--text-muted)", lineHeight: 1.4 }}>
+                  Đăng nhập để nhận ưu đãi và tích lũy điểm thưởng khi đặt bàn.
+                </p>
+              </div>
+            </div>
+            <button 
+              onClick={() => router.push(`/login?redirect=${encodeURIComponent('/restaurant/reservations/new')}`)}
+              style={{
+                padding: "8px 16px",
+                borderRadius: 10,
+                background: brandColor,
+                border: "none",
+                color: "#fff",
+                fontWeight: 700,
+                fontSize: 12,
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+                boxShadow: `0 4px 12px ${brandColor}30`,
+                transition: "transform 0.1s"
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.02)"}
+              onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
+            >
+              Đăng nhập
+            </button>
+          </div>
+        )}
 
         <div style={{ background: "var(--card)", borderRadius: 20, border: "1px solid var(--border)", padding: 28, boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
 
@@ -397,6 +447,28 @@ export default function NewReservationPage() {
                     <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>Mã xác nhận</p>
                     <p style={{ margin: "4px 0 0", fontSize: 28, fontWeight: 900, color: brandColor, fontFamily: "monospace", letterSpacing: "0.1em" }}>{createdCode}</p>
                   </div>
+
+                  {/* Payment deadline countdown */}
+                  {createdReservation?.paymentDeadline && !depositPaid && (
+                    <PaymentDeadlineCountdown
+                      deadline={createdReservation.paymentDeadline}
+                      onExpired={() => showToast("warning", "Hết hạn cọc", "Đặt bàn có thể đã bị hủy do hết hạn thanh toán cọc")}
+                    />
+                  )}
+
+                  {/* QR Code display */}
+                  {createdReservation?.metadata?.qrCodeUrl && (
+                    <div style={{ textAlign: "center", marginBottom: 20 }}>
+                      <img
+                        src={createdReservation.metadata.qrCodeUrl}
+                        alt={`QR Check-in ${createdCode}`}
+                        style={{ width: 160, height: 160, borderRadius: 12, border: "1px solid var(--border)", display: "block", margin: "0 auto 8px" }}
+                      />
+                      <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>
+                        Khách hàng có thể quét QR này để check-in
+                      </p>
+                    </div>
+                  )}
 
                   <div style={{ display: "flex", gap: 10, flexDirection: "column" }}>
                     <Button type="primary" block size="large" onClick={() => router.push("/")}

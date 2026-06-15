@@ -2,6 +2,8 @@
 
 import reservationService, { Reservation } from "@/lib/services/reservationService";
 import paymentService, { PAYMENT_STATUS_LABEL, PAYMENT_STATUS_COLOR } from "@/lib/services/paymentService";
+import EditReservationForm from "@/components/reservations/EditReservationForm";
+import QRScannerModal from "@/components/reservations/QRScannerModal";
 import { useTenant } from "@/lib/contexts/TenantContext";
 import { useToast } from "@/lib/contexts/ToastContext";
 import { Button } from "antd";
@@ -12,8 +14,9 @@ import React, { useEffect, useState } from "react";
 const STATUS_COLOR: Record<string, string> = {
   PENDING: "#f59e0b",
   CONFIRMED: "#10b981",
-  CANCELLED: "#6b7280",
+  CHECKED_IN: "#6366f1",
   COMPLETED: "#3b82f6",
+  CANCELLED: "#6b7280",
 };
 
 export default function ReservationDetailPage() {
@@ -27,6 +30,8 @@ export default function ReservationDetailPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [showCashModal, setShowCashModal] = useState(false);
   const [cashAmount, setCashAmount] = useState("");
+  const [showQRScanner, setShowQRScanner] = useState(false);
+  const [completeLoading, setCompleteLoading] = useState(false);
 
   const brandColor = tenant?.primaryColor || "#FF380B";
 
@@ -34,7 +39,7 @@ export default function ReservationDetailPage() {
     reservationService.getById(id).then(setRes).catch(() => showToast("error", "Lỗi", "Không tìm thấy đặt bàn")).finally(() => setLoading(false));
   }, [id]);
 
-  const handleAction = async (action: "CONFIRMED" | "CANCELLED") => {
+  const handleAction = async (action: "CONFIRMED" | "CANCELLED" | "CHECKED_IN") => {
     if (!res) return;
     setActionLoading(true);
     try {
@@ -65,6 +70,32 @@ export default function ReservationDetailPage() {
       showToast("error", "Lỗi", err.message);
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleComplete = async () => {
+    if (!res) return;
+    setCompleteLoading(true);
+    try {
+      const updated = await reservationService.complete(res.id);
+      setRes((r) => r ? { ...r, statusValue: updated.statusValue, completedAt: (updated as any).completedAt } : r);
+      showToast("success", "Hoàn thành", "Reservation đã được đóng");
+    } catch (err: any) {
+      showToast("error", "Lỗi", err.message);
+    } finally {
+      setCompleteLoading(false);
+    }
+  };
+
+  const handleCheckInByCode = async (code: string) => {
+    try {
+      const updated = await reservationService.checkIn(code);
+      setRes((r) => r ? { ...r, statusValue: updated.statusValue, checkedInAt: (updated as any).checkedInAt } : r);
+      showToast("success", "Check-in thành công", `Khách ${res?.customer?.user?.fullName ?? ""} đã check-in`);
+      setShowQRScanner(false);
+    } catch (err: any) {
+      showToast("error", "Check-in thất bại", err.message);
+      setShowQRScanner(false);
     }
   };
 
@@ -126,6 +157,27 @@ export default function ReservationDetailPage() {
               </Button>
             </div>
           )}
+          {/* CONFIRMED actions */}
+          {res.statusValue?.code === "CONFIRMED" && (
+            <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
+              <Button onClick={() => setShowQRScanner(true)}
+                style={{ background: "#10b981", borderColor: "#10b981", color: "#fff", borderRadius: 10, fontWeight: 700 }}>
+                📷 Quét QR Check-in
+              </Button>
+              <Button onClick={() => handleAction("CANCELLED")} danger loading={actionLoading} style={{ borderRadius: 10 }}>
+                ✕ Huỷ đặt bàn
+              </Button>
+            </div>
+          )}
+          {/* CHECKED_IN actions */}
+          {res.statusValue?.code === "CHECKED_IN" && (
+            <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+              <Button type="primary" loading={completeLoading} onClick={handleComplete}
+                style={{ background: "#3b82f6", borderColor: "#3b82f6", borderRadius: 10, fontWeight: 700 }}>
+                ✓ Đóng reservation
+              </Button>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -163,6 +215,11 @@ export default function ReservationDetailPage() {
                 💬 {res.specialRequests}
               </div>
             )}
+            <EditReservationForm
+              reservation={res}
+              onSave={(updated) => { setRes(updated); showToast("success", "Đã cập nhật", "Thông tin đặt bàn đã được thay đổi"); }}
+              brandColor={brandColor}
+            />
           </div>
         </div>
 
@@ -203,7 +260,33 @@ export default function ReservationDetailPage() {
           )}
         </div>
 
+        {/* Refund info */}
+        {res.refunds && res.refunds.length > 0 && (
+          <div style={{ background: "var(--card)", borderRadius: 16, border: "1px solid var(--border)", padding: 20, marginTop: 16 }}>
+            <h3 style={{ fontSize: 13, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 14px" }}>Hoàn cọc</h3>
+            {res.refunds.map((refund) => (
+              <div key={refund.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", borderRadius: 10, background: "var(--surface)", marginBottom: 6 }}>
+                <div>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: "#22c55e" }}>{Number(refund.amount).toLocaleString("vi-VN")}đ</span>
+                  <span style={{ fontSize: 12, color: "var(--text-muted)", marginLeft: 8 }}>Hoàn cọc</span>
+                </div>
+                <span style={{ fontSize: 12, fontWeight: 600, padding: "2px 8px", borderRadius: 12, background: "#f0fdf4", color: "#22c55e" }}>
+                  {refund.status === "PENDING" ? "Đang xử lý" : refund.status === "COMPLETED" ? "Đã hoàn" : refund.status}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
       </div>
+
+      {/* QR Scanner modal */}
+      {showQRScanner && (
+        <QRScannerModal
+          onSuccess={handleCheckInByCode}
+          onClose={() => setShowQRScanner(false)}
+        />
+      )}
 
       {/* Cash deposit modal */}
       {showCashModal && (
