@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import axiosInstance from "../../lib/services/axiosInstance";
 
 interface NavItem {
   id: string;
@@ -32,6 +33,42 @@ export default function DashboardSidebar({
 }: DashboardSidebarProps) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+
+  const [activeOrdersCount, setActiveOrdersCount] = useState(0);
+  const [pendingReservationsCount, setPendingReservationsCount] = useState(0);
+
+  useEffect(() => {
+    if (role !== "restaurant") return;
+
+    const fetchCounts = async () => {
+      try {
+        const ordersRes = await axiosInstance.get("/orders");
+        if (ordersRes.data?.success) {
+          const active = (ordersRes.data.data as any[]).filter(
+            (o) => o.status === "PENDING" || o.status === "CONFIRMED" || (o.status === "COMPLETED" && !o.isPaid)
+          );
+          setActiveOrdersCount(active.length);
+        }
+      } catch (e) {
+        console.error("Sidebar failed to fetch active orders:", e);
+      }
+
+      try {
+        const resRes = await axiosInstance.get("/reservations", { params: { limit: 100 } });
+        if (resRes.data?.success) {
+          const items = resRes.data.data?.items || [];
+          const pending = items.filter((r: any) => r.statusValue?.code === "PENDING");
+          setPendingReservationsCount(pending.length);
+        }
+      } catch (e) {
+        console.error("Sidebar failed to fetch pending reservations:", e);
+      }
+    };
+
+    fetchCounts();
+    const interval = setInterval(fetchCounts, 15000); // Poll every 15 seconds
+    return () => clearInterval(interval);
+  }, [role]);
 
   const adminSections: NavSection[] = [
     {
@@ -173,6 +210,7 @@ export default function DashboardSidebar({
           id: "reservations",
           label: "Đặt bàn",
           path: "/restaurant/reservations",
+          badge: pendingReservationsCount > 0 ? pendingReservationsCount : undefined,
           icon: (
             <svg className="dashboard-sidebar-item-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -195,6 +233,7 @@ export default function DashboardSidebar({
           id: "live-orders",
           label: "Màn hình Bếp",
           path: "/restaurant/live-orders",
+          badge: activeOrdersCount > 0 ? activeOrdersCount : undefined,
           icon: (
             <svg className="dashboard-sidebar-item-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -221,17 +260,6 @@ export default function DashboardSidebar({
             <svg className="dashboard-sidebar-item-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-            </svg>
-          ),
-        },
-        {
-          id: "reservations",
-          label: "Đặt bàn",
-          path: "/restaurant/reservations",
-          icon: (
-            <svg className="dashboard-sidebar-item-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
           ),
         },
