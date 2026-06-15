@@ -122,6 +122,7 @@ export interface Dish {
   description: string;
   price: string;
   unit: string;
+  imageUrl?: string | null;
   isVegetarian: boolean;
   isSpicy: boolean;
   isBestSeller: boolean;
@@ -138,6 +139,7 @@ export interface CreateDishData {
   description: string;
   price: number | string;
   unit: string;
+  imageUrl?: string | null;
   isVegetarian?: boolean;
   isSpicy?: boolean;
   isBestSeller?: boolean;
@@ -151,6 +153,7 @@ export interface UpdateDishData {
   description?: string;
   price?: number | string;
   unit?: string;
+  imageUrl?: string | null;
   isVegetarian?: boolean;
   isSpicy?: boolean;
   isBestSeller?: boolean;

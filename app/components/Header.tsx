@@ -4,12 +4,14 @@ import { CloseOutlined, MenuOutlined, LogoutOutlined, ProfileOutlined, UserOutli
 import { Button, Divider, Drawer, Layout, Menu, Space, Dropdown } from "antd";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import LanguageSwitcher from "../../components/LanguageSwitcher";
 import { useTenant } from "../../lib/contexts/TenantContext";
 import { useThemeMode } from "../theme/AntdProvider";
 import { usePageTransition } from "./PageTransition";
 import ThemeToggle from "./ThemeToggle";
+import SocialHeaderExtras from "@/components/social/SocialHeaderExtras";
 import { Security as SecurityIcon, Storefront as StorefrontIcon } from "@mui/icons-material";
 
 const { Header: AntHeader } = Layout;
@@ -20,6 +22,8 @@ import authService from "../../lib/services/authService";
 const Header: React.FC = () => {
   const { t } = useTranslation();
   const { tenant } = useTenant();
+  const pathname = usePathname();
+  const isSocialActive = pathname === "/social" || pathname?.startsWith("/social/");
 
   const tenantName = tenant?.name || "XFoodi";
   const tenantLogoUrl =
@@ -49,6 +53,20 @@ const Header: React.FC = () => {
     {
       key: "contact",
       label: <a href="#footer">{t("homepage.header.contact")}</a>,
+    },
+    {
+      key: "social",
+      label: (
+        <Link
+          href="/social"
+          style={{
+            color: isSocialActive ? "var(--primary)" : undefined,
+            fontWeight: isSocialActive ? 600 : undefined,
+          }}
+        >
+          Mạng xã hội
+        </Link>
+      ),
     },
   ];
 
@@ -283,6 +301,7 @@ const Header: React.FC = () => {
           {/* Desktop Buttons */}
           {!isMobile && (
             <Space size={12}>
+              <SocialHeaderExtras />
               {isAuthenticated ? (
                 <Dropdown
                   menu={{ items: userMenuItems }}
