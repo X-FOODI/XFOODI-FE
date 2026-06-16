@@ -1,6 +1,7 @@
 "use client";
 
 import reservationService, { Reservation } from "@/lib/services/reservationService";
+import StatsCards from "@/components/reservations/StatsCards";
 import { useAuth } from "@/lib/contexts/AuthContext";
 import { useTenant } from "@/lib/contexts/TenantContext";
 import { useToast } from "@/lib/contexts/ToastContext";
@@ -9,20 +10,24 @@ import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Button, Input, Select } from "antd";
+import { Button, DatePicker, Input, Select } from "antd";
+import type { Dayjs } from "dayjs";
 
 const STATUS_OPTIONS = [
   { value: "", label: "Tất cả" },
   { value: "PENDING", label: "Chờ xác nhận" },
   { value: "CONFIRMED", label: "Đã xác nhận" },
+  { value: "CHECKED_IN", label: "Đã check-in" },
+  { value: "COMPLETED", label: "Hoàn thành" },
   { value: "CANCELLED", label: "Đã huỷ" },
 ];
 
 const STATUS_COLOR: Record<string, string> = {
   PENDING: "#f59e0b",
   CONFIRMED: "#10b981",
-  CANCELLED: "#6b7280",
+  CHECKED_IN: "#6366f1",
   COMPLETED: "#3b82f6",
+  CANCELLED: "#6b7280",
 };
 
 function StatusBadge({ code, name }: { code: string; name: string }) {
@@ -86,6 +91,10 @@ export default function ReservationsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [checkInTarget, setCheckInTarget] = useState<Reservation | null>(null);
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
+  const [dateError, setDateError] = useState<string>("");
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
   const restaurantId = tenant?.id || user?.restaurantId || "";
   const brandColor = tenant?.primaryColor || "#FF380B";
@@ -100,6 +109,8 @@ export default function ReservationsPage() {
         limit: 20,
         status: statusFilter || undefined,
         search: search || undefined,
+        from: dateFrom ? new Date(`${dateFrom}T00:00:00+07:00`).toISOString() : undefined,
+        to: dateTo ? new Date(`${dateTo}T23:59:59+07:00`).toISOString() : undefined,
       });
       setItems(result.items);
       setTotal(result.total);
@@ -108,9 +119,20 @@ export default function ReservationsPage() {
     } finally {
       setLoading(false);
     }
-  }, [restaurantId, page, statusFilter, search]);
+  }, [restaurantId, page, statusFilter, search, dateFrom, dateTo]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  const handleDateChange = (from: string, to: string) => {
+    if (from && to && new Date(from) > new Date(to)) {
+      setDateError("Ngày bắt đầu phải trước ngày kết thúc");
+      return;
+    }
+    setDateError("");
+    setDateFrom(from);
+    setDateTo(to);
+    setPage(1);
+  };
 
   const handleStatusChange = async (id: string, status: string) => {
     try {
@@ -130,6 +152,19 @@ export default function ReservationsPage() {
     fetchData();
   };
 
+  const handleComplete = async (id: string) => {
+    setActionLoadingId(id);
+    try {
+      await reservationService.complete(id);
+      showToast("success", "Hoàn thành", "Reservation đã được đóng");
+      fetchData();
+    } catch (err: any) {
+      showToast("error", "Lỗi", err.message);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
   const formatTime = (t: string) => {
     const d = new Date(t);
     return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")} · ${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
@@ -142,6 +177,9 @@ export default function ReservationsPage() {
         <DashboardSidebar role="restaurant" restaurantName={tenant?.name ?? ""} userName={user?.fullName ?? user?.name ?? ""} userEmail={user?.email ?? ""} />
         <main className="flex-1 overflow-y-auto" style={{ background: "var(--bg-base)" }}>
           <div style={{ padding: "24px" }}>
+
+      {/* Stats Dashboard */}
+      <StatsCards restaurantId={restaurantId} />
 
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
@@ -165,6 +203,19 @@ export default function ReservationsPage() {
             <Select.Option key={o.value} value={o.value}>{o.label}</Select.Option>
           ))}
         </Select>
+        {/* Date range filter */}
+        <DatePicker.RangePicker
+          format="DD/MM/YYYY"
+          placeholder={["Từ ngày", "Đến ngày"]}
+          style={{ width: 280 }}
+          onChange={(_, dateStrings) => {
+            const [from, to] = dateStrings as [string, string];
+            const fromISO = from ? from.split("/").reverse().join("-") : "";
+            const toISO = to ? to.split("/").reverse().join("-") : "";
+            handleDateChange(fromISO, toISO);
+          }}
+        />
+        {dateError && <span style={{ fontSize: 12, color: "#ef4444" }}>{dateError}</span>}
       </div>
 
       {/* Table */}
@@ -217,6 +268,16 @@ export default function ReservationsPage() {
                           <Button size="small" onClick={() => setCheckInTarget(r)}
                             style={{ borderRadius: 8, fontSize: 12, background: "#10b981", borderColor: "#10b981", color: "#fff" }}>
                             Check-in
+                          </Button>
+                        )}
+                        {r.statusValue?.code === "CHECKED_IN" && (
+                          <Button
+                            size="small"
+                            loading={actionLoadingId === r.id}
+                            onClick={() => handleComplete(r.id)}
+                            style={{ borderRadius: 8, fontSize: 12, background: "#3b82f6", borderColor: "#3b82f6", color: "#fff" }}
+                          >
+                            ✓ Hoàn thành
                           </Button>
                         )}
                       </div>
