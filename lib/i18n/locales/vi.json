@@ -2075,13 +2075,22 @@
         "errors": {
           "number_required": "Yêu cầu nhập số bàn",
           "capacity_min": "Sức chứa tối thiểu là 1",
-          "capacity_max": "Sức chứa tối đa là 20"
+          "capacity_max": "Sức chứa tối đa là 20",
+          "deco_name_required": "Vui lòng nhập tên vật phẩm trang trí"
         },
         "areas": {
           "vip": "Khu vực VIP",
           "indoor": "Trong nhà",
           "outdoor": "Ngoài trời"
-        }
+        },
+        "tab_table": "Bàn ăn",
+        "tab_deco": "Trang trí",
+        "deco_type": "Loại vật phẩm trang trí",
+        "deco_type_plant": "Cây cảnh (Potted Plant)",
+        "deco_type_wall": "Vách tường / Hàng rào ngăn (Wall Partition)",
+        "deco_type_reception": "Quầy lễ tân (Reception Counter)",
+        "deco_name": "Tên vật phẩm trang trí",
+        "deco_name_placeholder": "Ví dụ: Cây xanh góc phòng, Vách tường số 1..."
       },
       "stats": {
         "total_tables": "Tổng số bàn",
@@ -2157,8 +2166,55 @@
         "errors": {
           "number_required": "Vui lòng nhập mã bàn",
           "width_too_small": "Chiều rộng phải từ 20 trở lên",
-          "height_too_small": "Chiều cao phải từ 20 trở lên"
-        }
+          "height_too_small": "Chiều cao phải từ 20 trở lên",
+          "deco_name_required": "Tên vật phẩm trang trí không được để trống"
+        },
+        "panorama_title": "Ảnh Panorama 360°",
+        "panorama_save": "Lưu ảnh",
+        "panorama_clear": "Xóa ảnh panorama hiện tại",
+        "panorama_upload_hint": "Bấm để tải ảnh panorama",
+        "saving_step1": "Đang lưu thay đổi...",
+        "saving_step2": "Đang xử lý hình ảnh độ phân giải cao...",
+        "saving_step3": "Đang tải lên máy chủ Cloudinary...",
+        "saving_step4": "Sẽ hơi lâu đấy, cảm phiền đợi xíu nhé...",
+        "deco_type": "Loại vật phẩm trang trí",
+        "deco_type_plant": "Cây cảnh (Plant)",
+        "deco_type_wall": "Tường / Vách ngăn (Wall)",
+        "deco_type_reception": "Quầy lễ tân (Reception Counter)",
+        "deco_name": "Tên vật phẩm",
+        "deco_rotation": "Góc xoay (độ)",
+        "edit_table_config": "⚙️ Chỉnh sửa cấu hình bàn ăn"
+      },
+      "operational_modal": {
+        "title": "Quản lý Bàn: {{number}}",
+        "current_status": "Trạng thái hiện tại",
+        "status_occupied": "Đang có khách",
+        "status_available": "Trống (Sẵn sàng)",
+        "seats": "{{count}} ghế",
+        "session_info": "Thông tin phiên ăn",
+        "order_code": "Mã đơn hàng:",
+        "btn_unlock": "🟢 Mở khóa & Sử dụng bàn ăn",
+        "btn_transfer": "🔄 Chuyển bàn",
+        "btn_merge": "🔗 Gộp bàn",
+        "btn_checkout": "🔴 Thanh toán & Đóng bàn",
+        "download_qr": "📥 Tải xuống hình ảnh QR Code của bàn này",
+        "go_to_menu": "🔗 Đi tới trang gọi món (Menu) của bàn"
+      },
+      "transfer_modal": {
+        "title": "Chuyển phiên sang bàn khác",
+        "description": "Chọn một bàn ăn đang trống để chuyển toàn bộ phiên sử dụng và đơn hàng (nếu có) từ bàn <strong>{{number}}</strong> sang.",
+        "target_label": "Chọn bàn trống đích *",
+        "select_placeholder": "Chọn bàn trống",
+        "confirm": "Xác nhận chuyển",
+        "cancel": "Hủy bỏ"
+      },
+      "merge_modal": {
+        "title": "Gộp bàn ăn",
+        "description": "Chọn một bàn ăn đang hoạt động (đang có khách) để gộp phiên của bàn <strong>{{number}}</strong> vào đó. Cả hai bàn sẽ cùng liên kết tới một đơn hàng chung.",
+        "target_label": "Chọn bàn gộp đích *",
+        "select_placeholder": "Chọn bàn bận",
+        "confirm": "Xác nhận gộp",
+        "cancel": "Hủy bỏ"
       }
     },
     "staff": {
