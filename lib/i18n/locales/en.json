@@ -574,6 +574,15 @@
         "grid": "Grid",
         "map": "Map"
       },
+      "map_controls": {
+        "zoom_out": "Zoom out",
+        "zoom_in": "Zoom in",
+        "zoom_fit": "Fit",
+        "upload_floorplan": "Upload floor plan",
+        "show_grid": "Show grid",
+        "floor_dimensions": "Floor size",
+        "tables_on_floor": "tables"
+      },
       "zones": {
         "all": "All",
         "zone_a": "Zone A",
@@ -3027,7 +3036,7 @@
   "homepage": {
     "header": {
       "logo_alt": "Restaurant logo",
-      "brand": "XFoodi",
+      "brand": "Restaurant",
       "product": "Product",
       "workflow": "Workflow",
       "restaurants": "Restaurants",
@@ -3044,13 +3053,13 @@
       "logout": "Logout"
     },
     "hero": {
-      "tag": "No.1 Multi-Tenant SaaS F&B Platform",
-      "title": "Turn every restaurant into its own platform",
-      "description": "Create your website, QR menu, online ordering, customer CRM, and automated marketing in just minutes.",
-      "get_started": "Start Free Trial",
-      "watch_demo": "View Restaurant Demo",
+      "tag": "All-in-one Restaurant Ops Platform",
+      "title": "Optimize restaurant operations with XFoodi",
+      "description": "Manage tables, orders, kitchen, inventory and reports on a single platform.",
+      "get_started": "Get Started",
+      "watch_demo": "Watch Demo",
       "stats": {
-        "brands": "Trusted Brands",
+        "brands": "Brands",
         "years": "Years of Experience",
         "branches": "Branches"
       },
@@ -3061,18 +3070,18 @@
         "orders": "Orders",
         "recent_orders": "Recent Orders"
       },
-      "trusted_by": "Trusted by leading partners"
+      "trusted_by": "Trusted by top brands"
     },
     "about": {
-      "tag": "MISSION & METRICS",
-      "title_prefix": "Thousands of restaurants ",
-      "title_highlight": "trust XFoodi",
-      "description": "From local cafes to major chains, XFoodi empowers owners to streamline operations and drive sustainable growth using isolated cloud databases.",
+      "tag": "Our Story",
+      "title_prefix": "Revolutionizing the ",
+      "title_highlight": "Culinary World",
+      "description": "Restaurant Platform was born from a simple mission: to empower restaurateurs with technology that feels as natural as their craft. We bridge the gap between traditional hospitality and modern efficiency, helping you focus on what matters most—great food and happy customers.",
       "stats": {
-        "restaurants": "Active Restaurants",
-        "countries": "Orders Processed",
-        "chefs": "End Customers",
-        "team": "Uptime SLA"
+        "restaurants": "Restaurants Empowered",
+        "countries": "Countries Supported",
+        "chefs": "Happy Chefs",
+        "team": "Team Members"
       },
       "mission": {
         "title": "Mission Driven",
@@ -3082,37 +3091,37 @@
         "title": "Innovation First",
         "desc": "Always ahead of the curve"
       },
-      "cta": "Join our community"
+      "cta": "Join Our Journey"
     },
     "features": {
-      "tag": "Highlight Features",
-      "title_prefix": "All the tools you need, ",
-      "brand": "in one place",
-      "description": "Optimize operations, boost productivity, and deliver outstanding dining experiences for your guests.",
+      "tag": "Features",
+      "title_prefix": "Highlight features of ",
+      "brand": "Restaurant",
+      "description": "All the tools you need to run your restaurant – in one intuitive interface.",
       "items": {
         "analytics": {
-          "title": "Real-time Reports",
-          "description": "Monitor revenue, top-selling items, and staff performance in real time."
+          "title": "Analytics",
+          "description": "Watch sales data flow into charts and reports in real time."
         },
         "tables": {
-          "title": "Smart Table Map",
-          "description": "Easily track available, occupied, or cleaning status of all tables."
+          "title": "Tables",
+          "description": "Monitor table maps and serving status instantly across all areas."
         },
         "menu": {
-          "title": "Digital Menu",
-          "description": "Instantly update dishes, pricing, and stock status across the system."
+          "title": "Menu",
+          "description": "Admins create dishes, update menus, and customers see changes immediately."
         },
         "reservations": {
-          "title": "Online Booking",
-          "description": "Allow guests to choose their favorite seats using interactive maps."
+          "title": "Reservations",
+          "description": "Customers book tables, admins process requests, and staff check in with a clear flow."
         },
         "customer": {
-          "title": "Customer CRM",
-          "description": "Integrated loyalty system with automatic point tracking and tier progression."
+          "title": "Customer",
+          "description": "Track order history, returning guests, and loyalty data for each customer."
         },
         "staff_ops": {
-          "title": "Lean Operations",
-          "description": "Connect customer orders instantly to the kitchen KDS and checkout counter."
+          "title": "Staff Ops",
+          "description": "KDS and operating workflow for staff, kitchen, and admins in one screen."
         },
         "table_management": {
           "title": "Smart Table Management",
@@ -3142,47 +3151,47 @@
       }
     },
     "workflow": {
-      "title": "Get live in 3 simple steps",
-      "description": "No complex setup needed — your restaurant can be ready to serve guests in just 10 minutes.",
+      "title": "How Restaurant Platform works in your restaurant",
+      "description": "From table booking to bill settlement, every step is supported by Restaurant Platform.",
       "steps": {
         "setup": {
-          "title": "Set up restaurant & menu",
-          "description": "Initialize your menu, tables, and staff permissions in just 10 minutes."
+          "title": "Restaurant & Menu Setup",
+          "description": "Configure restaurant info, create menu, set up tables and staff permissions in minutes."
         },
         "operation": {
-          "title": "Print QR Code & activate",
-          "description": "Each table gets a unique QR code. Guests scan to order and view menu directly."
+          "title": "Operation & Real-time Sync",
+          "description": "Receive orders, process payments, send orders to kitchen automatically. All changes updated instantly on all devices."
         },
         "analysis": {
-          "title": "Operate & Grow",
-          "description": "Track every order from kitchen to checkout. Get real-time sales reporting."
+          "title": "Analysis & Optimization",
+          "description": "View detailed reports on revenue, best sellers, costs. Use data to make smarter business decisions."
         }
       }
     },
     "testimonials": {
-      "title": "Real Restaurants, Real Results",
-      "description": "See how restaurant owners use XFoodi to streamline their workflows and boost sales.",
+      "title": "What restaurants say about Restaurant Platform?",
+      "description": "Hundreds of restaurant owners and managers have trusted Restaurant Platform to optimize their operations.",
       "items": {
         "nam": {
-          "role": "Owner, Seafood 123",
-          "quote": "XFoodi has completely automated our table booking and QR ordering. Waiters are less busy, errors are minimized, and sales have grown significantly."
+          "role": "Owner, 123 Seafood Restaurant",
+          "quote": "Restaurant Platform has completely changed how we operate. From table reservations to inventory management, everything is automated and much more accurate."
         },
         "huong": {
           "role": "Manager, Pho 24h Chain",
-          "quote": "XFoodi's multi-branch reporting is incredibly accurate and real-time. I can check revenue at any time right from my phone."
+          "quote": "I used to spend hours aggregating reports from 5 branches. Now with Restaurant Platform, all data is available on the dashboard in a few clicks."
         },
         "tuan": {
-          "role": "Founder, Saigon Broken Rice",
-          "quote": "Our customers love scanning the QR code to order and check bills. This has dramatically reduced wait times during peak hours."
+          "role": "Owner, Saigon Broken Rice",
+          "quote": "Simple interface, staff learns very quickly. Stable system, never encountered errors during peak hours. Recommend for every restaurant!"
         },
         "lan": {
-          "role": "Owner, Green Cafe & Bistro",
-          "quote": "XFoodi's AI dish suggestion works brilliantly. Guests feel cared for and order more items on average."
+          "role": "Manager, Green Cafe & Bistro",
+          "quote": "We love the real-time sync feature. Orders from app to kitchen in just 1 second, customers are very satisfied with service speed."
         }
       }
     },
     "footer": {
-      "tagline": "Next-generation operations and revenue optimization platform for F&B. Digitize your workflows and connect with customers effectively.",
+      "tagline": "Next generation restaurant operations platform. Helping you manage every aspect of your restaurant on a single system.",
       "columns": {
         "product": {
           "title": "Product",
@@ -3213,7 +3222,7 @@
           "gdpr": "GDPR"
         }
       },
-      "copyright": "© {year} XFoodi. All rights reserved.",
+      "copyright": "© {year} Restaurant Platform. All rights reserved.",
       "privacy": "Privacy",
       "terms": "Terms",
       "cookies": "Cookies"
@@ -3642,13 +3651,13 @@
     }
   },
   "menu_page": {
-    "logo_title": "XFOODI PREMIUM DINING",
+    "logo_title": "XFoodi PREMIUM DINING",
     "title": "Today's Menu",
     "loading": "Loading menu...",
     "retry": "Retry",
     "error_load": "Failed to load menu. Please try again later.",
     "items": "items",
-    "XFoodi_menu": "XFOODI MENU",
+    "XFoodi_menu": "XFoodi MENU",
     "search_placeholder": "Search items...",
     "viewing_category": "Viewing Category",
     "showing_items": "Showing {{count}} items",
@@ -3796,7 +3805,7 @@
       "privacy_policy": "Privacy Policy",
       "no_account": "Don't have an account?",
       "sign_up_here": "Sign up here",
-      "or_login_with": "Or sign in with",
+      "or_login_with": "Or login with",
       "phone_number": "Phone Number",
       "google_continue_service": "Continue with Google",
       "google_continue_service_signup": "Sign up with Google",

@@ -658,7 +658,15 @@ const authService = {
   getCurrentUser(): User | null {
     if (typeof window === 'undefined') return null;
     const userInfo = localStorage.getItem('userInfo') || sessionStorage.getItem('userInfo');
-    return userInfo ? JSON.parse(userInfo) : null;
+    if (!userInfo || userInfo === 'undefined') return null;
+    try {
+      return JSON.parse(userInfo);
+    } catch (e) {
+      console.error('Failed to parse userInfo:', e);
+      localStorage.removeItem('userInfo');
+      sessionStorage.removeItem('userInfo');
+      return null;
+    }
   },
 
   // Get current user from server
