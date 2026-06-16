@@ -1,6 +1,6 @@
 "use client";
 
-import { CloseOutlined, MenuOutlined, LogoutOutlined, ProfileOutlined, UserOutlined } from "@ant-design/icons";
+import { CloseOutlined, MenuOutlined, LogoutOutlined, ProfileOutlined, UserOutlined, DashboardOutlined, ShopOutlined, TeamOutlined, PlusOutlined } from "@ant-design/icons";
 import { Button, Divider, Drawer, Layout, Menu, Space, Dropdown } from "antd";
 import { motion } from "framer-motion";
 import Link from "next/link";
@@ -12,7 +12,6 @@ import { useThemeMode } from "../theme/AntdProvider";
 import { usePageTransition } from "./PageTransition";
 import ThemeToggle from "./ThemeToggle";
 import SocialHeaderExtras from "@/components/social/SocialHeaderExtras";
-import { Security as SecurityIcon, Storefront as StorefrontIcon } from "@mui/icons-material";
 
 const { Header: AntHeader } = Layout;
 
@@ -171,51 +170,25 @@ const Header: React.FC = () => {
     // Admin Dashboard — chỉ hiện cho Admin
     ...(isAdmin ? [{
       key: "admin-dashboard",
-      icon: (
-        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ display: "inline" }}>
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2m0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-        </svg>
-      ),
-      label: (
-        <Link href="/admin/dashboard">
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <SecurityIcon sx={{ fontSize: 14 }} />
-            {t("homepage.header.admin_dashboard", "Admin Dashboard")}
-          </span>
-        </Link>
-      ),
+      icon: <DashboardOutlined />,
+      label: <Link href="/admin/dashboard">{t("homepage.header.admin_dashboard", "Admin Dashboard")}</Link>,
     }] : []),
     // Restaurant Dashboard — chỉ hiện cho Owner
     ...(isOwner ? [{
       key: "restaurant-dashboard",
-      icon: (
-        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ display: "inline" }}>
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-            d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-        </svg>
-      ),
+      icon: <ShopOutlined />,
       label: <a href={getSubdomainRedirectUrl()}>{t("homepage.header.restaurant_dashboard", "Restaurant Dashboard")}</a>,
     }] : []),
     // Staff Dashboard — chỉ hiện cho Staff
     ...(isStaff ? [{
       key: "staff-dashboard",
-      icon: (
-        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ display: "inline" }}>
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-      ),
+      icon: <TeamOutlined />,
       label: <a href={getSubdomainRedirectUrl()}>{t("homepage.header.staff_dashboard", "Staff Panel")}</a>,
     }] : []),
     // Nếu là Customer và chưa có nhà hàng — hiện link đăng ký
     ...(!isAdmin && !isOwner && !isStaff ? [{
       key: "open-restaurant",
-      icon: (
-        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ display: "inline" }}>
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-        </svg>
-      ),
+      icon: <PlusOutlined />,
       label: <Link href="/register-restaurant">{t("homepage.header.open_restaurant", "Register Restaurant")}</Link>,
     }] : []),
     { type: "divider" as const },
@@ -512,7 +485,7 @@ const Header: React.FC = () => {
               </Link>
               {isAdmin && (
                 <Link href="/admin/dashboard" style={{ width: '100%' }}>
-                  <Button block size="large" icon={<SecurityIcon sx={{ fontSize: 14 }} />} style={{ fontWeight: 500 }}>
+                  <Button block size="large" icon={<DashboardOutlined />} style={{ fontWeight: 500 }}>
                     {t("homepage.header.admin_dashboard", "Admin Dashboard")}
                   </Button>
                 </Link>
