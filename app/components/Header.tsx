@@ -79,6 +79,7 @@ const Header: React.FC = () => {
   const [userEmail, setUserEmail] = useState<string>("");
   const [userAvatar, setUserAvatar] = useState<string>("");
   const [userRoles, setUserRoles] = useState<string[]>([]);
+  const [restaurantSlug, setRestaurantSlug] = useState<string | null>(null);
   const { isAnimationReady } = usePageTransition();
   const { mode } = useThemeMode();
 
@@ -102,6 +103,7 @@ const Header: React.FC = () => {
       setUserAvatar(user?.avatar || "");
       const roles = user?.roles || (user?.role ? [user.role] : []);
       setUserRoles(roles);
+      setRestaurantSlug(user?.restaurantSlug || null);
     };
 
     handleResize();
@@ -138,6 +140,27 @@ const Header: React.FC = () => {
     userRoles.some((r) => r.toLowerCase() === role.toLowerCase());
   const isAdmin = hasRole("Admin") || hasRole("SuperAdmin") || hasRole("System Admin");
   const isOwner = hasRole("Owner");
+  const isStaff = hasRole("Staff");
+
+  const getSubdomainRedirectUrl = () => {
+    if (typeof window === "undefined" || !restaurantSlug) {
+      return hasRole("Owner") ? "/restaurant/dashboard" : "/staff";
+    }
+    const host = window.location.host;
+    const protocol = window.location.protocol;
+    const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1");
+    const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || "xfoodi.website";
+    
+    const targetTenantSubdomain = isLocalhost
+      ? `${restaurantSlug}.localhost`
+      : `${restaurantSlug}.${BASE_DOMAIN}`;
+      
+    const hostWithoutPort = host.includes(":") ? host.split(":")[0] : host;
+    const port = host.includes(":") ? `:${host.split(":")[1]}` : "";
+    const targetPath = hasRole("Owner") ? "/restaurant/dashboard" : "/staff";
+    
+    return `${protocol}//${targetTenantSubdomain}${port}${targetPath}`;
+  };
 
   const userMenuItems = [
     {
@@ -172,10 +195,21 @@ const Header: React.FC = () => {
             d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
         </svg>
       ),
-      label: <Link href="/restaurant/dashboard">{t("homepage.header.restaurant_dashboard", "Restaurant Dashboard")}</Link>,
+      label: <a href={getSubdomainRedirectUrl()}>{t("homepage.header.restaurant_dashboard", "Restaurant Dashboard")}</a>,
+    }] : []),
+    // Staff Dashboard — chỉ hiện cho Staff
+    ...(isStaff ? [{
+      key: "staff-dashboard",
+      icon: (
+        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ display: "inline" }}>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      ),
+      label: <a href={getSubdomainRedirectUrl()}>{t("homepage.header.staff_dashboard", "Staff Panel")}</a>,
     }] : []),
     // Nếu là Customer và chưa có nhà hàng — hiện link đăng ký
-    ...(!isAdmin && !isOwner ? [{
+    ...(!isAdmin && !isOwner && !isStaff ? [{
       key: "open-restaurant",
       icon: (
         <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ display: "inline" }}>
@@ -484,13 +518,20 @@ const Header: React.FC = () => {
                 </Link>
               )}
               {isOwner && (
-                <Link href="/restaurant/dashboard" style={{ width: '100%' }}>
+                <a href={getSubdomainRedirectUrl()} style={{ width: '100%' }}>
                   <Button type="primary" block size="large" style={{ fontWeight: 600 }}>
                     {t("homepage.header.restaurant_dashboard", "Restaurant Dashboard")}
                   </Button>
-                </Link>
+                </a>
               )}
-              {!isAdmin && !isOwner && (
+              {isStaff && (
+                <a href={getSubdomainRedirectUrl()} style={{ width: '100%' }}>
+                  <Button type="primary" block size="large" style={{ fontWeight: 600 }}>
+                    {t("homepage.header.staff_dashboard", "Staff Panel")}
+                  </Button>
+                </a>
+              )}
+              {!isAdmin && !isOwner && !isStaff && (
                 <Link href="/register-restaurant" style={{ width: '100%' }}>
                   <Button block size="large" style={{ fontWeight: 500 }}>
                     {t("homepage.header.open_restaurant", "Register Restaurant")}
