@@ -167,6 +167,15 @@ const Header: React.FC = () => {
       icon: <ProfileOutlined />,
       label: <Link href="/profile">{t("homepage.header.view_profile", "View Profile")}</Link>,
     },
+    {
+      key: "my-reservations",
+      icon: (
+        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ display: "inline" }} className="mr-1.5">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+      ),
+      label: <Link href="/your-reservation">{t("homepage.header.my_reservations", "Lịch sử đặt bàn")}</Link>,
+    },
     // Admin Dashboard — chỉ hiện cho Admin
     ...(isAdmin ? [{
       key: "admin-dashboard",
@@ -206,6 +215,8 @@ const Header: React.FC = () => {
     return null;
   }
 
+  const isFixed = pathname === "/" || pathname === "/restaurant" || pathname === "/social" || pathname?.startsWith("/social/");
+
   return (
     <>
       <motion.div
@@ -220,11 +231,11 @@ const Header: React.FC = () => {
         }}>
         <AntHeader
           style={{
-            position: "fixed",
-            top: scrolled ? 10 : 20,
+            position: isFixed ? "fixed" : "absolute",
+            top: (isFixed && scrolled) ? 10 : 20,
             left: "50%",
             transform: "translateX(-50%)",
-            width: scrolled ? "calc(100% - 40px)" : "calc(100% - 80px)",
+            width: (isFixed && scrolled) ? "calc(100% - 40px)" : "calc(100% - 80px)",
             maxWidth: 1400,
             zIndex: 1000,
             display: "flex",
@@ -233,16 +244,16 @@ const Header: React.FC = () => {
             padding: "0 32px",
             background:
               mode === "dark"
-                ? scrolled
+                ? (isFixed && scrolled)
                   ? "rgba(20, 25, 39, 0.95)"
                   : "rgba(20, 25, 39, 0.9)"
-                : scrolled
+                : (isFixed && scrolled)
                   ? "rgba(255, 255, 255, 0.95)"
                   : "rgba(255, 255, 255, 0.9)",
             backdropFilter: "blur(20px)",
             WebkitBackdropFilter: "blur(20px)",
             borderRadius: 60,
-            boxShadow: scrolled
+            boxShadow: (isFixed && scrolled)
               ? "0 8px 32px rgba(0, 0, 0, 0.12)"
               : "0 4px 24px rgba(0, 0, 0, 0.08)",
             border: "1px solid rgba(255, 255, 255, 0.8)",

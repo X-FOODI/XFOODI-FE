@@ -6,10 +6,12 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 // Context to share animation ready state
 interface PageTransitionContextType {
   isAnimationReady: boolean;
+  isInProvider?: boolean;
 }
 
 const PageTransitionContext = createContext<PageTransitionContextType>({
-  isAnimationReady: false,
+  isAnimationReady: true,
+  isInProvider: false,
 });
 
 export const usePageTransition = () => useContext(PageTransitionContext);
@@ -80,7 +82,7 @@ const PageTransition: React.FC<PageTransitionProps> = ({
   };
 
   return (
-    <PageTransitionContext.Provider value={{ isAnimationReady }}>
+    <PageTransitionContext.Provider value={{ isAnimationReady, isInProvider: true }}>
       {/* Loading Screen */}
       <AnimatePresence mode="wait" onExitComplete={handleLoadingComplete}>
         {isLoading && (

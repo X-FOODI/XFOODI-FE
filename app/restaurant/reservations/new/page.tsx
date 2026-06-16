@@ -6,37 +6,89 @@ import PaymentDeadlineCountdown from "@/components/reservations/PaymentDeadlineC
 import { useAuth } from "@/lib/contexts/AuthContext";
 import { useTenant } from "@/lib/contexts/TenantContext";
 import { useToast } from "@/lib/contexts/ToastContext";
-import { Button } from "antd";
+import { useThemeMode } from "@/app/theme/AntdProvider";
+import Header from "@/app/components/Header";
+import { Button, DatePicker, TimePicker } from "antd";
+import dayjs from "dayjs";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Header } from "@/components/layout/Header";
+import { 
+  Calendar, 
+  Users, 
+  Clock, 
+  ChevronRight,
+  ChevronDown,
+  User, 
+  Phone, 
+  Mail, 
+  FileText,
+  MapPin,
+  Check,
+  Info,
+  Landmark,
+  Search
+} from "lucide-react";
+
+// ── Vietnamese banks (reused from wallet page) ─────────────────────────────────
+const VIETNAMESE_BANKS = [
+  { bin: "970415", code: "VTB",  name: "VietinBank",   color: "#1a6fd4", short: "CTG" },
+  { bin: "970436", code: "VCB",  name: "Vietcombank",  color: "#007b5e", short: "VCB" },
+  { bin: "970422", code: "MB",   name: "MBBank",        color: "#9b59b6", short: "MB"  },
+  { bin: "970418", code: "BIDV", name: "BIDV",          color: "#1a3a6b", short: "BIDV"},
+  { bin: "970405", code: "AGR",  name: "Agribank",      color: "#e74c3c", short: "AGR" },
+  { bin: "970407", code: "TCB",  name: "Techcombank",   color: "#e91e1e", short: "TCB" },
+  { bin: "970423", code: "TPB",  name: "TPBank",        color: "#7b2ff7", short: "TP"  },
+  { bin: "970432", code: "VPB",  name: "VPBank",        color: "#00a650", short: "VPB" },
+  { bin: "970416", code: "ACB",  name: "ACB",            color: "#003087", short: "ACB" },
+  { bin: "970403", code: "STB",  name: "Sacombank",     color: "#0066b3", short: "STB" },
+  { bin: "970400", code: "SEAB", name: "SeABank",       color: "#d4a017", short: "SEA" },
+  { bin: "970454", code: "VIB",  name: "VIB",            color: "#005bac", short: "VIB" },
+  { bin: "970440", code: "SHB",  name: "SHB",            color: "#c0392b", short: "SHB" },
+  { bin: "970443", code: "SGB",  name: "SaigonBank",    color: "#f39c12", short: "SGB" },
+  { bin: "970412", code: "PVB",  name: "PVcomBank",     color: "#2980b9", short: "PVC" },
+  { bin: "970414", code: "OCB",  name: "OCB",            color: "#27ae60", short: "OCB" },
+  { bin: "970428", code: "HDB",  name: "HDBank",         color: "#1abc9c", short: "HDB" },
+  { bin: "970439", code: "NCB",  name: "NCB",            color: "#8e44ad", short: "NCB" },
+];
 
 // ── Step indicator ─────────────────────────────────────────────────────────────
 const STEPS = ["Thời gian & Khách", "Chọn bàn", "Thông tin", "Xác nhận & Cọc"];
 
 function StepBar({ current }: { current: number }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 0, marginBottom: 32 }}>
+    <div className="flex items-center gap-0 mb-8 w-full">
       {STEPS.map((label, i) => (
         <React.Fragment key={i}>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}>
-            <div style={{
-              width: 32, height: 32, borderRadius: "50%",
-              background: i < current ? "var(--primary)" : i === current ? "var(--primary)" : "var(--border)",
-              color: i <= current ? "#fff" : "var(--text-muted)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 13, fontWeight: 700, flexShrink: 0,
-              opacity: i > current ? 0.4 : 1,
-            }}>
+          <div className="flex flex-col items-center flex-1">
+            <div 
+              className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300"
+              style={{
+                background: i < current ? "var(--primary)" : i === current ? "var(--primary)" : "var(--border)",
+                color: i <= current ? "#fff" : "var(--text-muted)",
+                boxShadow: i === current ? "0 0 12px var(--primary-glow)" : "none",
+                border: i === current ? "2px solid #fff" : "none"
+              }}
+            >
               {i < current ? "✓" : i + 1}
             </div>
-            <span style={{ fontSize: 11, marginTop: 4, color: i === current ? "var(--primary)" : "var(--text-muted)", fontWeight: i === current ? 700 : 400, textAlign: "center" }}>
+            <span 
+              className="text-[10px] mt-2 font-medium text-center leading-tight transition-all duration-300"
+              style={{
+                color: i === current ? "var(--primary)" : "var(--text-muted)",
+                fontWeight: i === current ? 700 : 400
+              }}
+            >
               {label}
             </span>
           </div>
           {i < STEPS.length - 1 && (
-            <div style={{ flex: 1, height: 2, background: i < current ? "var(--primary)" : "var(--border)", marginBottom: 16, transition: "background 0.3s" }} />
+            <div 
+              className="flex-1 h-0.5 transition-all duration-300 -mt-4"
+              style={{
+                background: i < current ? "var(--primary)" : "var(--border)"
+              }}
+            />
           )}
         </React.Fragment>
       ))}
@@ -45,13 +97,15 @@ function StepBar({ current }: { current: number }) {
 }
 
 // ── SePay QR waiting screen ────────────────────────────────────────────────────
-function SePayQR({ info, onSuccess, onSkip }: {
+function SePayQR({ info, deadline, onSuccess, onSkip }: {
   info: TransferInfo;
+  deadline?: string | null;
   onSuccess: () => void;
   onSkip: () => void;
 }) {
   const [polling, setPolling] = useState(true);
   const [dots, setDots] = useState(".");
+  const [isExpired, setIsExpired] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -60,7 +114,14 @@ function SePayQR({ info, onSuccess, onSkip }: {
   }, []);
 
   useEffect(() => {
-    if (!polling) return;
+    if (isExpired) {
+      setPolling(false);
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    }
+  }, [isExpired]);
+
+  useEffect(() => {
+    if (!polling || isExpired) return;
     intervalRef.current = setInterval(async () => {
       try {
         const { status } = await paymentService.pollStatus(info.paymentId);
@@ -72,48 +133,117 @@ function SePayQR({ info, onSuccess, onSkip }: {
       } catch { /* ignore */ }
     }, 3000);
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [polling, info.paymentId, onSuccess]);
+  }, [polling, isExpired, info.paymentId, onSuccess]);
 
   return (
-    <div style={{ textAlign: "center", padding: "24px 0" }}>
-      <h3 style={{ color: "var(--text)", marginBottom: 8 }}>Thanh toán đặt cọc</h3>
-      <p style={{ color: "var(--text-muted)", fontSize: 14, marginBottom: 20 }}>
+    <div className="text-center py-6">
+      <h3 className="text-lg font-bold text-[var(--text)] mb-2">Thanh toán đặt cọc</h3>
+      <p className="text-sm text-[var(--text-muted)] mb-5">
         Quét mã QR hoặc chuyển khoản theo thông tin bên dưới
       </p>
 
-      {info.qrUrl ? (
-        <img src={info.qrUrl} alt="QR chuyển khoản" style={{ width: 220, height: 220, borderRadius: 12, border: "1px solid var(--border)", display: "block", margin: "0 auto 20px" }} />
-      ) : (
-        <div style={{ padding: 16, background: "var(--surface)", borderRadius: 12, marginBottom: 20, fontSize: 13 }}>
-          <p style={{ margin: 0, color: "var(--text-muted)" }}>Chưa cấu hình QR. Chuyển khoản thủ công:</p>
+      {deadline && (
+        <div className="mb-5 flex justify-center">
+          <div style={{ maxWidth: 360, width: "100%" }}>
+            <PaymentDeadlineCountdown
+              deadline={deadline}
+              onExpired={() => setIsExpired(true)}
+            />
+          </div>
         </div>
       )}
 
-      <div style={{ background: "var(--surface)", borderRadius: 12, padding: "16px 20px", textAlign: "left", marginBottom: 20, fontSize: 13, lineHeight: 2 }}>
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ color: "var(--text-muted)" }}>Ngân hàng</span>
-          <b style={{ color: "var(--text)" }}>{info.bankInfo.bankCode || "—"}</b>
+      {isExpired && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          backgroundColor: "rgba(0, 0, 0, 0.85)",
+          backdropFilter: "blur(8px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 9999,
+          padding: 20
+        }}>
+          <div style={{
+            background: "var(--card, #1c1c1e)",
+            border: "1px solid var(--border, #3a3a3c)",
+            borderRadius: 24,
+            padding: "32px 24px",
+            maxWidth: 440,
+            width: "100%",
+            textAlign: "center",
+            boxShadow: "0 20px 40px rgba(0, 0, 0, 0.5)",
+            animation: "fadeIn 0.3s ease"
+          }}>
+            <div style={{ fontSize: 56, marginBottom: 16 }}>⏰</div>
+            <h3 style={{ fontSize: 18, fontWeight: 800, color: "var(--text, #fff)", margin: "0 0 10px" }}>
+              Hết hạn thời gian giữ bàn
+            </h3>
+            <p style={{ fontSize: 14, color: "var(--text-muted, #a1a1a6)", lineHeight: "1.6", margin: "0 0 24px" }}>
+              Thời gian thanh toán cọc (5 phút) đã hết hạn. Đặt bàn của bạn đã bị hủy tự động để giải phóng bàn cho thực khách khác. Vui lòng thực hiện đặt bàn mới.
+            </p>
+            <Button
+              type="primary"
+              onClick={() => {
+                window.location.reload();
+              }}
+              style={{
+                width: "100%",
+                height: 46,
+                borderRadius: 12,
+                fontWeight: 700,
+                background: "var(--primary, #FF380B)",
+                borderColor: "var(--primary, #FF380B)",
+                color: "#fff"
+              }}
+            >
+              Đặt bàn mới
+            </Button>
+          </div>
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ color: "var(--text-muted)" }}>Số tài khoản</span>
-          <b style={{ color: "var(--text)" }}>{info.bankInfo.accountNumber || "—"}</b>
+      )}
+
+      {info.qrUrl ? (
+        <img 
+          src={info.qrUrl} 
+          alt="QR chuyển khoản" 
+          className="w-56 h-56 rounded-xl border border-[var(--border)] block mx-auto mb-5 shadow-md" 
+        />
+      ) : (
+        <div className="p-4 bg-[var(--surface)] border border-[var(--border)] rounded-xl mb-5 text-sm">
+          <p className="m-0 text-[var(--text-muted)]">Chưa cấu hình QR. Chuyển khoản thủ công:</p>
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ color: "var(--text-muted)" }}>Tên tài khoản</span>
-          <b style={{ color: "var(--text)" }}>{info.bankInfo.accountName || "—"}</b>
+      )}
+
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4 text-left mb-5 text-sm space-y-2.5">
+        <div className="flex justify-between">
+          <span className="text-[var(--text-muted)]">Ngân hàng</span>
+          <b className="text-[var(--text)]">{info.bankInfo.bankCode || "—"}</b>
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ color: "var(--text-muted)" }}>Số tiền</span>
-          <b style={{ color: "var(--primary)", fontSize: 16 }}>{info.amount.toLocaleString("vi-VN")}đ</b>
+        <div className="flex justify-between">
+          <span className="text-[var(--text-muted)]">Số tài khoản</span>
+          <b className="text-[var(--text)]">{info.bankInfo.accountNumber || "—"}</b>
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ color: "var(--text-muted)" }}>Nội dung chuyển khoản</span>
-          <b style={{ color: "var(--text)", fontFamily: "monospace" }}>{info.transferContent}</b>
+        <div className="flex justify-between">
+          <span className="text-[var(--text-muted)]">Tên tài khoản</span>
+          <b className="text-[var(--text)]">{info.bankInfo.accountName || "—"}</b>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-[var(--text-muted)]">Số tiền</span>
+          <b className="text-[var(--primary)] text-base">{info.amount.toLocaleString("vi-VN")}đ</b>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-[var(--text-muted)]">Nội dung chuyển khoản</span>
+          <b className="text-[var(--text)] font-mono bg-zinc-800/10 dark:bg-zinc-100/10 px-2 py-0.5 rounded">{info.transferContent}</b>
         </div>
       </div>
 
-      <p style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 20 }}>
-        Đang chờ xác nhận thanh toán{dots}
+      <p className="text-xs text-[var(--text-muted)] mb-5">
+        Đang chờ xác nhận thanh toán {dots}
       </p>
     </div>
   );
@@ -124,6 +254,7 @@ export default function NewReservationPage() {
   const { user } = useAuth();
   const { tenant } = useTenant();
   const { showToast } = useToast();
+  const { mode } = useThemeMode();
   const router = useRouter();
 
   const [step, setStep] = useState(0);
@@ -135,14 +266,30 @@ export default function NewReservationPage() {
   const [guests, setGuests] = useState(2);
 
   // Step 1 — table selection
-  const [availableTables, setAvailableTables] = useState<AvailableTable[]>([]);
+  const [allTables, setAllTables] = useState<AvailableTable[]>([]);
   const [selectedTableIds, setSelectedTableIds] = useState<string[]>([]);
+  const [currentFloorId, setCurrentFloorId] = useState<string>("");
+  const [assignmentMode, setAssignmentMode] = useState<"auto" | "manual">("auto");
+  const [pendingConflictTable, setPendingConflictTable] = useState<AvailableTable | null>(null);
 
   // Step 2 — personal info
   const [name, setName] = useState(user?.fullName || user?.name || "");
   const [phone, setPhone] = useState(user?.phoneNumber || "");
   const [email, setEmail] = useState(user?.email || "");
   const [requests, setRequests] = useState("");
+
+  // Step 2 — bank refund info (for deposit refund via PayOS payout)
+  const [bankBin, setBankBin] = useState("");
+  const [bankCode, setBankCode] = useState("");
+  const [bankAccountNumber, setBankAccountNumber] = useState("");
+  const [bankAccountName, setBankAccountName] = useState("");
+  const [bankDropdownOpen, setBankDropdownOpen] = useState(false);
+  const [bankSearch, setBankSearch] = useState("");
+
+  // Visual layout state
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  const [canvasWidth, setCanvasWidth] = useState(600);
 
   useEffect(() => {
     if (user) {
@@ -159,13 +306,53 @@ export default function NewReservationPage() {
   const [transferInfo, setTransferInfo] = useState<TransferInfo | null>(null);
   const [depositPaid, setDepositPaid] = useState(false);
 
-  const brandColor = tenant?.primaryColor || "#FF380B";
+  const brandColor = tenant?.primaryColor || "#FF5A2C";
   const restaurantId = tenant?.id || user?.restaurantId || "";
 
+  // Group tables by floor
+  const floorsMap: Record<string, { id: string; name: string; tables: AvailableTable[] }> = {};
+  allTables.forEach((t) => {
+    if (!floorsMap[t.floorId]) {
+      floorsMap[t.floorId] = {
+        id: t.floorId,
+        name: t.floor?.name || "Tầng chưa đặt tên",
+        tables: [],
+      };
+    }
+    floorsMap[t.floorId].tables.push(t);
+  });
+  const floorsList = Object.values(floorsMap);
+
+  // Set default floor on load
+  useEffect(() => {
+    if (floorsList.length > 0 && !currentFloorId) {
+      setCurrentFloorId(floorsList[0].id);
+    }
+  }, [allTables, floorsList, currentFloorId]);
+
+  // Calculate layout scale dynamically
+  useEffect(() => {
+    if (step !== 1 || !canvasRef.current) return;
+
+    const handleResize = () => {
+      if (canvasRef.current) {
+        const width = canvasRef.current.clientWidth;
+        setCanvasWidth(width);
+        setScale(width / 600);
+      }
+    };
+
+    handleResize();
+    const observer = new ResizeObserver(handleResize);
+    observer.observe(canvasRef.current);
+
+    return () => observer.disconnect();
+  }, [step, currentFloorId]);
+
   // Estimate deposit amount (25k per seat capacity of selected tables, or per guest if auto-arranged)
-  const estimatedDeposit = selectedTableIds.length > 0
+  const estimatedDeposit = (assignmentMode === "manual" && selectedTableIds.length > 0)
     ? selectedTableIds.reduce((sum, id) => {
-        const tbl = availableTables.find((t) => t.id === id);
+        const tbl = allTables.find((t) => t.id === id);
         return sum + (tbl ? tbl.seatingCapacity * 25000 : 0);
       }, 0)
     : guests * 25000;
@@ -176,14 +363,26 @@ export default function NewReservationPage() {
       showToast("error", "Thiếu thông tin", "Vui lòng chọn ngày, giờ và nhà hàng");
       return;
     }
+
+    const selectedDateTime = new Date(`${date}T${time}:00`);
+    const now = new Date();
+    if (selectedDateTime.getTime() < now.getTime()) {
+      showToast("error", "Thời gian không hợp lệ", "Thời gian đặt bàn không được ở trong quá khứ");
+      return;
+    }
+    if (selectedDateTime.getTime() - now.getTime() < 30 * 60 * 1000) {
+      showToast("error", "Thời gian không hợp lệ", "Vui lòng đặt bàn trước giờ nhận ít nhất 30 phút");
+      return;
+    }
+
     setLoading(true);
     try {
       const isoTime = new Date(`${date}T${time}:00`).toISOString();
       const tables = await reservationService.checkTables({ restaurantId, time: isoTime, numberOfGuests: guests });
-      setAvailableTables(tables);
+      setAllTables(tables);
       setStep(1);
     } catch (err: any) {
-      showToast("error", "Lỗi", err.message || "Không thể kiểm tra bàn trống");
+      showToast("error", "Lỗi", err?.response?.data?.message || err.message || "Không thể kiểm tra bàn trống");
     } finally {
       setLoading(false);
     }
@@ -196,26 +395,42 @@ export default function NewReservationPage() {
       showToast("error", "Lỗi", "Vui lòng nhập địa chỉ email để nhận thông tin đặt bàn");
       return;
     }
+    // Validate bank info if deposit is required
+    if (estimatedDeposit > 0) {
+      if (!bankBin || !bankAccountNumber.trim() || !bankAccountName.trim()) {
+        showToast("error", "Thiếu thông tin hoàn tiền", "Vui lòng điền đầy đủ tài khoản ngân hàng để nhận hoàn cọc nếu cần");
+        return;
+      }
+    }
     setLoading(true);
     try {
       const isoTime = new Date(`${date}T${time}:00`).toISOString();
+      // Build bank refund payload if deposit exists
+      const bankRefund = estimatedDeposit > 0 && bankBin ? {
+        bankBin,
+        bankCode,
+        bankName: VIETNAMESE_BANKS.find(b => b.bin === bankBin)?.name ?? "",
+        accountNumber: bankAccountNumber.trim(),
+        accountName: bankAccountName.trim().toUpperCase(),
+      } : undefined;
       const res = await reservationService.create({
         restaurantId,
         numberOfGuests: guests,
         time: isoTime,
         specialRequests: requests || undefined,
-        tableIds: selectedTableIds,
+        tableIds: assignmentMode === "manual" ? selectedTableIds : [],
         fullName: name,
         phoneNumber: phone,
         email: email.trim(),
+        bankRefund,
       });
       setCreatedId(res.id);
       setCreatedCode(res.confirmationCode || "");
       setCreatedReservation(res);
-      showToast("success", "Đặt bàn thành công", `Mã xác nhận: ${res.confirmationCode}`);
 
       // Auto-get transfer info if deposit > 0
       if (Number(res.depositAmount) > 0) {
+        showToast("info", "Yêu cầu thanh toán cọc", "Vui lòng chuyển khoản cọc để hoàn tất đặt bàn");
         try {
           const info = await paymentService.getTransferInfo({
             reservationId: res.id,
@@ -224,10 +439,13 @@ export default function NewReservationPage() {
           });
           setTransferInfo(info);
         } catch { /* optional */ }
+      } else {
+        showToast("success", "Đặt bàn thành công", `Mã xác nhận: ${res.confirmationCode}`);
       }
       setStep(3);
     } catch (err: any) {
-      showToast("error", "Lỗi", err.message || "Không thể đặt bàn");
+      const msg = err?.response?.data?.message || err.message || "Không thể đặt bàn";
+      showToast("error", "Lỗi", msg);
     } finally {
       setLoading(false);
     }
@@ -241,142 +459,394 @@ export default function NewReservationPage() {
 
   const today = new Date().toISOString().split("T")[0];
 
-  // ── Render ───────────────────────────────────────────────────────────────────
-  return (
-    <div style={{ minHeight: "100vh", background: "var(--bg-base)" }}>
-      <Header />
-      <div style={{ maxWidth: 640, margin: "0 auto", padding: "24px 16px" }}>
+  const currentFloorTables = floorsMap[currentFloorId]?.tables || [];
 
+  return (
+    <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text)] transition-colors duration-300">
+      {/* Homepage Header */}
+      <Header />
+
+      <div className="max-w-2xl mx-auto px-4 pb-24 pt-32">
         {/* Breadcrumbs */}
-        <div style={{ marginBottom: 24, display: "flex", alignItems: "center", gap: 12 }}>
-          <Link href="/" style={{ color: "var(--text-muted)", fontSize: 13, textDecoration: "none" }}>← Trang chủ</Link>
-          <span style={{ color: "var(--border)" }}>/</span>
-          <span style={{ color: "var(--text)", fontWeight: 600, fontSize: 16 }}>Đặt bàn</span>
+        <div className="mb-6 flex items-center gap-2 text-xs">
+          <Link href="/" className="text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors">
+            Trang chủ
+          </Link>
+          <span className="text-[var(--border)]">/</span>
+          <span className="text-[var(--text)] font-semibold">Đặt bàn trực tuyến</span>
         </div>
 
         <StepBar current={step} />
 
         {!user && step < 3 && (
           <div 
+            className="p-4 rounded-2xl flex items-center justify-between gap-4 mb-6 shadow-sm border"
             style={{
-              padding: "16px 20px",
-              borderRadius: 20,
               background: `${brandColor}0D`,
-              border: `1px solid ${brandColor}30`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 16,
-              marginBottom: 24,
-              boxShadow: "0 4px 12px rgba(0,0,0,0.02)"
+              borderColor: `${brandColor}30`,
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <span style={{ fontSize: 24 }}>🎁</span>
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">🎁</span>
               <div>
-                <p style={{ margin: 0, fontWeight: 700, color: "var(--text)", fontSize: 14 }}>Tích lũy điểm thưởng!</p>
-                <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--text-muted)", lineHeight: 1.4 }}>
+                <p className="m-0 font-bold text-[var(--text)] text-sm">Tích lũy điểm thưởng!</p>
+                <p className="m-0 mt-1 text-xs text-[var(--text-muted)] leading-relaxed">
                   Đăng nhập để nhận ưu đãi và tích lũy điểm thưởng khi đặt bàn.
                 </p>
               </div>
             </div>
             <button 
               onClick={() => router.push(`/login?redirect=${encodeURIComponent('/restaurant/reservations/new')}`)}
+              className="px-4 py-2 rounded-xl text-white text-xs font-bold cursor-pointer transition-all duration-200 hover:scale-[1.02] shadow-sm flex-shrink-0"
               style={{
-                padding: "8px 16px",
-                borderRadius: 10,
                 background: brandColor,
-                border: "none",
-                color: "#fff",
-                fontWeight: 700,
-                fontSize: 12,
-                cursor: "pointer",
-                whiteSpace: "nowrap",
                 boxShadow: `0 4px 12px ${brandColor}30`,
-                transition: "transform 0.1s"
               }}
-              onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.02)"}
-              onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
             >
               Đăng nhập
             </button>
           </div>
         )}
 
-        <div style={{ background: "var(--card)", borderRadius: 20, border: "1px solid var(--border)", padding: 28, boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+        <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 md:p-8 shadow-sm">
 
           {/* Step 0: Time & Guests */}
           {step === 0 && (
-            <div className="space-y-5">
-              <h2 style={{ fontSize: 18, fontWeight: 700, color: "var(--text)", margin: 0 }}>Thời gian & Số khách</h2>
-
+            <div className="space-y-6">
               <div>
-                <label style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: 6 }}>Ngày đặt bàn</label>
-                <input type="date" value={date} min={today} onChange={(e) => setDate(e.target.value)}
-                  style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text)", fontSize: 14 }} />
+                <h2 className="text-xl font-bold text-[var(--text)] m-0">Thời gian & Số khách</h2>
+                <p className="text-xs text-[var(--text-muted)] mt-1">Vui lòng chọn thời gian và số lượng chỗ ngồi mong muốn.</p>
               </div>
 
-              <div>
-                <label style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: 6 }}>Giờ đến</label>
-                <input type="time" value={time} onChange={(e) => setTime(e.target.value)}
-                  style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text)", fontSize: 14 }} />
-              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-semibold text-[var(--text-muted)] block mb-1.5 flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5" /> Ngày đặt bàn
+                  </label>
+                  <DatePicker 
+                    value={date ? dayjs(date) : null}
+                    onChange={(val) => setDate(val ? val.format("YYYY-MM-DD") : "")}
+                    disabledDate={(current) => current && current < dayjs().startOf("day")}
+                    className="w-full h-11 rounded-xl"
+                    placeholder="Chọn ngày đặt bàn"
+                    format="DD/MM/YYYY"
+                    allowClear={false}
+                  />
+                </div>
 
-              <div>
-                <label style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: 6 }}>Số khách</label>
-                <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                  <button onClick={() => setGuests((g) => Math.max(1, g - 1))}
-                    style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid var(--border)", background: "var(--surface)", cursor: "pointer", fontSize: 20, color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
-                  <span style={{ fontSize: 24, fontWeight: 700, color: "var(--text)", minWidth: 32, textAlign: "center" }}>{guests}</span>
-                  <button onClick={() => setGuests((g) => g + 1)}
-                    style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid var(--border)", background: "var(--surface)", cursor: "pointer", fontSize: 20, color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
+                <div>
+                  <label className="text-xs font-semibold text-[var(--text-muted)] block mb-1.5 flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5" /> Giờ đến
+                  </label>
+                  <TimePicker 
+                    value={time ? dayjs(time, "HH:mm") : null}
+                    onChange={(val) => setTime(val ? val.format("HH:mm") : "")}
+                    format="HH:mm"
+                    minuteStep={15}
+                    className="w-full h-11 rounded-xl"
+                    placeholder="Chọn giờ đến"
+                    allowClear={false}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-[var(--text-muted)] block mb-1.5 flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5" /> Số lượng khách đi cùng
+                  </label>
+                  <div className="flex items-center gap-4 py-1">
+                    <button 
+                      onClick={() => setGuests((g) => Math.max(1, g - 1))}
+                      className="w-10 h-10 rounded-full border border-[var(--border)] bg-[var(--surface)] cursor-pointer text-xl text-[var(--text)] flex items-center justify-center hover:bg-[var(--border)] transition-colors active:scale-95"
+                    >
+                      −
+                    </button>
+                    <span className="text-2xl font-extrabold text-[var(--text)] min-w-[32px] text-center">{guests}</span>
+                    <button 
+                      onClick={() => setGuests((g) => Math.min(100, g + 1))}
+                      className="w-10 h-10 rounded-full border border-[var(--border)] bg-[var(--surface)] cursor-pointer text-xl text-[var(--text)] flex items-center justify-center hover:bg-[var(--border)] transition-colors active:scale-95"
+                    >
+                      +
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              <Button type="primary" block size="large" loading={loading} onClick={handleCheckTables}
-                style={{ background: brandColor, borderColor: brandColor, borderRadius: 12, height: 48, fontWeight: 700, fontSize: 15 }}>
-                Kiểm tra bàn trống →
+              <Button 
+                type="primary" 
+                block 
+                size="large" 
+                loading={loading} 
+                onClick={handleCheckTables}
+                className="rounded-xl h-12 font-bold text-sm shadow-md mt-6 flex items-center justify-center gap-2 border-none"
+                style={{ background: brandColor, color: "#fff" }}
+              >
+                Kiểm tra bàn trống <ChevronRight className="w-4 h-4" />
               </Button>
             </div>
           )}
 
-          {/* Step 1: Table selection */}
+          {/* Step 1: Table selection (Visual Floor Plan Map or Auto Assign) */}
           {step === 1 && (
-            <div className="space-y-5">
-              <h2 style={{ fontSize: 18, fontWeight: 700, color: "var(--text)", margin: 0 }}>Chọn bàn</h2>
-              <p style={{ fontSize: 13, color: "var(--text-muted)", margin: 0 }}>
-                {availableTables.length > 0 ? `${availableTables.length} bàn trống cho ${guests} khách` : "Không tìm thấy bàn phù hợp"}
-              </p>
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-xl font-bold text-[var(--text)] m-0">Phương thức chọn bàn</h2>
+                <p className="text-xs text-[var(--text-muted)] mt-1">
+                  Chọn phương thức xếp bàn hoặc sơ đồ vị trí ngồi phù hợp với sở thích của bạn.
+                </p>
+              </div>
 
-              {availableTables.length === 0 ? (
-                <div style={{ padding: 20, background: "var(--surface)", border: "1px dashed var(--border)", borderRadius: 12, textAlign: "center", marginBottom: 20 }}>
-                  <p style={{ margin: "0 0 8px 0", fontWeight: 700, color: "var(--text)", fontSize: 15 }}>
-                    Không tìm thấy bàn đơn lẻ cho {guests} người
-                  </p>
-                  <p style={{ margin: 0, color: "var(--text-muted)", fontSize: 13, lineHeight: 1.5 }}>
-                    Đừng lo lắng! Nhà hàng sẽ tự động ghép bàn hoặc bố trí không gian phù hợp cho nhóm của bạn. Bạn chỉ cần bấm tiếp tục để hoàn tất đặt cọc và giữ chỗ.
+              {allTables.length === 0 ? (
+                <div className="p-6 bg-[var(--surface)] border border-dashed border-[var(--border)] rounded-2xl text-center space-y-3">
+                  <p className="font-bold text-[var(--text)] text-base">Không tìm thấy bàn trống phù hợp</p>
+                  <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+                    Nhà hàng sẽ tự động sắp xếp ghép bàn hoặc thiết kế chỗ ngồi thích hợp nhất cho đoàn của bạn. Bạn chỉ cần nhấn tiếp tục để hoàn tất giữ chỗ.
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-3">
-                  {availableTables.map((t) => {
-                    const selected = selectedTableIds.includes(t.id);
-                    return (
-                      <button key={t.id} onClick={() => setSelectedTableIds(selected ? selectedTableIds.filter((id) => id !== t.id) : [...selectedTableIds, t.id])}
-                        style={{ padding: "14px 12px", borderRadius: 12, border: `2px solid ${selected ? brandColor : "var(--border)"}`, background: selected ? `${brandColor}12` : "var(--surface)", cursor: "pointer", textAlign: "left" }}>
-                        <p style={{ margin: 0, fontWeight: 700, color: selected ? brandColor : "var(--text)", fontSize: 15 }}>Bàn {t.code}</p>
-                        <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--text-muted)" }}>{t.seatingCapacity} chỗ · {t.floor.name}</p>
-                      </button>
-                    );
-                  })}
+                <div className="space-y-6">
+                  {/* Assignment mode selector */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <button
+                      onClick={() => {
+                        setAssignmentMode("auto");
+                        setSelectedTableIds([]);
+                      }}
+                      className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
+                        assignmentMode === "auto"
+                          ? "bg-[var(--primary)]/5 border-[var(--primary)] text-[var(--primary)]"
+                          : "bg-[var(--surface)] border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]"
+                      }`}
+                      style={assignmentMode === "auto" ? { borderColor: brandColor, color: brandColor, backgroundColor: `${brandColor}08` } : {}}
+                    >
+                      <div className="flex items-center gap-2 font-bold text-sm mb-1">
+                        <span>✨</span>
+                        <span>Để nhà hàng sắp xếp</span>
+                      </div>
+                      <p className="text-[11px] opacity-85 m-0 leading-normal">Hệ thống tự động xếp bàn trống tối ưu và phù hợp nhất cho đoàn của bạn.</p>
+                    </button>
+
+                    <button
+                      onClick={() => setAssignmentMode("manual")}
+                      className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
+                        assignmentMode === "manual"
+                          ? "bg-[var(--primary)]/5 border-[var(--primary)] text-[var(--primary)]"
+                          : "bg-[var(--surface)] border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]"
+                      }`}
+                      style={assignmentMode === "manual" ? { borderColor: brandColor, color: brandColor, backgroundColor: `${brandColor}08` } : {}}
+                    >
+                      <div className="flex items-center gap-2 font-bold text-sm mb-1">
+                        <span>🗺️</span>
+                        <span>Tự chọn bàn trên sơ đồ</span>
+                      </div>
+                      <p className="text-[11px] opacity-85 m-0 leading-normal">Xem sơ đồ mặt bằng thực tế và chọn vị trí bàn yêu thích (gần cửa sổ, sân khấu...).</p>
+                    </button>
+                  </div>
+
+                  {assignmentMode === "auto" ? (
+                    <div className="p-8 bg-[var(--surface)] border border-[var(--border)] rounded-2xl text-center space-y-4 shadow-sm">
+                      <div className="text-4xl animate-bounce">🍽️</div>
+                      <h3 className="font-bold text-[var(--text)] text-base m-0">Tự động sắp xếp bàn</h3>
+                      <p className="text-xs text-[var(--text-muted)] max-w-sm mx-auto leading-relaxed">
+                        Hệ thống sẽ tự động ghép và tối ưu vị trí ngồi tốt nhất cho nhóm của bạn dựa trên số lượng khách ({guests} người) khi bạn đến nhận bàn.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {/* Floor selection tabs */}
+                      {floorsList.length > 1 && (
+                        <div className="flex gap-2 border-b border-[var(--border)] pb-2 overflow-x-auto">
+                          {floorsList.map((f) => (
+                            <button
+                              key={f.id}
+                              onClick={() => setCurrentFloorId(f.id)}
+                              className={`px-4 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap cursor-pointer ${
+                                currentFloorId === f.id
+                                  ? "text-white shadow-sm"
+                                  : "text-[var(--text-muted)] bg-[var(--surface)] hover:text-[var(--text)]"
+                              }`}
+                              style={currentFloorId === f.id ? { backgroundColor: brandColor } : {}}
+                            >
+                              {f.name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Sơ đồ bàn Visual Layout */}
+                      <div className="relative border border-[var(--border)] rounded-2xl overflow-hidden shadow-inner">
+                        {/* Header bar of canvas */}
+                        <div className="bg-[var(--surface)] border-b border-[var(--border)] px-4 py-2.5 flex items-center justify-between text-[11px] text-[var(--text-muted)]">
+                          <div className="flex items-center gap-1">
+                            <MapPin className="w-3.5 h-3.5" />
+                            <span>Sơ đồ: <strong>{floorsMap[currentFloorId]?.name}</strong></span>
+                          </div>
+                          <div className="font-mono">Tỷ lệ: {Math.round(scale * 100)}%</div>
+                        </div>
+
+                        {/* Canvas Grid container */}
+                        <div 
+                          ref={canvasRef}
+                          className="relative w-full overflow-hidden select-none"
+                          style={{
+                            height: 400 * scale,
+                            backgroundSize: `${20 * scale}px ${20 * scale}px`,
+                            backgroundImage: mode === "dark" 
+                              ? "radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px)"
+                              : "radial-gradient(rgba(0,0,0,0.06) 1px, transparent 1px)",
+                            backgroundColor: mode === "dark" ? "#0f172a" : "#f8fafc",
+                          }}
+                        >
+                          {currentFloorTables.map((t) => {
+                            const selected = selectedTableIds.includes(t.id);
+                            const isAvailable = t.isAvailable;
+                            const hasSoftConflict = !!t.conflictTime;
+                            const isRound = t.shape?.toLowerCase() === "circle" || t.shape?.toLowerCase() === "round";
+                            
+                            const left = (t.positionX ?? 0) * scale;
+                            const top = (t.positionY ?? 0) * scale;
+                            const width = (t.width ?? 80) * scale;
+                            const height = (t.height ?? 80) * scale;
+                            const rotate = t.rotation ?? 0;
+
+                            return (
+                              <button
+                                key={t.id}
+                                disabled={!isAvailable}
+                                onClick={() => {
+                                  if (selected) {
+                                    setSelectedTableIds((prev) => prev.filter((id) => id !== t.id));
+                                  } else {
+                                    if (t.conflictTime) {
+                                      setPendingConflictTable(t);
+                                    } else {
+                                      setSelectedTableIds((prev) => [...prev, t.id]);
+                                    }
+                                  }
+                                }}
+                                className={`absolute flex flex-col items-center justify-center p-1 font-sans select-none transition-all duration-300 ${
+                                  !isAvailable 
+                                    ? "opacity-35 cursor-not-allowed" 
+                                    : selected 
+                                    ? "shadow-lg animate-pulse"
+                                    : "hover:scale-105 hover:shadow-md cursor-pointer"
+                                }`}
+                                style={{
+                                  left,
+                                  top,
+                                  width,
+                                  height,
+                                  transform: `rotate(${rotate}deg)`,
+                                  borderRadius: isRound ? "50%" : "12px",
+                                  border: !isAvailable 
+                                    ? "1.5px dashed #64748b" 
+                                    : selected
+                                    ? `2.5px solid ${brandColor}` 
+                                    : hasSoftConflict
+                                    ? "1.5px dashed #f59e0b"
+                                    : `2px solid ${brandColor}50`,
+                                  background: !isAvailable
+                                    ? (mode === "dark" ? "#1e293b" : "#e2e8f0")
+                                    : selected
+                                    ? `${brandColor}`
+                                    : hasSoftConflict
+                                    ? (mode === "dark" ? "rgba(245, 158, 11, 0.1)" : "rgba(245, 158, 11, 0.05)")
+                                    : (mode === "dark" ? "rgba(30, 41, 59, 0.6)" : "rgba(255, 255, 255, 0.95)"),
+                                  color: selected 
+                                    ? "#ffffff" 
+                                    : !isAvailable
+                                    ? "var(--text-muted)"
+                                    : hasSoftConflict
+                                    ? "#f59e0b"
+                                    : "var(--text)"
+                                }}
+                              >
+                                <span 
+                                  className="font-black tracking-tight leading-none"
+                                  style={{ fontSize: Math.max(10, 14 * scale) }}
+                                >
+                                  {t.code}
+                                </span>
+                                <span 
+                                  className="font-medium opacity-80 mt-1 leading-none whitespace-nowrap"
+                                  style={{ fontSize: Math.max(8, 10 * scale) }}
+                                >
+                                  👤 {t.seatingCapacity}
+                                </span>
+                                {selected && (
+                                  <div 
+                                    className="absolute -top-1.5 -right-1.5 bg-emerald-500 text-white rounded-full flex items-center justify-center p-0.5 shadow border border-white"
+                                    style={{ width: 16 * scale, height: 16 * scale }}
+                                  >
+                                    <Check className="w-full h-full stroke-[3]" />
+                                  </div>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {/* Legend bar */}
+                        <div className="bg-[var(--surface)] border-t border-[var(--border)] px-4 py-3 flex flex-wrap gap-x-6 gap-y-2 justify-center text-xs">
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-3.5 h-3.5 rounded border border-dashed border-[#64748b] bg-zinc-300 dark:bg-zinc-700 opacity-40" />
+                            <span className="text-[var(--text-muted)]">Bàn đã đặt / Không đủ chỗ</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <div 
+                              className="w-3.5 h-3.5 rounded border border-dashed border-amber-500 bg-amber-500/10" 
+                            />
+                            <span className="text-[var(--text-muted)]">Bàn có thể trùng giờ (Soft conflict)</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <div 
+                              className="w-3.5 h-3.5 rounded border" 
+                              style={{ borderColor: `${brandColor}90`, backgroundColor: "var(--surface)" }}
+                            />
+                            <span className="text-[var(--text-muted)]">Bàn trống có thể chọn</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <div 
+                              className="w-3.5 h-3.5 rounded" 
+                              style={{ backgroundColor: brandColor }}
+                            />
+                            <span className="text-[var(--text-muted)]">Bàn bạn đang chọn</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Selection Summary list */}
+                      {selectedTableIds.length > 0 && (
+                        <div className="p-3.5 rounded-xl bg-emerald-500/5 border border-emerald-500/20 flex items-center gap-3">
+                          <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500">
+                            <Info className="w-4 h-4" />
+                          </div>
+                          <p className="text-xs text-[var(--text)] m-0">
+                            Bạn đã chọn: <strong>{
+                              selectedTableIds.map(id => allTables.find(t => t.id === id)?.code).filter(Boolean).join(", ")
+                            }</strong>
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
-              <div style={{ display: "flex", gap: 10 }}>
-                <Button onClick={() => setStep(0)} style={{ flex: 1, borderRadius: 10, height: 44 }}>← Quay lại</Button>
-                <Button type="primary" onClick={() => setStep(2)} disabled={availableTables.length > 0 && selectedTableIds.length === 0}
-                  style={{ flex: 2, background: brandColor, borderColor: brandColor, borderRadius: 10, height: 44, fontWeight: 700 }}>
-                  {availableTables.length === 0 ? "Tiếp tục đặt bàn →" : (selectedTableIds.length > 0 ? `Tiếp tục (${selectedTableIds.length} bàn)` : "Bỏ qua chọn bàn →")}
+              <div className="flex gap-3 pt-4 border-t border-[var(--border)]">
+                <Button 
+                  onClick={() => setStep(0)} 
+                  className="flex-1 rounded-xl h-11 border-[var(--border)] text-[var(--text)] bg-transparent font-semibold"
+                >
+                  ← Quay lại
+                </Button>
+                <Button 
+                  type="primary" 
+                  onClick={() => setStep(2)} 
+                  disabled={assignmentMode === "manual" && selectedTableIds.length === 0}
+                  className="flex-[2] rounded-xl h-11 font-bold border-none"
+                  style={{ background: brandColor, color: "#fff" }}
+                >
+                  {assignmentMode === "auto" ? "Tiếp tục đặt bàn →" : (selectedTableIds.length > 0 ? `Tiếp tục (${selectedTableIds.length} bàn) →` : "Chọn bàn để tiếp tục")}
                 </Button>
               </div>
             </div>
@@ -384,44 +854,240 @@ export default function NewReservationPage() {
 
           {/* Step 2: Personal info */}
           {step === 2 && (
-            <div className="space-y-5">
-              <h2 style={{ fontSize: 18, fontWeight: 700, color: "var(--text)", margin: 0 }}>Thông tin liên hệ</h2>
-
-              {[
-                { label: "Họ tên", value: name, setter: setName, type: "text", placeholder: "Nguyễn Văn A" },
-                { label: "Số điện thoại", value: phone, setter: setPhone, type: "tel", placeholder: "0905 123 456" },
-                { label: "Địa chỉ Email (Nhận mã đặt bàn)", value: email, setter: setEmail, type: "email", placeholder: "example@gmail.com", disabled: !!user },
-              ].map((f) => (
-                <div key={f.label}>
-                  <label style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: 6 }}>{f.label}</label>
-                  <input type={f.type} value={f.value} placeholder={f.placeholder} onChange={(e) => f.setter(e.target.value)} disabled={f.disabled}
-                    style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--border)", background: f.disabled ? "rgba(0,0,0,0.05)" : "var(--surface)", color: "var(--text)", fontSize: 14 }} />
-                </div>
-              ))}
-
+            <div className="space-y-6">
               <div>
-                <label style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: 6 }}>Yêu cầu đặc biệt (không bắt buộc)</label>
-                <textarea value={requests} onChange={(e) => setRequests(e.target.value)} rows={3} placeholder="Ví dụ: ghế cho em bé, bánh sinh nhật..."
-                  style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text)", fontSize: 14, resize: "vertical" }} />
+                <h2 className="text-xl font-bold text-[var(--text)] m-0">Thông tin liên hệ</h2>
+                <p className="text-xs text-[var(--text-muted)] mt-1">Xin vui lòng điền các thông tin liên lạc để hoàn tất giữ bàn.</p>
               </div>
 
-              {/* Summary */}
-              <div style={{ padding: "14px 16px", borderRadius: 12, background: "var(--surface)", border: "1px solid var(--border)", fontSize: 13 }}>
-                <p style={{ margin: 0, fontWeight: 700, color: "var(--text)", marginBottom: 8 }}>Tóm tắt đặt bàn</p>
-                <p style={{ margin: "4px 0", color: "var(--text-muted)" }}>📅 {date} lúc {time}</p>
-                <p style={{ margin: "4px 0", color: "var(--text-muted)" }}>👥 {guests} khách</p>
-                {selectedTableIds.length > 0 && (
-                  <p style={{ margin: "4px 0", color: "var(--text-muted)" }}>🪑 {selectedTableIds.length} bàn đã chọn</p>
+              <div className="space-y-4">
+                {[
+                  { label: "Họ và tên khách hàng", value: name, setter: setName, type: "text", placeholder: "Nguyễn Văn A", icon: <User className="w-4 h-4 text-zinc-400" /> },
+                  { label: "Số điện thoại liên lạc", value: phone, setter: setPhone, type: "tel", placeholder: "0905 123 456", icon: <Phone className="w-4 h-4 text-zinc-400" /> },
+                  { label: "Địa chỉ Email nhận mã xác nhận", value: email, setter: setEmail, type: "email", placeholder: "example@gmail.com", disabled: !!user, icon: <Mail className="w-4 h-4 text-zinc-400" /> },
+                ].map((f) => (
+                  <div key={f.label}>
+                    <label className="text-xs font-semibold text-[var(--text-muted)] block mb-1.5">{f.label}</label>
+                    <div className="relative">
+                      <div className="absolute left-3.5 top-1/2 -translate-y-1/2">
+                        {f.icon}
+                      </div>
+                      <input 
+                        type={f.type} 
+                        value={f.value} 
+                        placeholder={f.placeholder} 
+                        onChange={(e) => f.setter(e.target.value)} 
+                        disabled={f.disabled}
+                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] text-sm focus:outline-none focus:border-[var(--primary)] transition-colors disabled:opacity-60" 
+                      />
+                    </div>
+                  </div>
+                ))}
+
+                <div>
+                  <label className="text-xs font-semibold text-[var(--text-muted)] block mb-1.5">Yêu cầu bổ sung (không bắt buộc)</label>
+                  <div className="relative">
+                    <div className="absolute left-3.5 top-4">
+                      <FileText className="w-4 h-4 text-zinc-400" />
+                    </div>
+                    <textarea 
+                      value={requests} 
+                      onChange={(e) => setRequests(e.target.value)} 
+                      rows={3} 
+                      placeholder="Ví dụ: ghế ăn dặm cho bé, có bánh kem sinh nhật, trang trí hoa..."
+                      className="w-full pl-10 pr-4 py-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] text-sm focus:outline-none focus:border-[var(--primary)] transition-colors resize-none" 
+                    />
+                  </div>
+                </div>
+
+                {/* Bank refund info — shown only when deposit is required */}
+                {estimatedDeposit > 0 && (
+                  <div className="rounded-2xl border border-[var(--border)] p-4 space-y-3" style={{ background: "var(--surface)" }}>
+                    <div className="flex items-center gap-2">
+                      <Landmark className="w-4 h-4" style={{ color: "var(--primary)" }} />
+                      <span className="text-sm font-bold text-[var(--text)]">Tài khoản nhận hoàn cọc</span>
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md" style={{ background: "var(--primary)20", color: "var(--primary)" }}>Bắt buộc</span>
+                    </div>
+                    <p className="text-[11px] text-[var(--text-muted)] leading-relaxed m-0">
+                      Trong trường hợp đặt bàn bị hủy, tiền cọc sẽ được hoàn tự động về tài khoản này.
+                    </p>
+                    {/* Bank selector — custom beautiful dropdown */}
+                    <div className="relative">
+                      <label className="text-xs font-semibold text-[var(--text-muted)] block mb-1.5">Ngân hàng</label>
+                      {/* Trigger */}
+                      <button
+                        type="button"
+                        onClick={() => { setBankDropdownOpen(o => !o); setBankSearch(""); }}
+                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-200 text-sm text-left"
+                        style={{
+                          background: "var(--surface)",
+                          borderColor: bankDropdownOpen ? "var(--primary)" : "var(--border)",
+                          boxShadow: bankDropdownOpen ? "0 0 0 3px var(--primary-glow, rgba(255,90,44,0.15))" : "none",
+                          color: bankBin ? "var(--text)" : "var(--text-muted)",
+                        }}
+                      >
+                        {bankBin ? (
+                          <>
+                            <span
+                              className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-[10px] font-black shrink-0 shadow-sm"
+                              style={{ background: VIETNAMESE_BANKS.find(b => b.bin === bankBin)?.color ?? "#666" }}
+                            >
+                              {VIETNAMESE_BANKS.find(b => b.bin === bankBin)?.short}
+                            </span>
+                            <span className="font-semibold flex-1">{VIETNAMESE_BANKS.find(b => b.bin === bankBin)?.name}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Landmark className="w-4 h-4 opacity-40 shrink-0" />
+                            <span className="flex-1">-- Chọn ngân hàng --</span>
+                          </>
+                        )}
+                        <ChevronDown
+                          className="w-4 h-4 shrink-0 transition-transform duration-200"
+                          style={{
+                            transform: bankDropdownOpen ? "rotate(180deg)" : "rotate(0deg)",
+                            color: "var(--text-muted)"
+                          }}
+                        />
+                      </button>
+
+                      {/* Dropdown panel */}
+                      {bankDropdownOpen && (
+                        <div
+                          className="absolute left-0 right-0 mt-2 rounded-2xl border shadow-2xl z-50 overflow-hidden"
+                          style={{
+                            background: "var(--card)",
+                            borderColor: "var(--border)",
+                            boxShadow: "0 20px 60px rgba(0,0,0,0.35)"
+                          }}
+                        >
+                          {/* Search */}
+                          <div className="p-2 border-b" style={{ borderColor: "var(--border)" }}>
+                            <div className="relative">
+                              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
+                              <input
+                                autoFocus
+                                type="text"
+                                value={bankSearch}
+                                onChange={e => setBankSearch(e.target.value)}
+                                placeholder="Tìm ngân hàng..."
+                                className="w-full pl-8 pr-3 py-2 rounded-lg text-xs border-none outline-none"
+                                style={{ background: "var(--surface)", color: "var(--text)" }}
+                              />
+                            </div>
+                          </div>
+                          {/* Bank list */}
+                          <div className="overflow-y-auto" style={{ maxHeight: 240 }}>
+                            {VIETNAMESE_BANKS
+                              .filter(b => b.name.toLowerCase().includes(bankSearch.toLowerCase()) || b.code.toLowerCase().includes(bankSearch.toLowerCase()))
+                              .map(b => (
+                                <button
+                                  key={b.bin}
+                                  type="button"
+                                  onClick={() => {
+                                    setBankBin(b.bin);
+                                    setBankCode(b.code);
+                                    setBankDropdownOpen(false);
+                                    setBankSearch("");
+                                  }}
+                                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-all duration-150 hover:opacity-100"
+                                  style={{
+                                    background: bankBin === b.bin ? `${b.color}15` : "transparent",
+                                    color: "var(--text)",
+                                  }}
+                                >
+                                  <span
+                                    className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-[10px] font-black shrink-0 shadow-sm"
+                                    style={{ background: b.color }}
+                                  >
+                                    {b.short}
+                                  </span>
+                                  <span className="flex-1 font-medium">{b.name}</span>
+                                  {bankBin === b.bin && (
+                                    <Check className="w-4 h-4 shrink-0" style={{ color: b.color }} />
+                                  )}
+                                </button>
+                              ))
+                            }
+                            {VIETNAMESE_BANKS.filter(b => b.name.toLowerCase().includes(bankSearch.toLowerCase()) || b.code.toLowerCase().includes(bankSearch.toLowerCase())).length === 0 && (
+                              <p className="text-center py-6 text-xs" style={{ color: "var(--text-muted)" }}>Không tìm thấy ngân hàng</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Backdrop */}
+                      {bankDropdownOpen && (
+                        <div className="fixed inset-0 z-40" onClick={() => { setBankDropdownOpen(false); setBankSearch(""); }} />
+                      )}
+                    </div>
+                    {/* Account number */}
+                    <div>
+                      <label className="text-xs font-semibold text-[var(--text-muted)] block mb-1.5">Số tài khoản</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={bankAccountNumber}
+                        onChange={(e) => setBankAccountNumber(e.target.value.replace(/\D/g, ""))}
+                        placeholder="Nhập số tài khoản"
+                        className="w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] text-sm font-mono focus:outline-none focus:border-[var(--primary)] transition-colors"
+                      />
+                    </div>
+                    {/* Account name */}
+                    <div>
+                      <label className="text-xs font-semibold text-[var(--text-muted)] block mb-1.5">Tên chủ tài khoản</label>
+                      <input
+                        type="text"
+                        value={bankAccountName}
+                        onChange={(e) => setBankAccountName(e.target.value.toUpperCase())}
+                        placeholder="NGUYEN VAN A"
+                        className="w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] text-sm font-mono uppercase focus:outline-none focus:border-[var(--primary)] transition-colors"
+                      />
+                    </div>
+                  </div>
                 )}
-                <p style={{ margin: "8px 0 0", color: "var(--text-muted)", borderTop: "1px dashed var(--border)", paddingTop: 8 }}>
-                  💰 Tiền đặt cọc (bắt buộc): <strong style={{ color: brandColor, fontSize: 15 }}>{estimatedDeposit.toLocaleString("vi-VN")}đ</strong>
-                </p>
+
+                {/* Summary card */}
+                <div className="p-4 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-xs space-y-2.5">
+                  <p className="m-0 font-bold text-sm text-[var(--text)] border-b border-[var(--border)] pb-2">Tóm tắt thông tin đặt chỗ</p>
+                  <div className="flex justify-between">
+                    <span className="text-[var(--text-muted)]">📅 Thời gian</span>
+                    <span className="font-semibold text-[var(--text)]">{date} lúc {time}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[var(--text-muted)]">👥 Số khách</span>
+                    <span className="font-semibold text-[var(--text)]">{guests} người</span>
+                  </div>
+                  {selectedTableIds.length > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-[var(--text-muted)]">🪑 Danh sách bàn</span>
+                      <span className="font-semibold text-[var(--text)]">
+                        {selectedTableIds.map(id => allTables.find(t => t.id === id)?.code).filter(Boolean).join(", ")}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between border-t border-dashed border-[var(--border)] pt-2 mt-1">
+                    <span className="text-[var(--text-muted)] font-medium">💰 Yêu cầu cọc (bắt buộc)</span>
+                    <span className="font-black text-sm text-[var(--primary)]">{estimatedDeposit.toLocaleString("vi-VN")}đ</span>
+                  </div>
+                </div>
               </div>
 
-              <div style={{ display: "flex", gap: 10 }}>
-                <Button onClick={() => setStep(1)} style={{ flex: 1, borderRadius: 10, height: 44 }}>← Quay lại</Button>
-                <Button type="primary" loading={loading} onClick={handleSubmit} disabled={!name || !phone || !email}
-                  style={{ flex: 2, background: brandColor, borderColor: brandColor, borderRadius: 10, height: 44, fontWeight: 700 }}>
+              <div className="flex gap-3 pt-4 border-t border-[var(--border)]">
+                <Button 
+                  onClick={() => setStep(1)} 
+                  className="flex-1 rounded-xl h-11 border-[var(--border)] text-[var(--text)] bg-transparent font-semibold"
+                >
+                  ← Quay lại
+                </Button>
+                <Button 
+                  type="primary" 
+                  loading={loading} 
+                  onClick={handleSubmit} 
+                  disabled={!name || !phone || !email}
+                  className="flex-[2] rounded-xl h-11 font-bold border-none"
+                  style={{ background: brandColor, color: "#fff" }}
+                >
                   Xác nhận đặt bàn
                 </Button>
               </div>
@@ -430,54 +1096,84 @@ export default function NewReservationPage() {
 
           {/* Step 3: Confirmation + SePay deposit */}
           {step === 3 && (
-            <div className="space-y-5">
+            <div className="space-y-6">
               {transferInfo && !depositPaid ? (
-                <SePayQR info={transferInfo} onSuccess={handleDepositSuccess} onSkip={() => setTransferInfo(null)} />
+                <SePayQR 
+                  info={transferInfo} 
+                  deadline={createdReservation?.paymentDeadline}
+                  onSuccess={handleDepositSuccess} 
+                  onSkip={() => setTransferInfo(null)} 
+                />
               ) : (
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 56, marginBottom: 12 }}>{depositPaid ? "🎉" : "✅"}</div>
-                  <h2 style={{ fontSize: 20, fontWeight: 800, color: "var(--text)", margin: "0 0 8px" }}>
-                    {depositPaid ? "Đặt bàn được xác nhận!" : "Đặt bàn thành công!"}
-                  </h2>
-                  <p style={{ color: "var(--text-muted)", fontSize: 14, margin: "0 0 24px" }}>
-                    {depositPaid ? "Cọc đã thanh toán. Hẹn gặp bạn tại nhà hàng!" : "Vui lòng đến đúng giờ và mang theo mã xác nhận."}
-                  </p>
-
-                  <div style={{ padding: "16px 20px", borderRadius: 14, background: "var(--surface)", border: "1px solid var(--border)", marginBottom: 24, display: "inline-block" }}>
-                    <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>Mã xác nhận</p>
-                    <p style={{ margin: "4px 0 0", fontSize: 28, fontWeight: 900, color: brandColor, fontFamily: "monospace", letterSpacing: "0.1em" }}>{createdCode}</p>
-                  </div>
+                <div className="text-center py-4">
+                  {(() => {
+                    const hasDeposit = Number(createdReservation?.depositAmount) > 0;
+                    if (depositPaid) {
+                      return (
+                        <>
+                          <div className="text-5xl mb-4">⏳</div>
+                          <h2 className="text-xl font-extrabold text-[var(--text)] m-0 mb-2">
+                            Thanh toán cọc thành công!
+                          </h2>
+                          <p className="text-sm text-[var(--text-muted)] m-0 mb-6 leading-relaxed">
+                            Yêu cầu đặt bàn của bạn đang <strong>chờ chủ nhà hàng xác nhận</strong>. Mã nhận bàn và mã QR check-in sẽ được gửi qua email cho bạn ngay sau khi yêu cầu được phê duyệt.
+                          </p>
+                        </>
+                      );
+                    } else if (hasDeposit) {
+                      return (
+                        <>
+                          <div className="text-5xl mb-4">⏳</div>
+                          <h2 className="text-xl font-extrabold text-[var(--text)] m-0 mb-2">
+                            Chờ thanh toán tiền cọc
+                          </h2>
+                          <p className="text-sm text-[var(--text-muted)] m-0 mb-6 leading-relaxed">
+                            Yêu cầu đặt bàn của bạn đang chờ thanh toán tiền cọc để chuyển tới chủ nhà hàng phê duyệt. Vui lòng hoàn tất thanh toán trước thời hạn để tránh bị tự động hủy.
+                          </p>
+                        </>
+                      );
+                    } else {
+                      return (
+                        <>
+                          <div className="text-5xl mb-4">⏳</div>
+                          <h2 className="text-xl font-extrabold text-[var(--text)] m-0 mb-2">
+                            Đang chờ xác nhận từ nhà hàng!
+                          </h2>
+                          <p className="text-sm text-[var(--text-muted)] m-0 mb-6 leading-relaxed">
+                            Yêu cầu đặt bàn đã được tiếp nhận thành công và <strong>đang chờ chủ nhà hàng xác nhận</strong>. Mã xác nhận nhận bàn và QR check-in sẽ được tự động gửi qua email của bạn sau khi nhà hàng đồng ý.
+                          </p>
+                        </>
+                      );
+                    }
+                  })()}
 
                   {/* Payment deadline countdown */}
                   {createdReservation?.paymentDeadline && !depositPaid && (
-                    <PaymentDeadlineCountdown
-                      deadline={createdReservation.paymentDeadline}
-                      onExpired={() => showToast("warning", "Hết hạn cọc", "Đặt bàn có thể đã bị hủy do hết hạn thanh toán cọc")}
-                    />
-                  )}
-
-                  {/* QR Code display */}
-                  {createdReservation?.metadata?.qrCodeUrl && (
-                    <div style={{ textAlign: "center", marginBottom: 20 }}>
-                      <img
-                        src={createdReservation.metadata.qrCodeUrl}
-                        alt={`QR Check-in ${createdCode}`}
-                        style={{ width: 160, height: 160, borderRadius: 12, border: "1px solid var(--border)", display: "block", margin: "0 auto 8px" }}
+                    <div className="mb-6">
+                      <PaymentDeadlineCountdown
+                        deadline={createdReservation.paymentDeadline}
+                        onExpired={() => showToast("warning", "Hết hạn cọc", "Đặt bàn có thể đã bị hủy do hết hạn thanh toán cọc")}
                       />
-                      <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>
-                        Khách hàng có thể quét QR này để check-in
-                      </p>
                     </div>
                   )}
 
-                  <div style={{ display: "flex", gap: 10, flexDirection: "column" }}>
-                    <Button type="primary" block size="large" onClick={() => router.push("/")}
-                      style={{ background: brandColor, borderColor: brandColor, borderRadius: 12, height: 48, fontWeight: 700 }}>
-                      Về trang chủ
+                  <div className="flex flex-col gap-3 pt-4 border-t border-[var(--border)]">
+                    <Button 
+                      type="primary" 
+                      block 
+                      size="large" 
+                      onClick={() => router.push("/")}
+                      className="rounded-xl h-12 font-bold text-sm border-none"
+                      style={{ background: brandColor, color: "#fff" }}
+                    >
+                      Quay về trang chủ
                     </Button>
-                    <Button block onClick={() => router.push(`/restaurant/reservations/${createdId}`)}
-                      style={{ borderRadius: 12, height: 44, color: "var(--text)" }}>
-                      Xem chi tiết đặt bàn
+                    <Button 
+                      block 
+                      onClick={() => router.push(`/your-reservation/${createdId}`)}
+                      className="rounded-xl h-11 border-[var(--border)] text-[var(--text)] bg-transparent font-semibold"
+                    >
+                      Xem chi tiết lịch trình đặt bàn
                     </Button>
                   </div>
                 </div>
@@ -487,6 +1183,51 @@ export default function NewReservationPage() {
 
         </div>
       </div>
+
+      {/* Soft Conflict Confirmation Modal */}
+      {pendingConflictTable && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 max-w-sm w-full shadow-xl text-left">
+            <div className="text-amber-500 text-3xl mb-3">⚠️</div>
+            <h3 className="text-base font-bold text-[var(--text)] mb-2">Thông báo thời gian bàn bận</h3>
+            <p className="text-xs text-[var(--text-muted)] mb-5 leading-relaxed">
+              Bàn <strong className="text-[var(--text)] font-semibold">{pendingConflictTable.code}</strong> hiện đang có một lượt khách đặt lúc{" "}
+              <strong className="text-[var(--text)] font-semibold">
+                {new Date(pendingConflictTable.conflictTime!).toLocaleTimeString("vi-VN", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </strong>
+              .
+              <br />
+              <br />
+              Trong trường hợp khách trước dùng bữa lâu hơn dự kiến, nhà hàng sẽ chủ động sắp xếp một bàn trống khác tương đương cho bạn khi bạn đến nhận bàn.
+              <br />
+              <br />
+              Bạn có đồng ý với sắp xếp này không?
+            </p>
+            <div className="flex gap-3">
+              <Button
+                onClick={() => setPendingConflictTable(null)}
+                className="flex-1 rounded-xl h-10 border-[var(--border)] text-[var(--text)] bg-transparent font-semibold"
+              >
+                Hủy
+              </Button>
+              <Button
+                type="primary"
+                onClick={() => {
+                  setSelectedTableIds((prev) => [...prev, pendingConflictTable.id]);
+                  setPendingConflictTable(null);
+                }}
+                className="flex-1 rounded-xl h-10 font-bold border-none"
+                style={{ background: brandColor, color: "#fff" }}
+              >
+                Đồng ý
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
