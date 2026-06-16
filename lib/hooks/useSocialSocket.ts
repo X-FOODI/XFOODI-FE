@@ -31,7 +31,7 @@ export function useSocialSocket({ enabled = true }: UseSocialSocketOptions = {})
     const socket = io(getSocketBaseUrl(), {
       path: '/hubs/social/socket.io',
       auth: { token },
-      transports: ['websocket', 'polling'],
+      transports: ['polling', 'websocket'],
       reconnection: true,
       reconnectionAttempts: 5,
     });
