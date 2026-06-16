@@ -2,7 +2,7 @@ import I18nProvider from "@/components/I18nProvider";
 import { GoogleOAuthAppProvider } from "@/components/providers/GoogleOAuthAppProvider";
 import TenantFavicon from "@/components/TenantFavicon";
 import { AuthProvider } from "@/lib/contexts/AuthContext";
-// import { CartProvider } from "@/lib/contexts/CartContext"; // TODO: Re-enable when cart services are ready
+import { CartProvider } from "@/lib/contexts/CartContext";
 import { TenantProvider } from "@/lib/contexts/TenantContext";
 import { ToastProvider } from "@/lib/contexts/ToastContext";
 import type { Metadata } from "next";
@@ -11,6 +11,8 @@ import { Suspense } from "react";
 import "timepicker-ui/main.css";
 import "./globals.css";
 import AntdProvider from "./theme/AntdProvider";
+
+import { ChatAssistantClient } from "@/components/ui/ChatAssistantClient";
 
 const inter = Inter({ subsets: ["latin", "vietnamese"] });
 
@@ -26,7 +28,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="vi" suppressHydrationWarning>
+    <html lang="vi" suppressHydrationWarning data-scroll-behavior="smooth">
       <head>
         <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet" />
         <script
@@ -144,7 +146,12 @@ export default function RootLayout({
             <GoogleOAuthAppProvider>
               <AuthProvider>
                 <ToastProvider>
-                  <AntdProvider>{children}</AntdProvider>
+                  <AntdProvider>
+                    <CartProvider>
+                      {children}
+                      <ChatAssistantClient />
+                    </CartProvider>
+                  </AntdProvider>
                 </ToastProvider>
               </AuthProvider>
             </GoogleOAuthAppProvider>

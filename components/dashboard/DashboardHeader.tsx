@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import authService from "../../lib/services/authService";
+import axiosInstance from "../../lib/services/axiosInstance";
 
 interface DashboardHeaderProps {
   role: "admin" | "restaurant";
@@ -22,26 +23,45 @@ export default function DashboardHeader({
 }: DashboardHeaderProps) {
   const router = useRouter();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [theme, setTheme] = useState<"light" | "dark">("light");
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Resolve user from auth if props not passed
-  const currentUser = authService.getCurrentUser();
-  const resolvedName =
-    userName ||
-    currentUser?.fullName ||
-    currentUser?.name ||
-    "User";
-  const resolvedEmail =
-    userEmail ||
-    currentUser?.email ||
-    "";
-  const resolvedAvatar = currentUser?.avatar || "";
-  const initials = resolvedName
-    .split(" ")
-    .map((w: string) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase() || "U";
+  const [activeOrdersCount, setActiveOrdersCount] = useState(0);
+  const [pendingReservationsCount, setPendingReservationsCount] = useState(0);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const notificationRef = useRef<HTMLDivElement>(null);
+
+  // Resolve user from auth if props not passed (with hydration-safe state)
+  const [resolvedName, setResolvedName] = useState(userName || "User");
+  const [resolvedEmail, setResolvedEmail] = useState(userEmail || "");
+  const [resolvedAvatar, setResolvedAvatar] = useState("");
+  const [initials, setInitials] = useState(() => {
+    const defaultName = userName || "User";
+    return defaultName
+      .split(" ")
+      .map((w: string) => w[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase() || "U";
+  });
+
+  useEffect(() => {
+    const currentUser = authService.getCurrentUser();
+    const name = userName || currentUser?.fullName || currentUser?.name || "User";
+    const email = userEmail || currentUser?.email || "";
+    const avatar = currentUser?.avatar || "";
+    const init = name
+      .split(" ")
+      .map((w: string) => w[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase() || "U";
+
+    setResolvedName(name);
+    setResolvedEmail(email);
+    setResolvedAvatar(avatar);
+    setInitials(init);
+  }, [userName, userEmail]);
 
   const chipLabel =
     role === "admin"
@@ -68,9 +88,8 @@ export default function DashboardHeader({
     title ??
     (role === "admin" ? "XFoodi Platform" : restaurantName ?? "Nhà hàng");
 
-  // Close dropdown when clicking outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
-    if (!dropdownOpen) return;
     const handler = (e: MouseEvent) => {
       if (
         dropdownRef.current &&
@@ -78,10 +97,72 @@ export default function DashboardHeader({
       ) {
         setDropdownOpen(false);
       }
+      if (
+        notificationRef.current &&
+        !notificationRef.current.contains(e.target as Node)
+      ) {
+        setNotificationOpen(false);
+      }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [dropdownOpen]);
+  }, []);
+
+  useEffect(() => {
+    if (role !== "restaurant") return;
+
+    const fetchCounts = async () => {
+      try {
+        const ordersRes = await axiosInstance.get("/orders");
+        if (ordersRes.data?.success) {
+          const active = (ordersRes.data.data as any[]).filter(
+            (o) => o.status === "PENDING" || o.status === "CONFIRMED" || (o.status === "COMPLETED" && !o.isPaid)
+          );
+          setActiveOrdersCount(active.length);
+        }
+      } catch (e) {
+        console.error("Header failed to fetch active orders:", e);
+      }
+
+      try {
+        const resRes = await axiosInstance.get("/reservations", { params: { limit: 100 } });
+        if (resRes.data?.success) {
+          const items = resRes.data.data?.items || [];
+          const pending = items.filter((r: any) => r.statusValue?.code === "PENDING");
+          setPendingReservationsCount(pending.length);
+        }
+      } catch (e) {
+        console.error("Header failed to fetch pending reservations:", e);
+      }
+    };
+
+    fetchCounts();
+    const interval = setInterval(fetchCounts, 15000); // Poll every 15 seconds
+    return () => clearInterval(interval);
+  }, [role]);
+
+  useEffect(() => {
+    // Initial load
+    const isDark = document.documentElement.classList.contains("dark");
+    setTheme(isDark ? "dark" : "light");
+  }, []);
+
+  const toggleTheme = () => {
+    const newTheme = theme === "light" ? "dark" : "light";
+    setTheme(newTheme);
+    localStorage.setItem("xfoodi-theme-mode", newTheme);
+    if (newTheme === "dark") {
+      document.documentElement.classList.add("dark");
+      document.documentElement.setAttribute("data-theme", "dark");
+      document.body.classList.add("dark");
+      document.body.setAttribute("data-theme", "dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+      document.documentElement.setAttribute("data-theme", "light");
+      document.body.classList.remove("dark");
+      document.body.setAttribute("data-theme", "light");
+    }
+  };
 
   const handleLogout = async () => {
     setDropdownOpen(false);
@@ -230,10 +311,11 @@ export default function DashboardHeader({
 
       {/* ── Right: Bell + User button ── */}
       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-
-        {/* Notification bell */}
+        
+        {/* Theme Toggle */}
         <button
-          title="Thông báo"
+          onClick={toggleTheme}
+          title={theme === "light" ? "Chuyển sang chế độ Tối" : "Chuyển sang chế độ Sáng"}
           style={{
             position: "relative",
             width: "36px",
@@ -257,24 +339,170 @@ export default function DashboardHeader({
             e.currentTarget.style.borderColor = "var(--border)";
           }}
         >
-          <svg width="17" height="17" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-          </svg>
-          {/* unread badge */}
-          <span
-            style={{
-              position: "absolute",
-              top: "6px",
-              right: "6px",
-              width: "8px",
-              height: "8px",
-              background: "var(--danger, #ef4444)",
-              borderRadius: "50%",
-              border: "2px solid var(--card)",
-            }}
-          />
+          {theme === "light" ? (
+            <svg width="17" height="17" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+            </svg>
+          ) : (
+            <svg width="17" height="17" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+          )}
         </button>
+
+        {/* Notification bell */}
+        <div ref={notificationRef} style={{ position: "relative" }}>
+          <button
+            onClick={() => setNotificationOpen((v) => !v)}
+            title="Thông báo"
+            style={{
+              position: "relative",
+              width: "36px",
+              height: "36px",
+              border: "1px solid var(--border)",
+              borderRadius: "50%",
+              background: "var(--card)",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "var(--text-muted)",
+              transition: "all 0.15s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "var(--surface)";
+              e.currentTarget.style.borderColor = "var(--primary, #ff5722)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "var(--card)";
+              e.currentTarget.style.borderColor = "var(--border)";
+            }}
+          >
+            <svg width="17" height="17" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+            {(activeOrdersCount > 0 || pendingReservationsCount > 0) && (
+              <span
+                style={{
+                  position: "absolute",
+                  top: "2px",
+                  right: "2px",
+                  background: "var(--danger, #ef4444)",
+                  color: "#fff",
+                  fontSize: "9px",
+                  fontWeight: 700,
+                  borderRadius: "50%",
+                  width: "14px",
+                  height: "14px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: "0 0 4px rgba(239,68,68,0.5)",
+                }}
+              >
+                {(activeOrdersCount > 0 ? 1 : 0) + (pendingReservationsCount > 0 ? 1 : 0)}
+              </span>
+            )}
+          </button>
+
+          {/* Notification dropdown */}
+          {notificationOpen && (
+            <div
+              style={{
+                position: "absolute",
+                top: "calc(100% + 10px)",
+                right: 0,
+                minWidth: "280px",
+                background: "var(--card)",
+                border: "1px solid var(--border)",
+                borderRadius: "16px",
+                boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)",
+                overflow: "hidden",
+                zIndex: 200,
+              }}
+            >
+              <div
+                style={{
+                  padding: "12px 16px",
+                  borderBottom: "1px solid var(--border)",
+                  fontWeight: 700,
+                  fontSize: "14px",
+                  color: "var(--text)",
+                  background: "var(--surface, rgba(0,0,0,0.02))",
+                }}
+              >
+                Thông báo mới
+              </div>
+              <div style={{ padding: "8px" }}>
+                {activeOrdersCount === 0 && pendingReservationsCount === 0 ? (
+                  <div style={{ padding: "16px 12px", textAlign: "center", color: "var(--text-muted)", fontSize: "13px" }}>
+                    Không có thông báo mới nào
+                  </div>
+                ) : (
+                  <>
+                    {pendingReservationsCount > 0 && (
+                      <Link
+                        href="/restaurant/reservations"
+                        onClick={() => setNotificationOpen(false)}
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "4px",
+                          padding: "10px 12px",
+                          borderRadius: "10px",
+                          color: "var(--text)",
+                          textDecoration: "none",
+                          fontSize: "13px",
+                          transition: "background 0.12s ease",
+                          borderBottom: activeOrdersCount > 0 ? "1px solid var(--border)" : "none",
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--danger)" }}></span>
+                          <strong>Yêu cầu đặt bàn mới</strong>
+                        </div>
+                        <span style={{ color: "var(--text-muted)", paddingLeft: "14px" }}>
+                          Bạn có {pendingReservationsCount} yêu cầu đặt bàn đang chờ phê duyệt.
+                        </span>
+                      </Link>
+                    )}
+
+                    {activeOrdersCount > 0 && (
+                      <Link
+                        href="/restaurant/live-orders"
+                        onClick={() => setNotificationOpen(false)}
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "4px",
+                          padding: "10px 12px",
+                          borderRadius: "10px",
+                          color: "var(--text)",
+                          textDecoration: "none",
+                          fontSize: "13px",
+                          transition: "background 0.12s ease",
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--primary)" }}></span>
+                          <strong>Đơn hàng đang xử lý</strong>
+                        </div>
+                        <span style={{ color: "var(--text-muted)", paddingLeft: "14px" }}>
+                          Có {activeOrdersCount} đơn hàng đang hiển thị trên Màn hình Bếp.
+                        </span>
+                      </Link>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* ── User trigger button (like booca) ── */}
         <div ref={dropdownRef} style={{ position: "relative" }}>
