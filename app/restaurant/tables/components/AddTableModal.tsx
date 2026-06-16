@@ -55,7 +55,10 @@ export const AddTableModal: React.FC<AddTableModalProps> = ({
         );
     } else {
       if (!decoName.trim()) {
-        newErrors.decoName = "Vui lòng nhập tên vật phẩm trang trí";
+        newErrors.decoName = t(
+          "dashboard.tables.add_table_modal.errors.deco_name_required",
+          { defaultValue: "Vui lòng nhập tên vật phẩm trang trí" }
+        );
       }
     }
 
@@ -223,7 +226,7 @@ export const AddTableModal: React.FC<AddTableModalProps> = ({
                           transition: "all 0.2s"
                         }}
                       >
-                        Bàn ăn
+                        {t("dashboard.tables.add_table_modal.tab_table", { defaultValue: "Bàn ăn" })}
                       </button>
                       <button
                         type="button"
@@ -243,7 +246,7 @@ export const AddTableModal: React.FC<AddTableModalProps> = ({
                           transition: "all 0.2s"
                         }}
                       >
-                        Trang trí
+                        {t("dashboard.tables.add_table_modal.tab_deco", { defaultValue: "Trang trí" })}
                       </button>
                     </div>
 
@@ -415,7 +418,7 @@ export const AddTableModal: React.FC<AddTableModalProps> = ({
                               marginBottom: 8,
                               letterSpacing: "-0.01em",
                             }}>
-                            Loại vật phẩm trang trí <span style={{ color: "#ff4d4f" }}>*</span>
+                            {t("dashboard.tables.add_table_modal.deco_type", { defaultValue: "Loại vật phẩm trang trí" })} <span style={{ color: "#ff4d4f" }}>*</span>
                           </label>
                           <div style={{ position: "relative" }}>
                             <DropDown
@@ -429,9 +432,9 @@ export const AddTableModal: React.FC<AddTableModalProps> = ({
                                 border: "2px solid var(--border)",
                               }}
                             >
-                              <option value="PLANT">Cây cảnh (Potted Plant)</option>
-                              <option value="WALL">Vách tường / Hàng rào ngăn (Wall Partition)</option>
-                              <option value="RECEPTION">Quầy lễ tân (Reception Counter)</option>
+                              <option value="PLANT">{t("dashboard.tables.add_table_modal.deco_type_plant", { defaultValue: "Cây cảnh (Potted Plant)" })}</option>
+                              <option value="WALL">{t("dashboard.tables.add_table_modal.deco_type_wall", { defaultValue: "Vách tường / Hàng rào ngăn (Wall Partition)" })}</option>
+                              <option value="RECEPTION">{t("dashboard.tables.add_table_modal.deco_type_reception", { defaultValue: "Quầy lễ tân (Reception Counter)" })}</option>
                             </DropDown>
                             <svg
                               style={{
@@ -467,7 +470,7 @@ export const AddTableModal: React.FC<AddTableModalProps> = ({
                               marginBottom: 8,
                               letterSpacing: "-0.01em",
                             }}>
-                            Tên vật phẩm trang trí <span style={{ color: "#ff4d4f" }}>*</span>
+                            {t("dashboard.tables.add_table_modal.deco_name", { defaultValue: "Tên vật phẩm trang trí" })} <span style={{ color: "#ff4d4f" }}>*</span>
                           </label>
                           <input
                             id="deco_name"
@@ -478,7 +481,7 @@ export const AddTableModal: React.FC<AddTableModalProps> = ({
                               if (errors.decoName)
                                 setErrors({ ...errors, decoName: "" });
                             }}
-                            placeholder="Ví dụ: Cây xanh góc phòng, Vách tường số 1..."
+                            placeholder={t("dashboard.tables.add_table_modal.deco_name_placeholder", { defaultValue: "Ví dụ: Cây xanh góc phòng, Vách tường số 1..." })}
                             required
                             style={{
                               width: "100%",
