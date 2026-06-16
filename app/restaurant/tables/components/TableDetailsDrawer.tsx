@@ -66,7 +66,7 @@ const SHAPE_OPTIONS = [
 function QRCodeSection({ qrCodeUrl, tableNumber, tableId }: { qrCodeUrl: string; tableNumber: string; tableId: string }) {
   const { t } = useTranslation();
   const tDetails = (key: string, options?: Record<string, unknown>) =>
-    t(`tables.details.${key}`, { ns: "dashboard", ...options });
+    t(`dashboard.tables.details.${key}`, options);
   const [copied, setCopied] = useState(false);
   const [imgError, setImgError] = useState(false);
 
@@ -284,7 +284,7 @@ function PanoramaSection({
   return (
     <motion.div initial={{ scale: 0.96, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.18 }} style={{ marginBottom: 28, borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface)', overflow: 'hidden' }}>
       <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{t('tables.details.panorama_title', { ns: 'dashboard', defaultValue: 'Ảnh panorama' })}</span>
+        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{t('dashboard.tables.details.panorama_title', { defaultValue: 'Ảnh panorama' })}</span>
         {onSavePanorama && (panoramaFile || clearPanorama) && (
           <button type="button" disabled={saving} onClick={() => onSavePanorama(table.id, panoramaFile, clearPanorama)} style={{ marginLeft: 'auto', padding: '5px 14px', borderRadius: 8, border: 'none', background: saving ? 'var(--border)' : 'linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%)', color: saving ? 'var(--text-muted)' : '#fff', fontSize: 12, fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
             {saving && (
@@ -293,13 +293,13 @@ function PanoramaSection({
                 <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
               </svg>
             )}
-            {saving ? 'Đang lưu...' : t('tables.details.panorama_save', { ns: 'dashboard', defaultValue: 'Lưu ảnh' })}
+            {saving ? 'Đang lưu...' : t('dashboard.tables.details.panorama_save', { defaultValue: 'Lưu ảnh' })}
           </button>
         )}
       </div>
       <div style={{ padding: '16px 18px' }}>
         <div onClick={() => !clearPanorama && fileRef.current?.click()} style={{ borderRadius: 10, border: '1.5px dashed var(--border)', background: 'var(--card)', minHeight: 180, overflow: 'hidden', cursor: clearPanorama ? 'not-allowed' : 'pointer', opacity: clearPanorama ? 0.5 : 1 }}>
-          {currentUrl ? <img src={currentUrl} alt="Panorama" style={{ width: '100%', height: 220, objectFit: 'cover', display: 'block' }} /> : <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 12 }}>{t('tables.details.panorama_upload_hint', { ns: 'dashboard', defaultValue: 'Bấm để tải ảnh panorama' })}</div>}
+          {currentUrl ? <img src={currentUrl} alt="Panorama" style={{ width: '100%', height: 220, objectFit: 'cover', display: 'block' }} /> : <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 12 }}>{t('dashboard.tables.details.panorama_upload_hint', { defaultValue: 'Bấm để tải ảnh panorama' })}</div>}
               </div>
         <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onClick={(e) => { (e.currentTarget as HTMLInputElement).value = ''; }} onChange={e => {
           const file = e.target.files?.[0] ?? null;
@@ -308,7 +308,7 @@ function PanoramaSection({
         }} />
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginTop: 10 }}>
           <input type="checkbox" checked={clearPanorama} onChange={e => setClearPanorama(e.target.checked)} />
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('tables.details.panorama_clear', { ns: 'dashboard', defaultValue: 'Xóa ảnh panorama hiện tại' })}</span>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('dashboard.tables.details.panorama_clear', { defaultValue: 'Xóa ảnh panorama hiện tại' })}</span>
           </label>
       </div>
     </motion.div>
@@ -335,11 +335,11 @@ function DynamicLoadingOverlay({ isSaving }: { isSaving: boolean }) {
 
   const OVERLAY_STATES = [
     { 
-      text: t('tables.details.saving_step1', { ns: 'dashboard', defaultValue: 'Đang lưu thay đổi...' }), 
+      text: t('dashboard.tables.details.saving_step1', { defaultValue: 'Đang lưu thay đổi...' }), 
       icon: <Spin size="large" /> 
     },
     { 
-      text: t('tables.details.saving_step2', { ns: 'dashboard', defaultValue: 'Đang xử lý hình ảnh độ phân giải cao...' }), 
+      text: t('dashboard.tables.details.saving_step2', { defaultValue: 'Đang xử lý hình ảnh độ phân giải cao...' }), 
       icon: (
         <div style={{ display: 'flex', gap: '12px' }}>
           <div className="w-4 h-4 bg-white rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
@@ -349,7 +349,7 @@ function DynamicLoadingOverlay({ isSaving }: { isSaving: boolean }) {
       )
     },
     { 
-      text: t('tables.details.saving_step3', { ns: 'dashboard', defaultValue: 'Đang tải lên máy chủ Cloudinary...' }), 
+      text: t('dashboard.tables.details.saving_step3', { defaultValue: 'Đang tải lên máy chủ Cloudinary...' }), 
       icon: (
         <div style={{ position: 'relative', width: '48px', height: '48px' }}>
           <div className="absolute inset-0 border-4 border-t-[var(--primary)] border-r-transparent border-b-[var(--primary)] border-l-transparent rounded-full animate-spin"></div>
@@ -358,7 +358,7 @@ function DynamicLoadingOverlay({ isSaving }: { isSaving: boolean }) {
       )
     },
     { 
-      text: t('tables.details.saving_step4', { ns: 'dashboard', defaultValue: 'Sẽ hơi lâu đấy, cảm phiền đợi xíu nhé...' }), 
+      text: t('dashboard.tables.details.saving_step4', { defaultValue: 'Sẽ hơi lâu đấy, cảm phiền đợi xíu nhé...' }), 
       icon: (
         <div style={{ display: 'flex', gap: '16px' }}>
           <div className="w-3 h-3 bg-red-400 rounded-full animate-ping"></div>
@@ -425,7 +425,7 @@ export const TableDetailsDrawer: React.FC<TableDetailsDrawerProps> = ({
 }) => {
   const { t } = useTranslation();
   const tDetails = (key: string, options?: Record<string, unknown>) =>
-    t(`tables.details.${key}`, { ns: "dashboard", ...options });
+    t(`dashboard.tables.details.${key}`, options);
   const [formData, setFormData] = React.useState({
     number: "",
     capacity: 4,
@@ -483,15 +483,15 @@ export const TableDetailsDrawer: React.FC<TableDetailsDrawerProps> = ({
     const newErrors: Record<string, string> = {};
     if (isDeco) {
       if (!decoName.trim()) {
-        newErrors.number = "Tên vật phẩm trang trí không được để trống";
+        newErrors.number = tDetails("errors.deco_name_required", { defaultValue: "Tên vật phẩm trang trí không được để trống" });
       }
     } else {
       if (!formData.number.trim())
         newErrors.number = tDetails("errors.number_required");
       if (formData.capacity < 1)
-        newErrors.capacity = t("table_form.errors.capacity_min");
+        newErrors.capacity = t("dashboard.tables.add_table_modal.errors.capacity_min");
       if (formData.capacity > 20)
-        newErrors.capacity = t("table_form.errors.capacity_max");
+        newErrors.capacity = t("dashboard.tables.add_table_modal.errors.capacity_max");
     }
     if (formData.width < 20) newErrors.width = tDetails("errors.width_too_small");
     if (formData.height < 20) newErrors.height = tDetails("errors.height_too_small");
@@ -769,7 +769,7 @@ export const TableDetailsDrawer: React.FC<TableDetailsDrawerProps> = ({
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
                           <div>
                             <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 8 }}>
-                              Loại vật phẩm trang trí
+                              {tDetails("deco_type", { defaultValue: "Loại vật phẩm trang trí" })}
                             </label>
                             <DropDown
                               value={decoType}
@@ -786,14 +786,14 @@ export const TableDetailsDrawer: React.FC<TableDetailsDrawerProps> = ({
                                 border: "2px solid var(--border)",
                               }}
                             >
-                              <option value="PLANT">Cây cảnh (Plant)</option>
-                              <option value="WALL">Tường / Vách ngăn (Wall)</option>
-                              <option value="RECEPTION">Quầy lễ tân (Reception Counter)</option>
+                              <option value="PLANT">{tDetails("deco_type_plant", { defaultValue: "Cây cảnh (Plant)" })}</option>
+                              <option value="WALL">{tDetails("deco_type_wall", { defaultValue: "Tường / Vách ngăn (Wall)" })}</option>
+                              <option value="RECEPTION">{tDetails("deco_type_reception", { defaultValue: "Quầy lễ tân (Reception Counter)" })}</option>
                             </DropDown>
                           </div>
                           <div>
                             <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 8 }}>
-                              Tên vật phẩm
+                              {tDetails("deco_name", { defaultValue: "Tên vật phẩm" })}
                             </label>
                             <input
                               type="text"
@@ -820,7 +820,7 @@ export const TableDetailsDrawer: React.FC<TableDetailsDrawerProps> = ({
 
                         <div>
                           <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 8 }}>
-                            Góc xoay (độ)
+                            {tDetails("deco_rotation", { defaultValue: "Góc xoay (độ)" })}
                           </label>
                           <input
                             type="number"
@@ -1194,7 +1194,7 @@ export const TableDetailsDrawer: React.FC<TableDetailsDrawerProps> = ({
                       style={{ animation: "spin 1s linear infinite" }}>
                       <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0" strokeLinecap="round" />
                     </svg>
-                    {t('tables.details.save_changes', { ns: 'dashboard', defaultValue: 'Save Changes' })}...
+                    {t('dashboard.tables.details.save_changes', { defaultValue: 'Save Changes' })}...
                   </>
                 ) : (
                   <>
@@ -1209,7 +1209,7 @@ export const TableDetailsDrawer: React.FC<TableDetailsDrawerProps> = ({
                       <polyline points="17 21 17 13 7 13 7 21" />
                       <polyline points="7 3 7 8 15 8" />
                     </svg>
-                    {t('tables.details.save_changes', { ns: 'dashboard', defaultValue: 'Save changes' })}
+                    {t('dashboard.tables.details.save_changes', { defaultValue: 'Save changes' })}
                   </>
                 )}
               </motion.button>

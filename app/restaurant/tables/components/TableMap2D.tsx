@@ -38,6 +38,8 @@ interface TableMap2DProps {
   focusOnSelected?: boolean;
 }
 
+const WOOD_FLOOR_PATTERN = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iODAiIHZpZXdCb3g9IjAgMCA4MCA4MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cGF0dGVybiBpZD0iaGVycmluZ2JvbmUiIHdpZHRoPSI4MCIgaGVpZ2h0PSI4MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgcGF0dGVyblRyYW5zZm9ybT0icm90YXRlKDQ1KSI+CiAgICA8cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMjAiIGhlaWdodD0iODAiIGZpbGw9IiNiODlkODIiIHN0cm9rZT0iIzhjNzM1YSIgc3Ryb2tlLXdpZHRoPSIwLjUiLz4KICAgIDxyZWN0IHg9IjIwIiB5PSI0MCIgd2lkdGg9IjIwIiBoZWlnaHQ9IjgwIiBmaWxsPSIjYTQ4YTcwIiBzdHJva2U9IiM4YzczNWEiIHN0cm9rZS13aWR0aD0iMC41Ii8+CiAgICA8cmVjdCB4PSI0MCIgeT0iMCIgd2lkdGg9IjIwIiBoZWlnaHQ9IjgwIiBmaWxsPSIjYzhhZDkzIiBzdHJva2U9IiM4YzczNWEiIHN0cm9rZS13aWR0aD0iMC41Ii8+CiAgICA8cmVjdCB4PSI2MCIgeT0iNDAiIHdpZHRoPSIyMCIgaGVpZ2h0PSI4MCIgZmlsbD0iI2IwOTU3YiIgc3Ryb2tlPSIjOGM3MzVhIiBzdHJva2Utd2lkdGg9IjAuNSIvPgogIDwvcGF0dGVybj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2hlcnJpbmdib25lKSIvPgo8L3N2Zz4=";
+
 /* ══════════════════════════════════════════════
    Main TableMap2D Component
    ══════════════════════════════════════════════ */
@@ -903,15 +905,42 @@ export const TableMap2D: React.FC<TableMap2DProps> = ({
               willChange: isGestureZooming ? "transform" : "auto",
               backfaceVisibility: "hidden",
               WebkitBackfaceVisibility: "hidden",
-              backgroundColor: "white",
-              backgroundImage: activeFloor.backgroundImage ? `url(${activeFloor.backgroundImage})` : undefined,
-              backgroundSize: "contain",
-              backgroundRepeat: "no-repeat",
+              backgroundColor: "#b89d82",
+              backgroundImage: activeFloor.backgroundImage 
+                ? `url(${activeFloor.backgroundImage})` 
+                : `url("${WOOD_FLOOR_PATTERN}")`,
+              backgroundSize: activeFloor.backgroundImage ? "contain" : "auto",
+              backgroundRepeat: activeFloor.backgroundImage ? "no-repeat" : "repeat",
               backgroundPosition: "center",
               border: activeFloor.backgroundImage ? "none" : "1px solid var(--border)",
               borderRadius: 8,
             }}
           >
+            {/* Floor Name Watermark */}
+            <div
+              style={{
+                position: "absolute",
+                left: "50%",
+                top: "45%",
+                transform: "translate(-50%, -50%)",
+                fontSize: "3rem",
+                fontWeight: 900,
+                color: "rgba(255, 255, 255, 0.22)",
+                fontFamily: "var(--font-sans), sans-serif",
+                pointerEvents: "none",
+                userSelect: "none",
+                zIndex: 0,
+                textTransform: "uppercase",
+                letterSpacing: "0.18em",
+                textShadow: "0 2px 4px rgba(0,0,0,0.08)",
+                textAlign: "center",
+                width: "100%",
+                padding: "0 20px",
+                boxSizing: "border-box",
+              }}
+            >
+              {activeFloor.name}
+            </div>
             {/* Grid Overlay */}
             {showGrid && !isGestureZooming && (
               <div

@@ -1169,13 +1169,22 @@
         "errors": {
           "number_required": "Table number is required",
           "capacity_min": "Minimum capacity is 1",
-          "capacity_max": "Maximum capacity is 20"
+          "capacity_max": "Maximum capacity is 20",
+          "deco_name_required": "Please enter decoration name"
         },
         "areas": {
           "vip": "VIP Section",
           "indoor": "Indoor Dining",
           "outdoor": "Outdoor Terrace"
-        }
+        },
+        "tab_table": "Dining Table",
+        "tab_deco": "Decoration",
+        "deco_type": "Decoration Type",
+        "deco_type_plant": "Potted Plant",
+        "deco_type_wall": "Wall Partition",
+        "deco_type_reception": "Reception Counter",
+        "deco_name": "Decoration Name",
+        "deco_name_placeholder": "E.g., Corner plant, Wall partition 1..."
       },
       "stats": {
         "total_tables": "Total Tables",
@@ -1250,8 +1259,55 @@
         "errors": {
           "number_required": "Table code is required",
           "width_too_small": "Width must be at least 20",
-          "height_too_small": "Height must be at least 20"
-        }
+          "height_too_small": "Height must be at least 20",
+          "deco_name_required": "Decoration name cannot be empty"
+        },
+        "panorama_title": "360° Panorama Image",
+        "panorama_save": "Save Image",
+        "panorama_clear": "Delete current panorama image",
+        "panorama_upload_hint": "Click to upload a panorama image",
+        "saving_step1": "Saving changes...",
+        "saving_step2": "Processing high resolution image...",
+        "saving_step3": "Uploading to Cloudinary...",
+        "saving_step4": "This might take a while, please wait...",
+        "deco_type": "Decoration Type",
+        "deco_type_plant": "Potted Plant",
+        "deco_type_wall": "Wall Partition",
+        "deco_type_reception": "Reception Counter",
+        "deco_name": "Item Name",
+        "deco_rotation": "Rotation angle (deg)",
+        "edit_table_config": "⚙️ Edit table configuration"
+      },
+      "operational_modal": {
+        "title": "Table Management: {{number}}",
+        "current_status": "Current Status",
+        "status_occupied": "Occupied",
+        "status_available": "Available (Ready)",
+        "seats": "{{count}} seats",
+        "session_info": "Session Info",
+        "order_code": "Order Code:",
+        "btn_unlock": "🟢 Unlock & Use Dining Table",
+        "btn_transfer": "🔄 Transfer Table",
+        "btn_merge": "🔗 Merge Table",
+        "btn_checkout": "🔴 Checkout & Close Table",
+        "download_qr": "📥 Download QR Code image for this table",
+        "go_to_menu": "🔗 Go to table order page (Menu)"
+      },
+      "transfer_modal": {
+        "title": "Transfer Session to Another Table",
+        "description": "Select an empty table to transfer the current session and order (if any) from table <strong>{{number}}</strong>.",
+        "target_label": "Select target empty table *",
+        "select_placeholder": "Select empty table",
+        "confirm": "Confirm transfer",
+        "cancel": "Cancel"
+      },
+      "merge_modal": {
+        "title": "Merge Dining Tables",
+        "description": "Select an active table (occupied) to merge the session of table <strong>{{number}}</strong>. Both tables will link to the same order.",
+        "target_label": "Select target table to merge *",
+        "select_placeholder": "Select occupied table",
+        "confirm": "Confirm merge",
+        "cancel": "Cancel"
       }
     },
     "toasts": {
