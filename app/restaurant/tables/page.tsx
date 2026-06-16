@@ -9,6 +9,7 @@ import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import { useAuth } from "@/lib/contexts/AuthContext";
 import { useTenant } from "@/lib/contexts/TenantContext";
 import axiosInstance from "@/lib/services/axiosInstance";
+import { TableMap2D } from "./components/TableMap2D";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 const getQrDownloadUrl = (qrText: string) => {
@@ -93,8 +94,6 @@ export default function TablesManagementPage() {
   const [sessionActionTable, setSessionActionTable] = useState<Table | null>(null);
   const [transferTargetTableId, setTransferTargetTableId] = useState<string>("");
   const [mergeTargetTableId, setMergeTargetTableId] = useState<string>("");
-
-  const canvasRef = useRef<HTMLDivElement>(null);
 
   // 1. Initial Page Authorization & Data Loading
   useEffect(() => {
@@ -206,43 +205,40 @@ export default function TablesManagementPage() {
   }, [user?.restaurantId, selectedFloorId, viewMode]);
 
   // 3. Drag and Drop Layout Editor Logic
-  const handleTableMouseDown = (e: React.MouseEvent, tableId: string) => {
-    if (viewMode !== "edit") return;
-    e.preventDefault();
+  const handleTablePositionChange = (tableId: string, position: { x: number; y: number }) => {
+    setTables((prev) =>
+      prev.map((t) => (t.id === tableId ? { ...t, positionX: position.x, positionY: position.y } : t))
+    );
     setSelectedTableId(tableId);
+    setIsModified(true);
+  };
 
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+  const handleTableResize = (tableId: string, size: { width: number; height: number }) => {
+    setTables((prev) =>
+      prev.map((t) => (t.id === tableId ? { ...t, width: size.width, height: size.height } : t))
+    );
+    setIsModified(true);
+  };
 
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const table = tables.find((t) => t.id === tableId);
-    if (!table) return;
+  const uploadFloorBackground = async (floorId: string, file: File) => {
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      formData.append("folder", "xfoodi/floors");
+      const uploadRes = await axiosInstance.post("/upload/image", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      const imageUrl = uploadRes.data?.data?.url || uploadRes.data?.url;
+      if (!imageUrl) throw new Error("Không nhận được URL ảnh");
 
-    const startPosX = table.positionX;
-    const startPosY = table.positionY;
-
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      const deltaX = moveEvent.clientX - startX;
-      const deltaY = moveEvent.clientY - startY;
-
-      // Restrict within canvas boundary
-      const newX = Math.max(0, Math.min(canvas.clientWidth - table.width, startPosX + deltaX));
-      const newY = Math.max(0, Math.min(canvas.clientHeight - table.height, startPosY + deltaY));
-
-      setTables((prev) =>
-        prev.map((t) => (t.id === tableId ? { ...t, positionX: newX, positionY: newY } : t))
-      );
-      setIsModified(true);
-    };
-
-    const handleMouseUp = () => {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-    };
-
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
+      const res = await axiosInstance.put(`/floors/${floorId}`, { imageUrl });
+      if (res.data.success) {
+        message.success("Đã cập nhật ảnh sơ đồ mặt bằng");
+        loadFloors();
+      }
+    } catch (err: any) {
+      message.error(err.response?.data?.message || "Không thể tải ảnh sơ đồ mặt bằng");
+    }
   };
 
   const saveLayout = async () => {
@@ -684,113 +680,34 @@ export default function TablesManagementPage() {
                   </div>
                 ) : (
                   <div className="flex flex-col lg:flex-row gap-6 items-start">
-                    
+
                     {/* The Visual map container */}
-                    <div className="flex-1 w-full overflow-auto bg-gray-50 dark:bg-[#0E131F] rounded-2xl border p-4 flex justify-center items-center" style={{ borderColor: "var(--border)", minHeight: "500px" }}>
-                      <div
-                        ref={canvasRef}
-                        className="relative bg-white dark:bg-[#181F2E] rounded-xl shadow-md border overflow-hidden transition-all duration-300"
-                        style={{
-                          width: `${canvasWidth}px`,
-                          height: `${canvasHeight}px`,
-                          borderColor: "var(--border)",
-                          backgroundImage: "radial-gradient(var(--border) 1px, transparent 1px)",
-                          backgroundSize: "20px 20px",
-                        }}
-                      >
-                        {/* Floor Name Label indicator */}
-                        <div className="absolute top-3 left-3 bg-black/5 dark:bg-white/5 backdrop-blur px-3 py-1 rounded-lg text-xs font-bold text-gray-500 pointer-events-none">
-                          {activeFloor?.name} ({canvasWidth}px x {canvasHeight}px)
+                    <div className="flex-1 w-full">
+                      {tables.length === 0 && (
+                        <div className="text-center text-gray-400 dark:text-gray-500 text-sm pb-2">
+                          Không có bàn ăn trên tầng này
+                          {viewMode === "edit" && <span className="text-xs ml-1">— Chọn "Thêm bàn ăn" để bắt đầu đặt bàn</span>}
                         </div>
-
-                        {/* Rendering positioned tables */}
-                        {tables.length === 0 ? (
-                          <div className="w-full h-full flex flex-col items-center justify-center p-8 text-gray-400 dark:text-gray-500 pointer-events-none">
-                            <span className="text-sm">Không có bàn ăn trên tầng này</span>
-                            {viewMode === "edit" && <span className="text-xs mt-1">Chọn "Thêm bàn ăn" để bắt đầu đặt bàn</span>}
-                          </div>
-                        ) : (
-                          tables.map((t) => {
-                            const isSelected = selectedTableId === t.id && viewMode === "edit";
-                            const isOccupied = t.status === "OCCUPIED";
-                            const isReserved = t.status === "RESERVED";
-                            const isVip = t.type === "VIP";
-
-                            // Color map
-                            let statusBg = "rgba(34, 197, 94, 0.1)"; // Available green soft
-                            let statusBorder = "#22c55e";
-                            let glowShadow = "rgba(34, 197, 94, 0.2) 0px 0px 15px";
-
-                            if (isOccupied) {
-                              statusBg = "rgba(239, 68, 68, 0.1)"; // Occupied red soft
-                              statusBorder = "#ef4444";
-                              glowShadow = "rgba(239, 68, 68, 0.3) 0px 0px 15px";
-                            } else if (isReserved) {
-                              statusBg = "rgba(245, 158, 11, 0.1)"; // Reserved orange soft
-                              statusBorder = "#f59e0b";
-                              glowShadow = "rgba(245, 158, 11, 0.3) 0px 0px 15px";
-                            }
-
-                            if (isSelected) {
-                              statusBorder = "#FF5A2C";
-                              glowShadow = "rgba(255, 90, 44, 0.6) 0px 0px 20px";
-                            }
-
-                            const shapeStyle =
-                              t.shape === "Round" ? { borderRadius: "9999px" } : { borderRadius: "8px" };
-
-                            return (
-                              <div
-                                key={t.id}
-                                onMouseDown={(e) => handleTableMouseDown(e, t.id)}
-                                onClick={() => handleTableClick(t)}
-                                className={`absolute select-none flex flex-col items-center justify-center p-1 cursor-pointer transition-shadow border-2 ${
-                                  isSelected ? "z-20 scale-105" : "z-10"
-                                }`}
-                                style={{
-                                  left: `${t.positionX}px`,
-                                  top: `${t.positionY}px`,
-                                  width: `${t.width}px`,
-                                  height: `${t.height}px`,
-                                  transform: `rotate(${t.rotation}deg)`,
-                                  background: statusBg,
-                                  borderColor: statusBorder,
-                                  boxShadow: glowShadow,
-                                  ...shapeStyle,
-                                }}
-                              >
-                                {isVip && (
-                                  <div className="absolute -top-3 text-[10px] bg-yellow-500 text-white font-black px-1 py-0.5 rounded leading-none">
-                                    VIP
-                                  </div>
-                                )}
-                                <span className="text-xs font-black text-gray-900 dark:text-white">
-                                  {t.code}
-                                </span>
-                                <span className="text-[10px] text-gray-500 dark:text-gray-400">
-                                  {t.seatingCapacity} chỗ
-                                </span>
-
-                                {/* pulsing dot inside table */}
-                                <span className="relative flex h-2 w-2 mt-1">
-                                  {isOccupied && (
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                  )}
-                                  <span
-                                    className={`relative inline-flex rounded-full h-2 w-2 ${
-                                      isOccupied
-                                        ? "bg-red-500"
-                                        : isReserved
-                                        ? "bg-yellow-500"
-                                        : "bg-green-500"
-                                    }`}
-                                  ></span>
-                                </span>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
+                      )}
+                      <TableMap2D
+                        floor={{
+                          id: activeFloor!.id,
+                          name: activeFloor!.name,
+                          width: canvasWidth,
+                          height: canvasHeight,
+                          imageUrl: activeFloor!.imageUrl,
+                        }}
+                        tables={tables}
+                        selectedTableId={viewMode === "edit" ? selectedTableId : null}
+                        readOnly={viewMode !== "edit"}
+                        onTableClick={(tableId) => {
+                          const target = tables.find((t) => t.id === tableId);
+                          if (target) handleTableClick(target);
+                        }}
+                        onTablePositionChange={handleTablePositionChange}
+                        onTableResize={handleTableResize}
+                        onBackgroundImageUpload={uploadFloorBackground}
+                      />
                     </div>
 
                     {/* Properties panel on the right (only for Edit Mode) */}

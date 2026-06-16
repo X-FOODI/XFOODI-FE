@@ -574,6 +574,15 @@
         "grid": "Grid",
         "map": "Map"
       },
+      "map_controls": {
+        "zoom_out": "Zoom out",
+        "zoom_in": "Zoom in",
+        "zoom_fit": "Fit",
+        "upload_floorplan": "Upload floor plan",
+        "show_grid": "Show grid",
+        "floor_dimensions": "Floor size",
+        "tables_on_floor": "tables"
+      },
       "zones": {
         "all": "All",
         "zone_a": "Zone A",
