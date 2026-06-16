@@ -5,13 +5,14 @@ import { AuthProvider } from "@/lib/contexts/AuthContext";
 import { CartProvider } from "@/lib/contexts/CartContext";
 import { TenantProvider } from "@/lib/contexts/TenantContext";
 import { ToastProvider } from "@/lib/contexts/ToastContext";
-import { ChatAssistant } from "@/components/ui/ChatAssistant";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Suspense } from "react";
 import "timepicker-ui/main.css";
 import "./globals.css";
 import AntdProvider from "./theme/AntdProvider";
+
+import { ChatAssistantClient } from "@/components/ui/ChatAssistantClient";
 
 const inter = Inter({ subsets: ["latin", "vietnamese"] });
 
@@ -148,7 +149,7 @@ export default function RootLayout({
                   <AntdProvider>
                     <CartProvider>
                       {children}
-                      <ChatAssistant />
+                      <ChatAssistantClient />
                     </CartProvider>
                   </AntdProvider>
                 </ToastProvider>

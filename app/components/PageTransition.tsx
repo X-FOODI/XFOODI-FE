@@ -298,9 +298,16 @@ const PageTransition: React.FC<PageTransitionProps> = ({
 
       {/* Page content - hidden during loading */}
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: isLoading ? 0 : 1 }}
-        transition={{ duration: 0.3 }}
+        initial={{ opacity: 0, y: 30, scale: 0.98 }}
+        animate={{ 
+          opacity: isLoading ? 0 : 1, 
+          y: isLoading ? 30 : 0, 
+          scale: isLoading ? 0.98 : 1 
+        }}
+        transition={{ 
+          duration: 1.0, 
+          ease: [0.16, 1, 0.3, 1] 
+        }}
         style={{
           visibility: isLoading ? 'hidden' : 'visible',
         }}

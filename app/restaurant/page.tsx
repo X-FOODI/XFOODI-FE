@@ -9,6 +9,28 @@ import Footer from "../components/Footer";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { Button } from "antd";
+import { useAuth } from "@/lib/contexts/AuthContext";
+import authService from "@/lib/services/authService";
+
+const resolveRestaurantUrl = (url: string) => {
+  if (!url) return "#";
+  
+  const isHomepage = typeof window !== "undefined" && 
+    (window.location.pathname === "/" || window.location.pathname === "/restaurant");
+
+  let target = url;
+  if (url === "/menu" || url === "menu") {
+    target = "/restaurant/menu";
+  } else if (url === "/reservation" || url === "reservation" || url === "#reservation") {
+    target = "/restaurant/reservations/new";
+  }
+
+  if (target.startsWith("#") && !isHomepage) {
+    return `/restaurant${target}`;
+  }
+
+  return target;
+};
 
 // ── Icons (inline SVG to avoid MUI dependency issues) ──────────────────────────
 const Icon = {
@@ -298,10 +320,862 @@ function MapEmbed({ address, lat, lng }: { address: string; lat?: number | null;
   );
 }
 
-// ── Main page ──────────────────────────────────────────────────────────────────
+// ── Published Layout Renderers ──────────────────────────────────────────────────
+
+function PublishedHeader({ props, brandColor }: { props: any; brandColor: string }) {
+  const links = Array.isArray(props.links) ? props.links : [];
+
+  return (
+    <header 
+      style={{ 
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 1000,
+        padding: "16px 24px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        background: "var(--card, #FFFFFF)", 
+        borderBottom: "1px solid var(--border, #E2E8F0)",
+        backdropFilter: "blur(20px)",
+        height: 72,
+      }}
+    >
+      <div style={{ maxWidth: 1200, margin: "0 auto", width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        {/* Logo and Business Name */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {props.logoUrl ? (
+            <div style={{ width: 40, height: 40, borderRadius: 8, overflow: "hidden", border: "1px solid var(--border)" }}>
+              <img src={props.logoUrl} alt={props.businessName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            </div>
+          ) : (
+            <div 
+              style={{ 
+                width: 40, 
+                height: 40, 
+                borderRadius: 8, 
+                display: "flex", 
+                alignItems: "center", 
+                justifyContent: "center", 
+                fontWeight: "bold", 
+                fontSize: 18, 
+                color: "#fff",
+                background: brandColor,
+              }}
+            >
+              {props.businessName ? props.businessName.charAt(0).toUpperCase() : "R"}
+            </div>
+          )}
+          <span style={{ fontWeight: 800, fontSize: 18, color: "var(--text)" }}>
+            {props.businessName || "Restaurant"}
+          </span>
+        </div>
+
+        {/* Navigation Links */}
+        <nav style={{ display: "flex", alignItems: "center", gap: 24 }} className="hidden md:flex">
+          {links.map((link: any, i: number) => (
+            <a
+              key={i}
+              href={resolveRestaurantUrl(link.href)}
+              style={{ 
+                fontSize: 14,
+                fontWeight: 600,
+                color: "var(--text-muted)",
+                textDecoration: "none",
+                transition: "color 0.2s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = brandColor;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = "var(--text-muted)";
+              }}
+            >
+              {link.label}
+            </a>
+          ))}
+        </nav>
+
+        {/* Action Button */}
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", fontSize: 12, fontWeight: 600, gap: 6, padding: "4px 10px", borderRadius: 6, border: "1px solid var(--border)", color: "var(--text-muted)" }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#22c55e" }} />
+            Open Now
+          </span>
+          
+          {props.ctaText && (
+            <a
+              href={resolveRestaurantUrl(props.ctaLink)}
+              style={{
+                background: brandColor,
+                color: "#fff",
+                textDecoration: "none",
+                padding: "10px 24px",
+                borderRadius: "8px",
+                fontSize: "14px",
+                fontWeight: "bold",
+                display: "inline-block",
+                transition: "transform 0.2s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-1px)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "none";
+              }}
+            >
+              {props.ctaText}
+            </a>
+          )}
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function PublishedHero({ props, brandColor }: { props: any; brandColor: string }) {
+  const hasLogo = !!props.logoUrl;
+
+  return (
+    <section
+      style={{
+        position: "relative",
+        minHeight: "75vh",
+        display: "flex",
+        alignItems: "center",
+        padding: "80px 24px",
+        background: `linear-gradient(135deg,rgba(0,0,0,${(props.overlayOpacity || 0.65) * 1.3}) 0%,rgba(0,0,0,${props.overlayOpacity || 0.65}) 100%), url(${props.backgroundImage || "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1600&auto=format&fit=crop&q=80"})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        color: "#fff",
+      }}
+    >
+      <div style={{ maxWidth: 1200, margin: "0 auto", width: "100%", zIndex: 2 }}>
+        {hasLogo ? (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+            {/* Left Content Column */}
+            <div className="lg:col-span-7 text-left space-y-6">
+              <motion.h1
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                style={{ fontSize: "clamp(2.2rem,5vw,3.8rem)", fontWeight: 900, lineHeight: 1.1, margin: 0 }}
+              >
+                {props.title}
+              </motion.h1>
+              <motion.p
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                style={{ fontSize: "clamp(1rem,1.8vw,1.2rem)", color: "rgba(255,255,255,0.85)", margin: 0, lineHeight: 1.6 }}
+              >
+                {props.subtitle}
+              </motion.p>
+              {props.ctaText && (
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="pt-2">
+                  <Link href={resolveRestaurantUrl(props.ctaLink || "#reservation")}>
+                    <Button
+                      type="primary"
+                      size="large"
+                      style={{
+                        background: brandColor,
+                        borderColor: brandColor,
+                        height: 56,
+                        padding: "0 44px",
+                        fontWeight: 700,
+                        fontSize: 17,
+                        boxShadow: `0 8px 24px ${brandColor}40`,
+                        borderRadius: 8,
+                      }}
+                    >
+                      {props.ctaText}
+                    </Button>
+                  </Link>
+                </motion.div>
+              )}
+            </div>
+
+            {/* Right Logo Column */}
+            <div className="lg:col-span-5 flex justify-center">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.1, duration: 0.5 }}
+                className="flex items-center justify-center overflow-hidden transition-all duration-300 hover:scale-105"
+                style={{
+                  width: 240,
+                  height: 240,
+                  borderRadius: "24%",
+                  background: "rgba(255,255,255,0.1)",
+                  border: "3px solid rgba(255,255,255,0.2)",
+                  backdropFilter: "blur(16px)",
+                  boxShadow: "0 20px 48px rgba(0,0,0,0.3)",
+                }}
+              >
+                <img
+                  src={props.logoUrl}
+                  alt={props.title}
+                  style={{ width: "88%", height: "88%", objectFit: "contain" }}
+                />
+              </motion.div>
+            </div>
+          </div>
+        ) : (
+          /* Standard Centered Layout */
+          <div style={{ textAlign: "center" }} className="space-y-6">
+            <motion.h1
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              style={{ fontSize: "clamp(2.5rem,6vw,4.2rem)", fontWeight: 900, lineHeight: 1.1, marginBottom: 16 }}
+            >
+              {props.title}
+            </motion.h1>
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              style={{ fontSize: "clamp(1.1rem,2vw,1.4rem)", color: "rgba(255,255,255,0.85)", marginBottom: 32 }}
+            >
+              {props.subtitle}
+            </motion.p>
+            {props.ctaText && (
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+                <Link href={resolveRestaurantUrl(props.ctaLink || "#reservation")}>
+                  <Button
+                    type="primary"
+                    size="large"
+                    style={{
+                      background: brandColor,
+                      borderColor: brandColor,
+                      height: 56,
+                      padding: "0 44px",
+                      fontWeight: 700,
+                      fontSize: 17,
+                      boxShadow: `0 8px 24px ${brandColor}40`,
+                      borderRadius: 8,
+                    }}
+                  >
+                    {props.ctaText}
+                  </Button>
+                </Link>
+              </motion.div>
+            )}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function PublishedStats({ props }: { props: any }) {
+  const stats = Array.isArray(props.stats) ? props.stats : [];
+  return (
+    <section
+      style={{
+        padding: "32px 24px",
+        background: props.backgroundColor || "var(--primary, #FF380B)",
+      }}
+    >
+      <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+          {stats.map((s: any, i: number) => (
+            <div key={i} className="space-y-1">
+              <p
+                style={{ color: "#fff", fontSize: "clamp(1.8rem, 3vw, 2.5rem)", fontWeight: 800, margin: 0 }}
+              >
+                {s.value}
+              </p>
+              <p
+                style={{ color: "rgba(255,255,255,0.85)", fontSize: 13, margin: 0 }}
+              >
+                {s.label}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PublishedInfoCards({ props, brandColor }: { props: any; brandColor: string }) {
+  const cards = Array.isArray(props.cards) ? props.cards : [];
+
+  const getIcon = (iconName: string) => {
+    switch (iconName) {
+      case "MapPin":
+        return <Icon.Location />;
+      case "Clock":
+        return <Icon.Clock />;
+      case "Phone":
+        return <Icon.Phone />;
+      default:
+        return <Icon.Location />;
+    }
+  };
+
+  return (
+    <section style={{ padding: "48px 24px", background: "var(--bg-base)" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {cards.map((card: any, i: number) => (
+            <div
+              key={i}
+              className="p-6 rounded-2xl border transition-all duration-300 hover:shadow-lg"
+              style={{
+                background: "var(--card)",
+                borderColor: "var(--border)",
+              }}
+            >
+              <div
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 12,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginBottom: 16,
+                  background: `${brandColor}18`,
+                  color: brandColor,
+                }}
+              >
+                {getIcon(card.icon)}
+              </div>
+              <h3
+                style={{ fontSize: 14, fontWeight: 700, marginBottom: 8, marginTop: 0, color: "var(--text)" }}
+              >
+                {card.title}
+              </h3>
+              <p
+                style={{ fontSize: 13, margin: 0, lineHeight: 1.5, color: "var(--text-muted)" }}
+              >
+                {card.content}
+              </p>
+              {card.sub && (
+                <p
+                  style={{ fontSize: 12, marginTop: 4, margin: 0, color: "var(--text-muted)", opacity: 0.8 }}
+                >
+                  {card.sub}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
+function PublishedAbout({ props, brandColor }: { props: any; brandColor: string }) {
+  return (
+    <section style={{ padding: "80px 24px", background: "var(--surface, var(--bg-base))" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+          <div className="space-y-6">
+            <span style={{ fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", color: brandColor }}>
+              {props.heading || "Về Chúng Tôi"}
+            </span>
+            <h2 style={{ fontSize: "clamp(1.8rem,3vw,2.5rem)", fontWeight: 800, color: "var(--text)", lineHeight: 1.2 }}>
+              Tinh Hoa Ẩm Thực
+            </h2>
+            <p style={{ fontSize: 15, color: "var(--text-muted)", lineHeight: 1.8 }}>{props.story}</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {(props.values || []).map((val: any, i: number) => (
+                <div key={i} className="flex gap-3">
+                  <span style={{ fontSize: 24, flexShrink: 0 }}>{val.icon}</span>
+                  <div>
+                    <h4 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{val.title}</h4>
+                    <p style={{ fontSize: 12, color: "var(--text-muted)" }}>{val.description}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{ borderRadius: 24, overflow: "hidden", height: 400, boxShadow: "0 12px 40px rgba(0,0,0,0.08)" }}>
+            <img
+              src={props.image || "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&auto=format&fit=crop&q=80"}
+              alt="Về chúng tôi"
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PublishedMenuGrid({ props, brandColor }: { props: any; brandColor: string }) {
+  const categories = Array.isArray(props.categories) ? props.categories : [];
+  return (
+    <section style={{ padding: "80px 24px", background: "var(--bg-base)" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+        <div style={{ textAlign: "center", marginBottom: 48 }}>
+          <span style={{ fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", color: brandColor }}>
+            Thực Đơn Của Quán
+          </span>
+          <h2 style={{ fontSize: "clamp(1.8rem,3vw,2.5rem)", fontWeight: 800, color: "var(--text)", marginTop: 8 }}>
+            {props.title}
+          </h2>
+          {props.subtitle && (
+            <p style={{ fontSize: 14, color: "var(--text-muted)", marginTop: 8 }}>{props.subtitle}</p>
+          )}
+        </div>
+
+        {categories.map((cat: any, ci: number) => (
+          <div key={ci} style={{ marginBottom: 48 }}>
+            <h3
+              style={{
+                fontSize: 18,
+                fontWeight: 800,
+                color: brandColor,
+                borderBottom: `2px solid ${brandColor}`,
+                paddingBottom: 6,
+                marginBottom: 24,
+                display: "inline-block",
+              }}
+            >
+              {cat.name}
+            </h3>
+            <div className={`grid gap-6 ${props.layout === "list" ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2"}`}>
+              {(cat.items || []).map((item: any, ii: number) => (
+                <div
+                  key={ii}
+                  className="flex gap-4 p-4 rounded-2xl animate-card"
+                  style={{ background: "var(--card)", border: "1px solid var(--border)", boxShadow: "0 2px 12px rgba(0,0,0,0.02)" }}
+                >
+                  {item.image && (
+                    <div style={{ width: 80, height: 80, borderRadius: 12, overflow: "hidden", flexShrink: 0 }}>
+                      <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", margin: 0 }}>{item.name}</h4>
+                        {item.badge && (
+                          <span
+                            className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full mt-1"
+                            style={{ background: `${brandColor}18`, color: brandColor }}
+                          >
+                            {item.badge}
+                          </span>
+                        )}
+                      </div>
+                      {props.showPrices !== false && (
+                        <span style={{ fontSize: 15, fontWeight: 800, color: brandColor }}>{item.price}</span>
+                      )}
+                    </div>
+                    <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 6, lineHeight: 1.5 }}>
+                      {item.description}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function PublishedOpeningHours({ props, brandColor }: { props: any; brandColor: string }) {
+  return (
+    <section style={{ padding: "80px 24px", background: "var(--surface, var(--bg-base))" }}>
+      <div style={{ maxWidth: 600, margin: "0 auto", textAlign: "center" }}>
+        <span style={{ fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", color: brandColor }}>
+          Thời Gian Phục Vụ
+        </span>
+        <h2 style={{ fontSize: "clamp(1.8rem,3vw,2.5rem)", fontWeight: 800, color: "var(--text)", margin: "8px 0 32px" }}>
+          {props.title}
+        </h2>
+        <div
+          className="space-y-4 text-left"
+          style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 20, padding: 24 }}
+        >
+          {(props.hours || []).map((h: any, i: number) => (
+            <div
+              key={i}
+              className="flex justify-between items-center py-2"
+              style={{ borderBottom: i < props.hours.length - 1 ? "1px solid var(--border)" : "none" }}
+            >
+              <span style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{h.day}</span>
+              <span style={{ fontSize: 14, color: h.closed ? "var(--text-muted)" : "var(--text)" }}>
+                {h.closed ? "Đóng Cửa" : `${h.open} - ${h.close}`}
+              </span>
+            </div>
+          ))}
+          {props.note && (
+            <p style={{ fontSize: 12, color: "var(--text-muted)", textAlign: "center", marginTop: 16 }}>ℹ️ {props.note}</p>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PublishedLocationMap({ props, brandColor }: { props: any; brandColor: string }) {
+  return (
+    <section style={{ padding: "80px 24px", background: "var(--bg-base)" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+        <div style={{ textAlign: "center", marginBottom: 48 }}>
+          <span style={{ fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", color: brandColor }}>
+            Tìm Đường Đến Quán
+          </span>
+          <h2 style={{ fontSize: "clamp(1.8rem,3vw,2.5rem)", fontWeight: 800, color: "var(--text)", margin: "8px 0 0" }}>
+            {props.title}
+          </h2>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
+          <div className="lg:col-span-2 space-y-6">
+            <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 20, padding: 24 }} className="space-y-4">
+              {[
+                { icon: <Icon.Location />, label: "Địa Chỉ", value: props.address },
+                { icon: <Icon.Phone />, label: "Điện Thoại", value: props.phone },
+                { icon: <Icon.Email />, label: "Email", value: props.email },
+              ].map((item, i) => (
+                <div key={i} className="flex gap-4">
+                  <div
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 8,
+                      background: `${brandColor}18`,
+                      color: brandColor,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {item.icon}
+                  </div>
+                  <div>
+                    <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)" }}>
+                      {item.label}
+                    </span>
+                    <p style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", margin: 0 }}>{item.value}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <Link href="/restaurant/reservations/new">
+              <Button type="primary" block size="large" style={{ background: brandColor, borderColor: brandColor, height: 54, fontWeight: 700, borderRadius: 8, fontSize: 16 }}>
+                Đặt Bàn Ngay
+              </Button>
+            </Link>
+          </div>
+          <div className="lg:col-span-3">
+            <MapEmbed address={props.address} lat={props.coordinates?.lat} lng={props.coordinates?.lng} />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PublishedFooter({ props, brandColor }: { props: any; brandColor: string }) {
+  return (
+    <footer style={{ background: "var(--card)", borderTop: "1px solid var(--border)", padding: "48px 24px" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto" }} className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="space-y-4">
+          <h3 style={{ fontSize: 18, fontWeight: 800, color: brandColor }}>{props.businessName}</h3>
+          <p style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.6 }}>{props.description}</p>
+        </div>
+        <div className="space-y-4">
+          <h4 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>Liên Kết</h4>
+          <ul className="space-y-2">
+            {(props.links || []).map((l: any, i: number) => (
+              <li key={i}>
+                <a href={resolveRestaurantUrl(l.href)} style={{ fontSize: 13, color: "var(--text-muted)", textDecoration: "none" }}>
+                  {l.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="space-y-4">
+          <h4 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>Mạng Xã Hội</h4>
+          <div className="flex gap-4">
+            {(props.socialMedia || []).map((s: any, i: number) => (
+              <a key={i} href={s.url} style={{ fontSize: 13, color: "var(--text-muted)" }}>
+                {s.platform}
+              </a>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div style={{ maxWidth: 1200, margin: "24px auto 0", paddingTop: 24, borderTop: "1px solid var(--border)", textAlign: "center" }}>
+        <p style={{ fontSize: 12, color: "var(--text-muted)" }}>{props.copyright}</p>
+      </div>
+    </footer>
+  );
+}
+
+function PublishedGallery({ props, brandColor }: { props: any; brandColor: string }) {
+  const images = Array.isArray(props.images) ? props.images : [];
+  return (
+    <section style={{ padding: "80px 24px", background: "var(--bg-base)" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+        <div style={{ textAlign: "center", marginBottom: 40 }}>
+          <span style={{ fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", color: brandColor }}>
+            Hình Ảnh
+          </span>
+          <h2 style={{ fontSize: "clamp(1.6rem,2.5vw,2.2rem)", fontWeight: 800, color: "var(--text)", margin: "8px 0 0" }}>
+            {props.title || "Hình Ảnh Nhà Hàng"}
+          </h2>
+        </div>
+        <Gallery images={images} />
+      </div>
+    </section>
+  );
+}
+
+function PublishedTestimonials({ props, brandColor }: { props: any; brandColor: string }) {
+  const reviews = Array.isArray(props.reviews) ? props.reviews : [];
+  return (
+    <section style={{ padding: "80px 24px", background: "var(--surface, var(--bg-base))" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+        <div style={{ textAlign: "center", marginBottom: 48 }}>
+          <span style={{ fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", color: brandColor }}>
+            Đánh Giá
+          </span>
+          <h2 style={{ fontSize: "clamp(1.8rem,3vw,2.5rem)", fontWeight: 800, color: "var(--text)", margin: "8px 0 0" }}>
+            {props.title || "Khách Hàng Nói Gì"}
+          </h2>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {reviews.map((r: any, i: number) => (
+            <div
+              key={i}
+              style={{
+                padding: 24,
+                borderRadius: 20,
+                background: "var(--card)",
+                border: "1px solid var(--border)",
+                boxShadow: "0 2px 12px rgba(0,0,0,0.02)",
+              }}
+            >
+              <div className="flex gap-1 mb-3">
+                {Array.from({ length: r.rating || 5 }).map((_, j) => (
+                  <Icon.Star key={j} />
+                ))}
+              </div>
+              <p style={{ fontSize: 14, color: "var(--text)", lineHeight: 1.6 }}>"{r.text}"</p>
+              <h4 style={{ fontSize: 13, fontWeight: 700, color: "var(--text-muted)", marginTop: 16 }}>— {r.name}</h4>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PublishedReservationCTA({ props, brandColor }: { props: any; brandColor: string }) {
+  return (
+    <section
+      style={{
+        position: "relative",
+        padding: "80px 24px",
+        background: `linear-gradient(135deg,rgba(0,0,0,0.75) 0%,rgba(0,0,0,0.75) 100%), url(${props.backgroundImage || "https://images.unsplash.com/photo-1559339352-11d035aa65de?w=1600&auto=format&fit=crop&q=80"})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        color: "#fff",
+        textAlign: "center",
+        borderRadius: 24,
+        margin: "0 24px 72px",
+        overflow: "hidden",
+      }}
+    >
+      <div style={{ maxWidth: 800, margin: "0 auto" }} className="space-y-6">
+        <h2 style={{ fontSize: "clamp(1.8rem,3vw,2.5rem)", fontWeight: 800 }}>{props.title}</h2>
+        <p style={{ fontSize: 15, color: "rgba(255,255,255,0.85)" }}>{props.description}</p>
+        <Link href={props.buttonLink || "/restaurant/reservations/new"}>
+          <Button type="primary" size="large" style={{ background: brandColor, borderColor: brandColor, height: 54, padding: "0 44px", fontWeight: 700, borderRadius: 8, fontSize: 16 }}>
+            {props.buttonText}
+          </Button>
+        </Link>
+      </div>
+    </section>
+  );
+}
+
+function PublishedContact({ props, brandColor }: { props: any; brandColor: string }) {
+  const [form, setForm] = useState({ name: "", email: "", phone: "", message: "" });
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    alert("Tin nhắn của bạn đã được gửi thành công! 🎉");
+    setForm({ name: "", email: "", phone: "", message: "" });
+  };
+  return (
+    <section style={{ padding: "80px 24px", background: "var(--bg-base)" }}>
+      <div style={{ maxWidth: 600, margin: "0 auto" }}>
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
+          <span style={{ fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", color: brandColor }}>
+            Liên Hệ
+          </span>
+          <h2 style={{ fontSize: "clamp(1.8rem,3vw,2.5rem)", fontWeight: 800, color: "var(--text)", margin: "8px 0 0" }}>
+            {props.title || "Liên Hệ Với Chúng Tôi"}
+          </h2>
+          {props.subtitle && <p style={{ fontSize: 14, color: "var(--text-muted)", marginTop: 8 }}>{props.subtitle}</p>}
+        </div>
+        <form
+          onSubmit={handleSubmit}
+          style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 20, padding: 24 }}
+          className="space-y-4"
+        >
+          {props.fields?.map((f: any, i: number) => (
+            <div key={i} className="flex flex-col gap-2">
+              <label style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{f.label}</label>
+              {f.type === "textarea" ? (
+                <textarea
+                  required={f.required}
+                  value={(form as any)[f.label.toLowerCase()] || ""}
+                  onChange={(e) => setForm({ ...form, [f.label.toLowerCase()]: e.target.value })}
+                  style={{
+                    padding: 12,
+                    borderRadius: 10,
+                    border: "1px solid var(--border)",
+                    background: "var(--bg-base)",
+                    color: "var(--text)",
+                    minHeight: 100,
+                  }}
+                />
+              ) : (
+                <input
+                  type={f.type}
+                  required={f.required}
+                  value={(form as any)[f.label.toLowerCase()] || ""}
+                  onChange={(e) => setForm({ ...form, [f.label.toLowerCase()]: e.target.value })}
+                  style={{
+                    padding: 12,
+                    borderRadius: 10,
+                    border: "1px solid var(--border)",
+                    background: "var(--bg-base)",
+                    color: "var(--text)",
+                  }}
+                />
+              )}
+            </div>
+          ))}
+          <Button type="primary" htmlType="submit" size="large" block style={{ background: brandColor, borderColor: brandColor, height: 48, fontWeight: 700 }}>
+            {props.submitText || "Gửi Tin Nhắn"}
+          </Button>
+        </form>
+      </div>
+    </section>
+  );
+}
+
+const ANIMATION_VARIANTS = {
+  none: {
+    initial: {},
+    whileInView: {},
+    transition: {}
+  },
+  fadeIn: {
+    initial: { opacity: 0 },
+    whileInView: { opacity: 1 },
+    transition: { duration: 0.8, ease: "easeOut" }
+  },
+  slideUp: {
+    initial: { opacity: 0, y: 50 },
+    whileInView: { opacity: 1, y: 0 },
+    transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] }
+  },
+  slideLeft: {
+    initial: { opacity: 0, x: 50 },
+    whileInView: { opacity: 1, x: 0 },
+    transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] }
+  }
+};
+
+function PublishedLayoutRenderer({ layout, brandColor }: { layout: any; brandColor: string }) {
+  const sections = Array.isArray(layout.sections) ? layout.sections : [];
+
+  return (
+    <div style={{ fontFamily: layout.theme?.fontFamily || "Inter, sans-serif" }}>
+      {sections
+        .filter((s: any) => s.visible)
+        .map((s: any) => {
+          const animType = (s.props?.animation as keyof typeof ANIMATION_VARIANTS) || "none";
+          const anim = ANIMATION_VARIANTS[animType] || ANIMATION_VARIANTS.none;
+
+          const renderedComponent = (() => {
+            switch (s.type) {
+              case "header":
+                return <PublishedHeader props={s.props} brandColor={brandColor} />;
+              case "hero":
+                return <PublishedHero props={s.props} brandColor={brandColor} />;
+              case "stats":
+                return <PublishedStats props={s.props} />;
+              case "info-cards":
+                return <PublishedInfoCards props={s.props} brandColor={brandColor} />;
+              case "about":
+                return <PublishedAbout props={s.props} brandColor={brandColor} />;
+              case "menu-grid":
+              case "menu-featured":
+                return <PublishedMenuGrid props={s.props} brandColor={brandColor} />;
+              case "opening-hours":
+                return <PublishedOpeningHours props={s.props} brandColor={brandColor} />;
+              case "location-map":
+                return <PublishedLocationMap props={s.props} brandColor={brandColor} />;
+              case "gallery":
+                return <PublishedGallery props={s.props} brandColor={brandColor} />;
+              case "testimonials":
+                return <PublishedTestimonials props={s.props} brandColor={brandColor} />;
+              case "reservation-cta":
+                return <PublishedReservationCTA props={s.props} brandColor={brandColor} />;
+              case "contact":
+                return <PublishedContact props={s.props} brandColor={brandColor} />;
+              case "footer":
+                return <PublishedFooter props={s.props} brandColor={brandColor} />;
+              default:
+                return null;
+            }
+          })();
+
+          if (!renderedComponent) return null;
+
+          const sectionId = (() => {
+            if (s.type === "menu-grid" || s.type === "menu-featured") return "menu";
+            if (s.type === "location-map" || s.type === "contact") return "contact";
+            if (s.type === "about") return "about";
+            if (s.type === "gallery") return "gallery";
+            if (s.type === "opening-hours") return "hours";
+            if (s.type === "testimonials") return "testimonials";
+            return undefined;
+          })();
+
+          if (s.type === "header" || s.type === "footer") {
+            return <div key={s.id} id={sectionId}>{renderedComponent}</div>;
+          }
+
+          return (
+            <motion.div
+              key={s.id}
+              id={sectionId}
+              initial={anim.initial}
+              whileInView={anim.whileInView}
+              viewport={{ once: true, margin: "-100px" }}
+              transition={anim.transition}
+            >
+              {renderedComponent}
+            </motion.div>
+          );
+        })}
+    </div>
+  );
+}
+
 export default function RestaurantLandingPage() {
   const { tenant, loading } = useTenant();
   const [restaurantData, setRestaurantData] = useState<any>(null);
+  const { user } = useAuth();
+  const [publishedLayout, setPublishedLayout] = useState<any>(null);
 
   // Fetch public restaurant data by slug — không cần auth
   useEffect(() => {
@@ -336,6 +1210,28 @@ export default function RestaurantLandingPage() {
     latitude: restaurantData?.latitude,
     longitude: restaurantData?.longitude,
   };
+
+  useEffect(() => {
+    if (!data.id) return;
+    
+    // Fetch published layout from builder using dynamic URL and disable cache
+    const builderUrl = process.env.NEXT_PUBLIC_BUILDER_URL || "http://localhost:3001";
+    fetch(`${builderUrl}/api/layouts?tenantId=${data.id}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((layouts) => {
+        if (Array.isArray(layouts)) {
+          const published = layouts.find((l: any) => l.status === "published");
+          if (published) {
+            setPublishedLayout(published);
+          }
+        }
+      })
+      .catch((err) => {
+        console.warn("Could not load published layout from MongoDB builder:", err);
+      });
+  }, [data.id]);
+
+  const isOwnerOrStaff = user && (user.restaurantId === data.id || user.restaurantSlug === data.slug);
   const brandColor = data.primaryColor || "#FF380B";
   const isPreview = !tenant;
 
@@ -344,6 +1240,12 @@ export default function RestaurantLandingPage() {
       document.documentElement.style.setProperty('--primary', brandColor);
     }
   }, [brandColor]);
+
+  useEffect(() => {
+    if (publishedLayout?.theme?.mode) {
+      document.documentElement.setAttribute('data-theme', publishedLayout.theme.mode);
+    }
+  }, [publishedLayout]);
 
   const address = [
     data.businessAddressLine1,
@@ -366,6 +1268,70 @@ export default function RestaurantLandingPage() {
           <p style={{ color: "var(--text-muted)", fontSize: 15 }}>Đang tải trang nhà hàng...</p>
         </div>
       </div>
+    );
+  }
+
+  if (publishedLayout) {
+    const hasHeader = publishedLayout.sections?.some((s: any) => s.type === "header" && s.visible);
+
+    return (
+      <PageTransition minimumLoadingTime={800}>
+        <div style={{ minHeight: "100vh", background: publishedLayout.theme?.mode === "light" ? "#F8FAFC" : "#0A0E14" }}>
+          {!hasHeader && <Header />}
+          <main style={{ paddingTop: hasHeader ? 72 : 84 }}>
+            {isPreview && (
+              <div style={{ background: "linear-gradient(90deg,#f59e0b,#d97706)", color: "#fff", textAlign: "center", padding: "10px 24px", fontSize: 13, fontWeight: 600 }}>
+                ⚠️ Chế độ xem trước — Chưa được cấu hình tên miền chính thức
+              </div>
+            )}
+            
+            <PublishedLayoutRenderer layout={publishedLayout} brandColor={brandColor} />
+
+            {/* Staff portal link */}
+            <section style={{ padding: "32px 24px", background: "var(--surface, var(--bg-base))", borderTop: "1px solid var(--border)" }}>
+              <div style={{ maxWidth: 1200, margin: "0 auto", textAlign: "center" }}>
+                <Link href="/admin">
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text-muted)", textDecoration: "underline", cursor: "pointer" }}>
+                    🔐 Cổng thông tin cho quản lý &amp; nhân viên nhà hàng
+                  </span>
+                </Link>
+              </div>
+            </section>
+          </main>
+
+          {/* Floating Edit Button for Owner/Staff */}
+          {isOwnerOrStaff && (
+            <div style={{ position: "fixed", bottom: 32, right: 32, zIndex: 9999 }}>
+              <a
+                href={`${process.env.NEXT_PUBLIC_BUILDER_URL || "http://localhost:3001"}/editor?tenantId=${data.id || ""}&token=${authService.getAccessToken() || ""}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Button
+                  type="primary"
+                  size="large"
+                  style={{
+                    background: "#10B981", // Emerald green
+                    borderColor: "#10B981",
+                    height: 54,
+                    padding: "0 24px",
+                    boxShadow: "0 10px 30px rgba(16, 185, 129, 0.4)",
+                    fontWeight: 700,
+                    fontSize: 15,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    color: "#fff",
+                    borderRadius: 10,
+                  }}
+                >
+                  <span>✏️ Thiết Kế Website</span>
+                </Button>
+              </a>
+            </div>
+          )}
+        </div>
+      </PageTransition>
     );
   }
 
@@ -410,14 +1376,14 @@ export default function RestaurantLandingPage() {
                   <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }}
                     className="flex flex-wrap gap-4 pt-2">
                     <Link href="/menu">
-                      <Button type="primary" size="large" shape="round"
-                        style={{ background: brandColor, borderColor: brandColor, height: 52, padding: "0 32px", fontWeight: 700, fontSize: 15, boxShadow: `0 8px 24px ${brandColor}40` }}>
+                      <Button type="primary" size="large"
+                        style={{ background: brandColor, borderColor: brandColor, height: 56, padding: "0 40px", fontWeight: 700, fontSize: 16, boxShadow: `0 8px 24px ${brandColor}40`, borderRadius: 8 }}>
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><Icon.Menu /> Xem Thực Đơn</span>
                       </Button>
                     </Link>
                     <Link href="/restaurant/reservations/new">
-                      <Button size="large" shape="round"
-                        style={{ height: 52, padding: "0 32px", fontWeight: 700, fontSize: 15, background: "rgba(255,255,255,0.1)", borderColor: "rgba(255,255,255,0.3)", color: "#fff" }}>
+                      <Button size="large"
+                        style={{ height: 56, padding: "0 40px", fontWeight: 700, fontSize: 16, background: "rgba(255,255,255,0.1)", borderColor: "rgba(255,255,255,0.3)", color: "#fff", borderRadius: 8 }}>
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>Đặt Bàn Online <Icon.Arrow /></span>
                       </Button>
                     </Link>
@@ -555,8 +1521,8 @@ export default function RestaurantLandingPage() {
               </div>
               <div style={{ textAlign: "center", marginTop: 40 }}>
                 <Link href="/menu">
-                  <Button type="primary" size="large" shape="round"
-                    style={{ background: brandColor, borderColor: brandColor, height: 48, padding: "0 36px", fontWeight: 700 }}>
+                  <Button type="primary" size="large"
+                    style={{ background: brandColor, borderColor: brandColor, height: 54, padding: "0 44px", fontWeight: 700, borderRadius: 8, fontSize: 16 }}>
                     Xem toàn bộ thực đơn →
                   </Button>
                 </Link>
@@ -595,8 +1561,8 @@ export default function RestaurantLandingPage() {
                   {/* CTA */}
                   <div style={{ paddingTop: 8 }}>
                     <Link href="/restaurant/reservations/new">
-                      <Button type="primary" block size="large" shape="round"
-                        style={{ background: brandColor, borderColor: brandColor, fontWeight: 700, height: 48 }}>
+                      <Button type="primary" block size="large"
+                        style={{ background: brandColor, borderColor: brandColor, fontWeight: 700, height: 54, borderRadius: 8, fontSize: 16 }}>
                         Đặt Bàn Ngay
                       </Button>
                     </Link>
@@ -624,6 +1590,38 @@ export default function RestaurantLandingPage() {
 
         </main>
         <footer id="footer"><Footer /></footer>
+
+        {/* Floating Edit Button for Owner/Staff */}
+        {isOwnerOrStaff && (
+          <div style={{ position: "fixed", bottom: 32, right: 32, zIndex: 9999 }}>
+            <a
+              href={`${process.env.NEXT_PUBLIC_BUILDER_URL || "http://localhost:3001"}/editor?tenantId=${data.id || ""}&token=${authService.getAccessToken() || ""}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Button
+                type="primary"
+                size="large"
+                style={{
+                  background: "#10B981", // Emerald green
+                  borderColor: "#10B981",
+                  height: 54,
+                  padding: "0 24px",
+                  boxShadow: "0 10px 30px rgba(16, 185, 129, 0.4)",
+                  fontWeight: 700,
+                  fontSize: 15,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  color: "#fff",
+                  borderRadius: 10,
+                }}
+              >
+                <span>✏️ Thiết Kế Website</span>
+              </Button>
+            </a>
+          </div>
+        )}
       </div>
     </PageTransition>
   );

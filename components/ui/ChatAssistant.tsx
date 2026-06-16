@@ -1,16 +1,31 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useTenant } from "@/lib/contexts/TenantContext";
 import { useAuth } from "@/lib/contexts/AuthContext";
 import { useCart } from "@/lib/contexts/CartContext";
-import { message } from "antd";
+import { motion, AnimatePresence } from "framer-motion";
+import { useParams } from "next/navigation";
+import axiosInstance from "@/lib/services/axiosInstance";
+import { io } from "socket.io-client";
 import {
-  CloseOutlined,
-  SendOutlined,
-  DeleteOutlined
-} from "@ant-design/icons";
+  Trash2,
+  X,
+  Send,
+  Sparkles,
+  ShoppingCart,
+  Check,
+  Calendar,
+  CheckCircle2,
+  ArrowRight,
+  Tag,
+  ClipboardList,
+  BookOpen,
+  Bell,
+  Clock,
+} from "lucide-react";
 
+/* ─────────────────────────── Types ─────────────────────────── */
 interface ChatMessage {
   role: "user" | "model";
   content: string;
@@ -22,648 +37,1241 @@ interface AIConfig {
   temperature: number;
   welcomeMessage: string;
   systemPrompt: string;
+  quickSuggestions: string[];
 }
+
+type ChatType = "system" | "restaurant";
+
+/* ─────────────────────────── Helpers ─────────────────────────── */
+function generateSessionId() {
+  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+}
+
+/** Strip [ACTION:...] tags, convert markdown → HTML for chat bubbles */
+function renderMessageContent(text: string) {
+  if (!text && text !== "") return null;
+  // Strip ACTION tags
+  let clean = text.replace(/\[ACTION:\s*[A-Z_]+(?:\s+\{[\s\S]*?\})?\s*\]/g, "").trim();
+
+  // Escape HTML first
+  clean = clean
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  // Convert markdown to HTML
+  clean = clean
+    // Code block (```)
+    .replace(/```([\s\S]*?)```/g, '<pre style="background:rgba(0,0,0,0.06);border-radius:8px;padding:8px 10px;margin:6px 0;font-size:12px;overflow-x:auto;white-space:pre-wrap;"><code>$1</code></pre>')
+    // Inline code
+    .replace(/`([^`]+)`/g, '<code style="background:rgba(0,0,0,0.08);padding:1px 5px;border-radius:4px;font-size:12px;">$1</code>')
+    // Bold
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    // Italic
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    // H1-H3
+    .replace(/^### (.*?)$/gm, '<p style="font-weight:800;font-size:13px;margin:8px 0 4px;">$1</p>')
+    .replace(/^## (.*?)$/gm, '<p style="font-weight:800;font-size:14px;margin:8px 0 4px;">$1</p>')
+    .replace(/^# (.*?)$/gm, '<p style="font-weight:900;font-size:15px;margin:8px 0 4px;">$1</p>')
+    // Numbered list
+    .replace(/^(\d+)\. (.*?)$/gm, '<div style="display:flex;gap:6px;margin:2px 0;"><span style="min-width:16px;font-weight:700;color:var(--primary);">$1.</span><span>$2</span></div>')
+    // Bullet list
+    .replace(/^[-•*] (.*?)$/gm, '<div style="display:flex;gap:6px;margin:2px 0;"><span style="min-width:12px;color:var(--primary);">•</span><span>$1</span></div>')
+    // Blockquote
+    .replace(/^&gt; (.*?)$/gm, '<div style="border-left:3px solid var(--primary);padding-left:8px;color:var(--text-muted);margin:4px 0;">$1</div>')
+    // Blank lines → paragraph break
+    .replace(/\n{2,}/g, '</p><p style="margin:6px 0;">')
+    // Single newline
+    .replace(/\n/g, '<br/>');
+
+  return <div dangerouslySetInnerHTML={{ __html: `<p style="margin:0">${clean}</p>` }} />;
+}
+
+/* ─────────────────────────── Sub-components ─────────────────────────── */
+function TypingDots() {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "10px 14px" }}>
+      {[0, 150, 300].map((delay, i) => (
+        <span
+          key={i}
+          style={{
+            width: 8, height: 8, borderRadius: "50%",
+            background: "var(--text-muted)",
+            display: "inline-block",
+            animation: "chatDotBounce 1.2s infinite ease-in-out",
+            animationDelay: `${delay}ms`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/* ─────────────────────────── A2UI System ─────────────────────────── */
+interface UICard { type: string; data: Record<string, any>; }
+
+/** Extract [UI: TYPE {...}] tags from AI response, return clean text + cards */
+function extractUICards(text: string): { cleanText: string; cards: UICard[] } {
+  const cards: UICard[] = [];
+  const re = /\[UI:\s*([A-Z_]+)(?:\s+(\{[\s\S]*?\}))?\s*\]/g;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    try {
+      cards.push({ type: m[1], data: m[2] ? JSON.parse(m[2]) : {} });
+    } catch { /* skip malformed */ }
+  }
+  const cleanText = text
+    .replace(/\[UI:\s*[A-Z_]+(?:\s+\{[\s\S]*?\})?\s*\]/g, "")
+    .replace(/\[ACTION:\s*[A-Z_]+(?:\s+\{[\s\S]*?\})?\s*\]/g, "")
+    .trim();
+  return { cleanText, cards };
+}
+
+/* ── PRICING_CARD ── */
+function PricingCard({ data, accentColor }: { data: any; accentColor: string }) {
+  const isProHighlight = data.highlight === "pro";
+  return (
+    <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+      {[
+        { name: "FREE", price: "0đ", badge: null, features: ["Gọi món QR cơ bản", "Báo cáo đơn giản", "Tối đa 5 bàn", "2MB tài liệu AI"], cta: "Dùng ngay" },
+        { name: "PRO", price: "499.000đ/tháng", badge: "🔥 Phổ biến", features: ["Không giới hạn bàn", "Sơ đồ bàn 3D", "AI Chatbot RAG", "Quản lý kho nâng cao", "Tích hợp PayOS"], cta: "Dùng thử 14 ngày" },
+      ].map((plan, i) => {
+        const isHighlight = (isProHighlight && i === 1) || (!isProHighlight && i === 0);
+        return (
+          <div key={i} style={{
+            borderRadius: 14, padding: "14px 12px",
+            background: isHighlight ? accentColor : "var(--surface)",
+            border: isHighlight ? "none" : "1px solid var(--border)",
+            color: isHighlight ? "white" : "var(--text)",
+            position: "relative", overflow: "hidden",
+          }}>
+            {plan.badge && (
+              <div style={{ fontSize: 9, fontWeight: 800, background: "rgba(255,255,255,0.25)", padding: "2px 8px", borderRadius: 999, display: "inline-block", marginBottom: 8 }}>{plan.badge}</div>
+            )}
+            <div style={{ fontWeight: 900, fontSize: 15, marginBottom: 2 }}>{plan.name}</div>
+            <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 10, opacity: 0.85 }}>{plan.price}</div>
+            {plan.features.map((f, j) => (
+              <div key={j} style={{ fontSize: 11, display: "flex", gap: 5, marginBottom: 3, alignItems: "flex-start" }}>
+                <span style={{ flexShrink: 0, opacity: 0.8 }}>✓</span>
+                <span style={{ opacity: 0.9 }}>{f}</span>
+              </div>
+            ))}
+            <a href="/register-restaurant" style={{
+              display: "block", marginTop: 12, padding: "7px 0",
+              borderRadius: 8, textAlign: "center", textDecoration: "none",
+              fontSize: 11, fontWeight: 700,
+              background: isHighlight ? "rgba(255,255,255,0.2)" : accentColor,
+              color: isHighlight ? "white" : "white",
+              border: isHighlight ? "1px solid rgba(255,255,255,0.3)" : "none",
+            }}>{plan.cta} →</a>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ── FEATURE_CARD ── */
+function FeatureCard({ data, accentColor }: { data: any; accentColor: string }) {
+  const features: string[] = data.features || [];
+  return (
+    <div style={{ marginTop: 10, background: "var(--surface)", borderRadius: 14, padding: "12px 14px", border: "1px solid var(--border)" }}>
+      <div style={{ fontWeight: 800, fontSize: 12, color: "var(--text)", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ background: accentColor, color: "white", borderRadius: 6, padding: "2px 8px", fontSize: 10, display: "inline-flex", alignItems: "center", gap: 4 }}>
+          <Sparkles style={{ width: 10, height: 10 }} /> TÍNH NĂNG
+        </span>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "5px 8px" }}>
+        {features.map((f, i) => (
+          <div key={i} style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 5, color: "var(--text)" }}>
+            <span style={{ color: accentColor, fontWeight: 800, fontSize: 13 }}>✓</span>
+            <span>{f}</span>
+          </div>
+        ))}
+      </div>
+      <a href="/register-restaurant" style={{
+        display: "block", marginTop: 12, padding: "8px", borderRadius: 10,
+        background: accentColor, color: "white", textAlign: "center",
+        fontSize: 12, fontWeight: 700, textDecoration: "none",
+      }}>Trải nghiệm tất cả tính năng →</a>
+    </div>
+  );
+}
+
+/* ── CTA_CARD ── */
+function CtaCard({ data, accentColor }: { data: any; accentColor: string }) {
+  return (
+    <div style={{ marginTop: 10, borderRadius: 14, padding: "14px 16px", background: `color-mix(in srgb, ${accentColor} 10%, var(--surface))`, border: `1px solid color-mix(in srgb, ${accentColor} 30%, var(--border))` }}>
+      <a href={data.url || "/register-restaurant"} style={{
+        display: "block", padding: "10px", borderRadius: 10,
+        background: accentColor, color: "white", textAlign: "center",
+        fontSize: 13, fontWeight: 800, textDecoration: "none",
+        boxShadow: `0 4px 12px ${accentColor}40`,
+      }}>
+        {data.label || "Đăng ký ngay →"}
+      </a>
+      {data.note && (
+        <p style={{ fontSize: 11, color: "var(--text-muted)", textAlign: "center", margin: "8px 0 0" }}>
+          {data.note}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/* ── STEPS_CARD ── */
+function StepsCard({ data, accentColor }: { data: any; accentColor: string }) {
+  const steps: string[] = data.steps || [];
+  return (
+    <div style={{ marginTop: 10, background: "var(--surface)", borderRadius: 14, padding: "12px 14px", border: "1px solid var(--border)" }}>
+      <div style={{ fontWeight: 800, fontSize: 11, color: "var(--text-muted)", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.06em" }}>Quy trình đăng ký</div>
+      {steps.map((step, i) => (
+        <div key={i} style={{ display: "flex", gap: 10, marginBottom: i < steps.length - 1 ? 10 : 0, alignItems: "flex-start" }}>
+          <div style={{
+            width: 24, height: 24, borderRadius: "50%", flexShrink: 0,
+            background: accentColor, color: "white",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 11, fontWeight: 800,
+          }}>{i + 1}</div>
+          <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+            <span style={{ fontSize: 12, color: "var(--text)", lineHeight: 1.4 }}>{step}</span>
+            {i < steps.length - 1 && (
+              <div style={{ width: 1, height: 10, background: "var(--border)", margin: "4px 0 0 -22px", marginLeft: "calc(-10px + 12px)" }} />
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ── DISH_CONFIRM ── */
+function DishConfirmCard({ data, accentColor, onAddToCart }: { data: any; accentColor: string; onAddToCart?: (d: any) => void }) {
+  const [added, setAdded] = useState(false);
+  const fmt = (n: number) => new Intl.NumberFormat("vi-VN").format(n) + "đ";
+  return (
+    <div style={{ marginTop: 10, background: "var(--surface)", borderRadius: 14, border: "1px solid var(--border)", overflow: "hidden" }}>
+      <div style={{ padding: "12px 14px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+          <span style={{ fontWeight: 800, fontSize: 13, color: "var(--text)" }}>{data.name || "Món ăn"}</span>
+          <span style={{ fontWeight: 800, fontSize: 13, color: accentColor }}>{fmt(data.price || 0)}</span>
+        </div>
+        {data.description && <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 10px" }}>{data.description}</p>}
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => {
+              if (onAddToCart) onAddToCart(data);
+              setAdded(true);
+              setTimeout(() => setAdded(false), 2500);
+            }}
+            style={{
+              flex: 1, padding: "8px", borderRadius: 10, border: "none",
+              background: added ? "#22c55e" : accentColor, color: "white",
+              fontWeight: 700, fontSize: 12, cursor: "pointer", transition: "background 0.3s",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+            }}
+          >
+            {added ? (
+              <>
+                <Check style={{ width: 14, height: 14 }} />
+                <span>Đã thêm vào giỏ!</span>
+              </>
+            ) : (
+              <>
+                <ShoppingCart style={{ width: 14, height: 14 }} />
+                <span>Thêm vào giỏ hàng</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── BOOKING_FORM ── */
+function BookingFormCard({ data, accentColor }: { data: any; accentColor: string }) {
+  const { user } = useAuth();
+  const { tenant } = useTenant();
+  const [form, setForm] = useState({
+    date: "",
+    time: "",
+    guests: "2",
+    note: "",
+    fullName: "",
+    phoneNumber: "",
+    email: ""
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+  const [confirmationCode, setConfirmationCode] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      const restaurantId = tenant?.id || "";
+      if (!restaurantId) {
+        throw new Error("Không xác định được nhà hàng để đặt bàn.");
+      }
+
+      const payload: any = {
+        restaurantId,
+        numberOfGuests: Number(form.guests),
+        time: new Date(`${form.date}T${form.time}`).toISOString(),
+        specialRequests: form.note || undefined,
+      };
+
+      if (!user) {
+        payload.fullName = form.fullName;
+        payload.phoneNumber = form.phoneNumber;
+        payload.email = form.email;
+      }
+
+      const response = await axiosInstance.post("/reservations", payload);
+      if (response.data?.success && response.data?.data) {
+        setConfirmationCode(response.data.data.confirmationCode);
+        setSubmitted(true);
+      } else {
+        throw new Error(response.data?.message || "Lỗi bất thường từ máy chủ.");
+      }
+    } catch (err: any) {
+      console.error("[BookingFormCard] Reservation error:", err);
+      setError(err?.response?.data?.message || err?.message || "Đặt bàn không thành công. Vui lòng thử lại.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (submitted) return (
+    <div style={{ marginTop: 10, borderRadius: 14, padding: "16px", background: "var(--card)", border: "1.5px solid #22c55e", textAlign: "center" }}>
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 6 }}>
+        <CheckCircle2 style={{ width: 28, height: 28, color: "#22c55e" }} />
+      </div>
+      <p style={{ fontWeight: 800, fontSize: 13, color: "#22c55e", margin: 0 }}>Yêu cầu đặt bàn đã được xác nhận!</p>
+      {confirmationCode && (
+        <div style={{ margin: "10px auto", padding: "6px 12px", background: "rgba(34,197,94,0.1)", borderRadius: 8, border: "1px dashed #22c55e", display: "inline-block", fontSize: 13, fontWeight: 800, color: "#22c55e", fontFamily: "monospace" }}>
+          MÃ XÁC NHẬN: {confirmationCode}
+        </div>
+      )}
+      <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "4px 0 0" }}>Hệ thống đã gửi email xác nhận đặt bàn của bạn.</p>
+    </div>
+  );
+
+  return (
+    <form onSubmit={handleSubmit} style={{ marginTop: 10, background: "var(--surface)", borderRadius: 14, padding: "14px", border: "1px solid var(--border)" }}>
+      <div style={{ fontWeight: 800, fontSize: 12, marginBottom: 12, display: "flex", alignItems: "center", gap: 6, color: "var(--text)" }}>
+        <span style={{ background: accentColor, color: "white", borderRadius: 6, padding: "2px 8px", fontSize: 10, display: "inline-flex", alignItems: "center", gap: 4 }}>
+          <Calendar style={{ width: 10, height: 10 }} /> ĐẶT BÀN
+        </span>
+        <span style={{ color: "var(--text-muted)", fontWeight: 500 }}>{data.restaurantName}</span>
+      </div>
+      
+      {error && (
+        <div style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(239,68,68,0.1)", border: "1px solid #ef4444", color: "#ef4444", fontSize: 11.5, marginBottom: 10, lineHeight: 1.4 }}>
+          {error}
+        </div>
+      )}
+
+      {[
+        { label: "Ngày", key: "date", type: "date", required: true },
+        { label: "Giờ", key: "time", type: "time", required: true },
+        { label: "Số người", key: "guests", type: "number", required: true },
+      ].map(field => (
+        <div key={field.key} style={{ marginBottom: 10 }}>
+          <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: 3 }}>{field.label}</label>
+          <input
+            type={field.type}
+            required={field.required}
+            min={field.key === "guests" ? 1 : undefined}
+            max={field.key === "guests" ? 20 : undefined}
+            value={(form as any)[field.key]}
+            onChange={e => setForm(prev => ({ ...prev, [field.key]: e.target.value }))}
+            style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: "1.5px solid var(--border)", background: "var(--card)", color: "var(--text)", fontSize: 12, boxSizing: "border-box", outline: "none" }}
+          />
+        </div>
+      ))}
+
+      <div style={{ marginBottom: 10 }}>
+        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: 3 }}>Yêu cầu đặc biệt</label>
+        <textarea
+          rows={2}
+          value={form.note}
+          placeholder="Ví dụ: Bàn gần cửa sổ, ăn chay..."
+          onChange={e => setForm(prev => ({ ...prev, note: e.target.value }))}
+          style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: "1.5px solid var(--border)", background: "var(--card)", color: "var(--text)", fontSize: 12, boxSizing: "border-box", outline: "none", resize: "none" }}
+        />
+      </div>
+
+      {!user && (
+        <>
+          <div style={{ height: 1, background: "var(--border)", margin: "14px 0" }} />
+          <div style={{ fontWeight: 700, fontSize: 11, color: "var(--text-muted)", marginBottom: 8, textTransform: "uppercase" }}>Thông tin liên hệ (Khách)</div>
+          {[
+            { label: "Họ và tên", key: "fullName", type: "text", placeholder: "Nhập họ tên của bạn", required: true },
+            { label: "Số điện thoại", key: "phoneNumber", type: "tel", placeholder: "Nhập số điện thoại", required: true },
+            { label: "Email", key: "email", type: "email", placeholder: "Nhập email liên hệ", required: true },
+          ].map(field => (
+            <div key={field.key} style={{ marginBottom: 10 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: 3 }}>{field.label}</label>
+              <input
+                type={field.type}
+                required={field.required}
+                placeholder={field.placeholder}
+                value={(form as any)[field.key]}
+                onChange={e => setForm(prev => ({ ...prev, [field.key]: e.target.value }))}
+                style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: "1.5px solid var(--border)", background: "var(--card)", color: "var(--text)", fontSize: 12, boxSizing: "border-box", outline: "none" }}
+              />
+            </div>
+          ))}
+        </>
+      )}
+
+      <button type="submit" disabled={loading} style={{
+        width: "100%", padding: "9px", borderRadius: 10, border: "none",
+        background: accentColor, color: "white", fontWeight: 700, fontSize: 12, cursor: loading ? "not-allowed" : "pointer",
+        opacity: loading ? 0.7 : 1, transition: "opacity 0.2s",
+        display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+      }}>
+        {loading ? (
+          "Đang gửi yêu cầu..."
+        ) : (
+          <>
+            <span>Gửi yêu cầu đặt bàn</span>
+            <ArrowRight style={{ width: 14, height: 14 }} />
+          </>
+        )}
+      </button>
+    </form>
+  );
+}
+
+/* ── Card dispatcher ── */
+function renderUICard(card: UICard, accentColor: string, onAddToCart?: (d: any) => void) {
+  switch (card.type) {
+    case "PRICING_CARD":   return <PricingCard data={card.data} accentColor={accentColor} />;
+    case "FEATURE_CARD":   return <FeatureCard data={card.data} accentColor={accentColor} />;
+    case "CTA_CARD":       return <CtaCard data={card.data} accentColor={accentColor} />;
+    case "STEPS_CARD":     return <StepsCard data={card.data} accentColor={accentColor} />;
+    case "DISH_CONFIRM":   return <DishConfirmCard data={card.data} accentColor={accentColor} onAddToCart={onAddToCart} />;
+    case "BOOKING_FORM":   return <BookingFormCard data={card.data} accentColor={accentColor} />;
+    default: return null;
+  }
+}
+
+
+const getSuggestionDetails = (chip: string) => {
+  const clean = chip.replace(/\s*[^\w\s가-힣\u00C0-\u024F\u1EA0-\u1EF9]+$/u, "").trim();
+  let icon: React.ReactNode | undefined;
+  if (chip.includes("💡") || clean.toLowerCase().includes("tính năng")) {
+    icon = <Sparkles style={{ width: 12, height: 12 }} />;
+  } else if (chip.includes("🏷️") || clean.toLowerCase().includes("gói dịch vụ")) {
+    icon = <Tag style={{ width: 12, height: 12 }} />;
+  } else if (chip.includes("📋") || clean.toLowerCase().includes("đăng ký")) {
+    icon = <ClipboardList style={{ width: 12, height: 12 }} />;
+  } else if (chip.includes("📜") || clean.toLowerCase().includes("thực đơn")) {
+    icon = <BookOpen style={{ width: 12, height: 12 }} />;
+  } else if (chip.includes("🕐") || clean.toLowerCase().includes("mở cửa")) {
+    icon = <Clock style={{ width: 12, height: 12 }} />;
+  } else if (chip.includes("📅") || clean.toLowerCase().includes("đặt bàn")) {
+    icon = <Calendar style={{ width: 12, height: 12 }} />;
+  } else if (chip.includes("🔔") || clean.toLowerCase().includes("phục vụ")) {
+    icon = <Bell style={{ width: 12, height: 12 }} />;
+  }
+  return { text: clean || chip, icon };
+};
+
+interface ChatWindowProps {
+  chatType: ChatType;
+  history: ChatMessage[];
+  isLoading: boolean;
+  query: string;
+  onQueryChange: (v: string) => void;
+  onSend: (overrideText?: string) => void;
+  onClear: () => void;
+  onClose: () => void;
+  config: AIConfig;
+  logoUrl: string;
+  botName: string;
+  accentColor: string;
+  onAddToCart?: (data: any) => void;
+}
+
+function ChatWindow({
+  chatType, history, isLoading, query,
+  onQueryChange, onSend, onClear, onClose,
+  config, logoUrl, botName, accentColor, onAddToCart,
+}: ChatWindowProps) {
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [history, isLoading]);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const suggestions = config.quickSuggestions?.length
+    ? config.quickSuggestions
+    : chatType === "system"
+      ? ["Tính năng XFoodi 💡", "Gói dịch vụ 🏷️", "Cách đăng ký 📋"]
+      : ["Xem thực đơn 📜", "Giờ mở cửa 🕐", "Đặt bàn 📅", "Gọi phục vụ 🔔"];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 24, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 24, scale: 0.96 }}
+      transition={{ type: "spring", stiffness: 340, damping: 28 }}
+      style={{
+        position: "fixed",
+        bottom: 88,
+        right: 24,
+        width: "min(400px, calc(100vw - 32px))",
+        height: "min(580px, calc(100dvh - 120px))",
+        borderRadius: 20,
+        display: "flex",
+        flexDirection: "column",
+        boxShadow: "0 20px 60px rgba(0,0,0,0.18), 0 4px 16px rgba(0,0,0,0.1)",
+        border: "1px solid var(--border)",
+        background: "var(--card)",
+        overflow: "hidden",
+        zIndex: 9998,
+      }}
+    >
+      {/* ── Header ── */}
+      <div
+        style={{
+          padding: "12px 16px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          borderBottom: "1px solid var(--border)",
+          background: `color-mix(in srgb, ${accentColor} 8%, var(--surface))`,
+          flexShrink: 0,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ position: "relative", flexShrink: 0 }}>
+            <img
+              src={logoUrl}
+              alt={botName}
+              style={{
+                width: 36, height: 36, borderRadius: "50%", objectFit: "cover",
+                border: `2px solid ${accentColor}`,
+                background: "white",
+              }}
+              onError={(e) => { (e.target as HTMLImageElement).src = "/images/logo/xfoodi-logo.png"; }}
+            />
+            <span style={{
+              position: "absolute", bottom: 0, right: 0,
+              width: 10, height: 10, borderRadius: "50%",
+              background: "#22c55e",
+              border: "2px solid var(--card)",
+            }} />
+          </div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)", lineHeight: 1.2 }}>
+              {botName}
+            </div>
+            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+              ● Trực tuyến
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          {history.length > 1 && (
+            <button
+              onClick={onClear}
+              title="Xóa lịch sử"
+              style={{
+                width: 30, height: 30, borderRadius: 8,
+                border: "none", background: "transparent",
+                color: "var(--text-muted)", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                transition: "background 0.15s, color 0.15s",
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(239,68,68,0.1)"; (e.currentTarget as HTMLElement).style.color = "#ef4444"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = "var(--text-muted)"; }}
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            style={{
+              width: 30, height: 30, borderRadius: 8,
+              border: "none", background: "transparent",
+              color: "var(--text-muted)", cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "background 0.15s",
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.06)"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* ── Message List ── */}
+      <div
+        style={{
+          flex: 1, overflowY: "auto", padding: "16px 14px",
+          display: "flex", flexDirection: "column", gap: 12,
+          scrollbarWidth: "thin",
+        }}
+      >
+        {history.map((msg, idx) => {
+          const isLastMsg = idx === history.length - 1;
+          const isStreaming = isLastMsg && msg.role === "model" && msg.content === "";
+          const parsed = msg.role === "model" && !isStreaming ? extractUICards(msg.content) : null;
+          return (
+            <div
+              key={idx}
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 8,
+                flexDirection: msg.role === "user" ? "row-reverse" : "row",
+              }}
+            >
+              {msg.role === "model" && (
+                <img
+                  src={logoUrl}
+                  alt="AI"
+                  style={{
+                    width: 28, height: 28, borderRadius: "50%",
+                    objectFit: "cover", flexShrink: 0, marginTop: 4,
+                    border: "1.5px solid var(--border)", background: "white",
+                  }}
+                  onError={(e) => { (e.target as HTMLImageElement).src = "/images/logo/xfoodi-logo.png"; }}
+                />
+              )}
+              <div style={{ maxWidth: "82%", display: "flex", flexDirection: "column", gap: 0 }}>
+                {/* Text bubble */}
+                <div
+                  style={{
+                    padding: "10px 14px",
+                    borderRadius: msg.role === "user"
+                      ? "18px 18px 4px 18px"
+                      : "18px 18px 18px 4px",
+                    fontSize: 13.5,
+                    lineHeight: 1.6,
+                    ...(msg.role === "user"
+                      ? { background: accentColor, color: "white", boxShadow: `0 2px 8px ${accentColor}40` }
+                      : { background: "var(--surface)", color: "var(--text)", border: "1px solid var(--border)", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }),
+                  }}
+                >
+                  {isStreaming
+                    ? <TypingDots />
+                    : parsed
+                      ? (renderMessageContent(parsed.cleanText) ?? parsed.cleanText)
+                      : (renderMessageContent(msg.content) ?? msg.content)
+                  }
+                </div>
+                {/* A2UI Cards below bubble */}
+                {parsed && parsed.cards.length > 0 && parsed.cards.map((card, ci) => (
+                  <div key={ci}>{renderUICard(card, accentColor, onAddToCart)}</div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Removed separate isLoading indicator — the empty optimistic message above handles it */}
+        <div ref={chatEndRef} />
+      </div>
+
+      {/* ── Quick Suggestion Chips ── */}
+      <div
+        style={{
+          padding: "8px 12px",
+          display: "flex", flexWrap: "wrap", gap: 6,
+          borderTop: "1px solid var(--border)",
+          background: "color-mix(in srgb, var(--surface) 60%, var(--card))",
+          flexShrink: 0,
+        }}
+      >
+        {suggestions.map((chip, i) => {
+          const { text, icon } = getSuggestionDetails(chip);
+          return (
+            <button
+              key={i}
+              onClick={() => onSend(text)}
+              disabled={isLoading}
+              style={{
+                padding: "5px 12px",
+                borderRadius: 999,
+                fontSize: 12,
+                fontWeight: 500,
+                border: `1.5px solid ${i === 0 ? accentColor : "var(--border)"}`,
+                background: i === 0 ? `${accentColor}12` : "var(--card)",
+                color: i === 0 ? accentColor : "var(--text)",
+                cursor: isLoading ? "not-allowed" : "pointer",
+                opacity: isLoading ? 0.5 : 1,
+                transition: "all 0.15s",
+                whiteSpace: "nowrap",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+              }}
+            >
+              {icon}
+              <span>{text}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ── Input Footer ── */}
+      <form
+        onSubmit={(e) => { e.preventDefault(); onSend(); }}
+        style={{
+          padding: "10px 12px",
+          display: "flex", gap: 8, alignItems: "center",
+          borderTop: "1px solid var(--border)",
+          background: "var(--card)",
+          flexShrink: 0,
+        }}
+      >
+        <input
+          ref={inputRef}
+          type="text"
+          value={query}
+          onChange={(e) => onQueryChange(e.target.value)}
+          placeholder="Nhập tin nhắn..."
+          disabled={isLoading}
+          style={{
+            flex: 1, padding: "9px 14px",
+            borderRadius: 12,
+            border: "1.5px solid var(--border)",
+            background: "var(--surface)",
+            color: "var(--text)",
+            fontSize: 13.5,
+            outline: "none",
+            transition: "border-color 0.2s",
+          }}
+          onFocus={(e) => { e.currentTarget.style.borderColor = accentColor; }}
+          onBlur={(e) => { e.currentTarget.style.borderColor = "var(--border)"; }}
+        />
+        <button
+          type="submit"
+          disabled={isLoading || !query.trim()}
+          style={{
+            width: 38, height: 38,
+            borderRadius: 11,
+            border: "none",
+            background: isLoading || !query.trim() ? "var(--border)" : accentColor,
+            color: "white",
+            cursor: isLoading || !query.trim() ? "not-allowed" : "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            transition: "all 0.2s",
+            flexShrink: 0,
+            boxShadow: !isLoading && query.trim() ? `0 4px 12px ${accentColor}50` : "none",
+          }}
+        >
+          <Send className="h-4 w-4" />
+        </button>
+      </form>
+    </motion.div>
+  );
+}
+
+/* ─────────────────────────── Main Component ─────────────────────────── */
+const DEFAULT_SYSTEM_CONFIG: AIConfig = {
+  isChatEnabled: true,
+  aiModel: "gemini-2.5-flash",
+  temperature: 0.4,
+  welcomeMessage: "Trợ lý ảo hỗ trợ tìm hiểu về nền tảng SaaS quản lý nhà hàng XFoodi. Hãy hỏi tôi về các gói dịch vụ, giá thành hoặc cách đăng ký ngay!",
+  systemPrompt: "",
+  quickSuggestions: ["Tính năng XFoodi 💡", "Gói dịch vụ 🏷️", "Cách đăng ký 📋"],
+};
+
+const DEFAULT_RESTAURANT_CONFIG: AIConfig = {
+  isChatEnabled: true,
+  aiModel: "gemini-2.5-flash",
+  temperature: 0.2,
+  welcomeMessage: "Chào mừng bạn đến với nhà hàng! Tôi có thể tư vấn món ăn ngon, cách đặt bàn hay kết nối trực tiếp đến nhân viên phục vụ giúp bạn.",
+  systemPrompt: "",
+  quickSuggestions: ["Xem thực đơn 📜", "Giờ mở cửa 🕐", "Đặt bàn 📅", "Gọi phục vụ 🔔"],
+};
 
 export function ChatAssistant() {
   const { tenant } = useTenant();
   const { user } = useAuth();
-  const { addToCart, clearCart, openCartModal } = useCart();
-  
-  // Active chat state: "system" | "restaurant" | null
-  const [activeChat, setActiveChat] = useState<"system" | "restaurant" | null>(null);
+  const { cartItems, addToCart, clearCart, openCartModal, orderTableId } = useCart();
+  const params = useParams();
+  const tableIdFromUrl = params?.tableId as string | undefined;
+  const activeTableId = tableIdFromUrl || orderTableId;
 
-  // System Chat States
+  const [tableInfo, setTableInfo] = useState<{ code: string; floor?: { name: string } } | null>(null);
+
+  useEffect(() => {
+    if (!activeTableId) {
+      setTableInfo(null);
+      return;
+    }
+    axiosInstance.get(`/tables/public/${activeTableId}`)
+      .then(res => {
+        if (res.data?.success && res.data?.data) {
+          setTableInfo(res.data.data);
+        }
+      })
+      .catch(err => {
+        console.warn("Failed to fetch table info:", err);
+      });
+  }, [activeTableId]);
+
+  const handleCallWaiter = useCallback(() => {
+    if (!tenant?.id) return;
+    if (!activeTableId) {
+      alert("Không tìm thấy thông tin bàn của bạn. Vui lòng quét lại mã QR tại bàn để gọi phục vụ.");
+      return;
+    }
+
+    const api = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+    const socketUrl = api.replace(/\/api\/?$/, "");
+
+    console.log("[ChatAssistant Socket] Initializing connection to:", socketUrl);
+    const socket = io(socketUrl, {
+      transports: ["websocket"],
+    });
+
+    socket.on("connect", () => {
+      console.log("[ChatAssistant Socket] Connected to broadcast CALL_STAFF");
+      socket.emit("join_restaurant", tenant.id);
+      socket.emit("CALL_STAFF", {
+        restaurantId: tenant.id,
+        tableId: activeTableId,
+        tableCode: tableInfo?.code || `Bàn ${activeTableId.slice(0, 4)}`,
+        floorName: tableInfo?.floor?.name || "Khu vực chung",
+        message: "Khách hàng yêu cầu hỗ trợ tại bàn thông qua AI Chatbot",
+        type: "ASSISTANCE"
+      });
+      
+      // Close socket after sending
+      setTimeout(() => {
+        socket.disconnect();
+        console.log("[ChatAssistant Socket] Disconnected after emit");
+      }, 1000);
+    });
+
+    socket.on("connect_error", (err: any) => {
+      console.error("[ChatAssistant Socket] Connection error:", err);
+    });
+  }, [tenant?.id, activeTableId, tableInfo]);
+
+  /* ── Context detection ──
+     - Nếu tenant !== null → đang ở restaurant domain → chỉ show restaurant chat
+     - Nếu tenant === null → đang ở landing/system domain → chỉ show system chat
+  */
+  const isRestaurantDomain = !!(tenant?.id && tenant.id !== "system" && tenant.id !== "demo");
+  const isAdminDomain = typeof window !== "undefined" &&
+    (window.location.hostname.startsWith("admin.") || window.location.hostname === "admin.localhost");
+
+  /* ── Open state ── */
+  const [activeChat, setActiveChat] = useState<ChatType | null>(null);
+
+  /* ── System Chat ── */
   const [historySystem, setHistorySystem] = useState<ChatMessage[]>([]);
   const [querySystem, setQuerySystem] = useState("");
   const [isLoadingSystem, setIsLoadingSystem] = useState(false);
-  
-  // Restaurant Chat States
+  const [aiConfigSystem, setAiConfigSystem] = useState<AIConfig>(DEFAULT_SYSTEM_CONFIG);
+
+  /* ── Restaurant Chat ── */
   const [historyRestaurant, setHistoryRestaurant] = useState<ChatMessage[]>([]);
   const [queryRestaurant, setQueryRestaurant] = useState("");
   const [isLoadingRestaurant, setIsLoadingRestaurant] = useState(false);
-  const [sessionIdRestaurant, setSessionIdRestaurant] = useState<string>("");
+  const [sessionIdRestaurant, setSessionIdRestaurant] = useState("");
+  const [aiConfigRestaurant, setAiConfigRestaurant] = useState<AIConfig>(DEFAULT_RESTAURANT_CONFIG);
 
-  // AI Configuration States
-  const [aiConfigSystem, setAiConfigSystem] = useState<AIConfig>({
-    isChatEnabled: true,
-    aiModel: "gemini-2.5-flash",
-    temperature: 0.4,
-    welcomeMessage: "Trợ lý ảo hỗ trợ tìm hiểu về nền tảng SaaS quản lý nhà hàng XFoodi. Hãy hỏi tôi về các gói dịch vụ, giá thành hoặc cách đăng ký ngay!",
-    systemPrompt: ""
-  });
-
-  const [aiConfigRestaurant, setAiConfigRestaurant] = useState<AIConfig>({
-    isChatEnabled: true,
-    aiModel: "gemini-2.5-flash",
-    temperature: 0.2,
-    welcomeMessage: "Chào mừng bạn đến với nhà hàng! Tôi có thể tư vấn món ăn ngon, cách đặt bàn hay kết nối trực tiếp đến nhân viên phục vụ giúp bạn.",
-    systemPrompt: ""
-  });
-
-  const chatEndRef = useRef<HTMLDivElement>(null);
-
-  // 1. Fetch AI Configuration for System Chat on mount
+  /* ─────────────── Fetch AI configs ─────────────── */
   useEffect(() => {
+    if (isAdminDomain) return;
     fetch("/api/ai/config?restaurantId=system")
-      .then(res => res.json())
-      .then(res => {
-        if (res.success && res.data) {
-          setAiConfigSystem(res.data);
-        }
-      })
-      .catch(err => console.error("[ChatAssistant] Fetch system config error:", err));
-  }, []);
+      .then(r => r.json())
+      .then(r => { if (r.success && r.data) setAiConfigSystem(prev => ({ ...prev, ...r.data })); })
+      .catch(() => { /* keep defaults */ });
+  }, [isAdminDomain]);
 
-  // 2. Fetch AI Configuration for Restaurant Chat when tenant changes
   useEffect(() => {
-    if (tenant?.id && tenant.id !== "demo") {
-      fetch(`/api/ai/config?restaurantId=${tenant.id}`)
-        .then(res => res.json())
-        .then(res => {
-          if (res.success && res.data) {
-            setAiConfigRestaurant(res.data);
-          }
-        })
-        .catch(err => console.error("[ChatAssistant] Fetch restaurant config error:", err));
+    if (!tenant?.id || tenant.id === "demo" || isAdminDomain) return;
+    fetch(`/api/ai/config?restaurantId=${tenant.id}`)
+      .then(r => r.json())
+      .then(r => { if (r.success && r.data) setAiConfigRestaurant(prev => ({ ...prev, ...r.data })); })
+      .catch(() => { /* keep defaults */ });
+  }, [tenant?.id, isAdminDomain]);
+
+  /* ─────────────── Session & history persistence ─────────────── */
+  useEffect(() => {
+    if (typeof window === "undefined" || !tenant?.id) return;
+    let sid = localStorage.getItem(`xfoodi-chat-session-${tenant.id}`);
+    if (!sid) {
+      sid = generateSessionId();
+      localStorage.setItem(`xfoodi-chat-session-${tenant.id}`, sid);
+    }
+    setSessionIdRestaurant(sid);
+
+    const saved = localStorage.getItem(`xfoodi-chat-history-restaurant-${tenant.id}-${sid}`);
+    if (saved) {
+      try { setHistoryRestaurant(JSON.parse(saved)); } catch { /* ignore */ }
     }
   }, [tenant?.id]);
 
-  // 3. Initialize Restaurant session ID and load history from localStorage
   useEffect(() => {
-    if (typeof window !== "undefined" && tenant?.id) {
-      let savedSessionId = localStorage.getItem(`xfoodi-chat-session-${tenant.id}`);
-      if (!savedSessionId) {
-        savedSessionId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-        localStorage.setItem(`xfoodi-chat-session-${tenant.id}`, savedSessionId);
-      }
-      setSessionIdRestaurant(savedSessionId);
-
-      const savedHistory = localStorage.getItem(`xfoodi-chat-history-restaurant-${tenant.id}-${savedSessionId}`);
-      if (savedHistory) {
-        try {
-          setHistoryRestaurant(JSON.parse(savedHistory));
-        } catch (e) {
-          console.error("Failed to parse saved restaurant chat history", e);
-        }
-      } else {
-        setHistoryRestaurant([]);
-      }
-    }
-  }, [tenant?.id]);
-
-  // 4. Load System history from localStorage on mount
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const savedHistory = localStorage.getItem("xfoodi-chat-history-system");
-      if (savedHistory) {
-        try {
-          setHistorySystem(JSON.parse(savedHistory));
-        } catch (e) {
-          console.error("Failed to parse saved system chat history", e);
-        }
-      }
-    }
+    if (typeof window === "undefined") return;
+    const saved = localStorage.getItem("xfoodi-chat-history-system");
+    if (saved) { try { setHistorySystem(JSON.parse(saved)); } catch { /* ignore */ } }
   }, []);
 
-  // 5. Save System history to localStorage
   useEffect(() => {
-    if (historySystem.length > 0) {
-      localStorage.setItem("xfoodi-chat-history-system", JSON.stringify(historySystem));
-    }
+    if (historySystem.length > 0) localStorage.setItem("xfoodi-chat-history-system", JSON.stringify(historySystem));
   }, [historySystem]);
 
-  // 6. Save Restaurant history to localStorage
   useEffect(() => {
     if (tenant?.id && sessionIdRestaurant && historyRestaurant.length > 0) {
-      localStorage.setItem(
-        `xfoodi-chat-history-restaurant-${tenant.id}-${sessionIdRestaurant}`,
-        JSON.stringify(historyRestaurant)
-      );
+      localStorage.setItem(`xfoodi-chat-history-restaurant-${tenant.id}-${sessionIdRestaurant}`, JSON.stringify(historyRestaurant));
     }
   }, [historyRestaurant, tenant?.id, sessionIdRestaurant]);
 
-  // 7. Inject welcome messages if histories are empty
+  /* ─────────────── Inject welcome message ─────────────── */
   useEffect(() => {
     if (aiConfigSystem?.welcomeMessage) {
-      setHistorySystem(prev => {
-        if (prev.length === 0) {
-          return [{ role: "model", content: aiConfigSystem.welcomeMessage }];
-        }
-        return prev;
-      });
+      setHistorySystem(prev => prev.length === 0 ? [{ role: "model", content: aiConfigSystem.welcomeMessage }] : prev);
     }
-  }, [aiConfigSystem]);
+  }, [aiConfigSystem.welcomeMessage]);
 
   useEffect(() => {
     if (aiConfigRestaurant?.welcomeMessage && tenant?.id) {
-      setHistoryRestaurant(prev => {
-        if (prev.length === 0) {
-          return [{ role: "model", content: aiConfigRestaurant.welcomeMessage }];
-        }
-        return prev;
-      });
+      setHistoryRestaurant(prev => prev.length === 0 ? [{ role: "model", content: aiConfigRestaurant.welcomeMessage }] : prev);
     }
-  }, [aiConfigRestaurant, tenant?.id]);
+  }, [aiConfigRestaurant.welcomeMessage, tenant?.id]);
 
-  // Auto-scroll to bottom of chat window
-  useEffect(() => {
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [historySystem, historyRestaurant, activeChat, isLoadingSystem, isLoadingRestaurant]);
-
-  const handleClearHistory = (type: "system" | "restaurant") => {
-    if (window.confirm("Bạn có chắc chắn muốn xóa lịch sử trò chuyện này?")) {
-      if (type === "system") {
-        setHistorySystem(aiConfigSystem.welcomeMessage ? [{ role: "model", content: aiConfigSystem.welcomeMessage }] : []);
-        localStorage.removeItem("xfoodi-chat-history-system");
-      } else {
-        setHistoryRestaurant(aiConfigRestaurant.welcomeMessage ? [{ role: "model", content: aiConfigRestaurant.welcomeMessage }] : []);
-        if (tenant?.id && sessionIdRestaurant) {
-          localStorage.removeItem(`xfoodi-chat-history-restaurant-${tenant.id}-${sessionIdRestaurant}`);
-        }
-      }
-      message.success("Đã xóa lịch sử trò chuyện!");
-    }
-  };
-
-  const executeA2UIActions = (text: string) => {
-    const actionRegex = /\[ACTION:\s*([A-Z_]+)(?:\s+({.*?}))?\s*\]/g;
-    let match;
-    while ((match = actionRegex.exec(text)) !== null) {
-      const actionName = match[1];
-      const actionArgsStr = match[2];
-      console.log(`[A2UI Action] Detected: ${actionName} with args: ${actionArgsStr}`);
-
+  /* ─────────────── A2UI Action executor ─────────────── */
+  const executeActions = useCallback((text: string) => {
+    const re = /\[ACTION:\s*([A-Z_]+)(?:\s+(\{[\s\S]*?\}))?\s*\]/g;
+    let m;
+    while ((m = re.exec(text)) !== null) {
       try {
-        const args = actionArgsStr ? JSON.parse(actionArgsStr) : {};
-
-        if (actionName === "ADD_TO_CART") {
-          if (args.id && args.name && args.price) {
-            addToCart({
-              id: args.id,
-              name: args.name,
-              price: String(args.price),
-              quantity: Number(args.quantity || 1),
-              category: "food",
-              categoryId: args.categoryId || "dish"
-            });
-          } else {
-            console.warn("ADD_TO_CART missing arguments:", args);
-          }
-        } else if (actionName === "CLEAR_CART") {
+        const args = m[2] ? JSON.parse(m[2]) : {};
+        if (m[1] === "ADD_TO_CART" && args.id && args.name && args.price) {
+          addToCart({ id: args.id, name: args.name, price: String(args.price), quantity: Number(args.quantity || 1), category: "food", categoryId: args.categoryId || "dish" });
+        } else if (m[1] === "CLEAR_CART") {
           clearCart();
-          message.info("🧹 Đã làm trống giỏ hàng!");
-        } else if (actionName === "OPEN_CART") {
+        } else if (m[1] === "OPEN_CART") {
           openCartModal();
-          message.info("🛒 Đã mở giỏ hàng!");
-        } else if (actionName === "CALL_WAITER") {
-          handleSuggestionClick("restaurant", "CALL_WAITER");
+        } else if (m[1] === "CALL_WAITER") {
+          handleCallWaiter();
         }
-      } catch (e) {
-        console.error("Failed to parse or execute action args:", e, actionArgsStr);
-      }
+      } catch { /* ignore parse errors */ }
     }
-  };
+  }, [addToCart, clearCart, openCartModal, handleCallWaiter]);
 
-  const handleSend = async (chatType: "system" | "restaurant", textToSend?: string) => {
+  /* ─────────────── Send message ─────────────── */
+  const handleSend = useCallback(async (chatType: ChatType, overrideText?: string) => {
     const isSystem = chatType === "system";
-    const query = isSystem ? querySystem : queryRestaurant;
-    const activeText = (textToSend || query).trim();
-    if (!activeText) return;
+    const rawQuery = isSystem ? querySystem : queryRestaurant;
+    const text = (overrideText ?? rawQuery).trim();
+    if (!text) return;
 
-    if (!textToSend) {
-      if (isSystem) setQuerySystem("");
-      else setQueryRestaurant("");
+    // Clear input
+    if (!overrideText) {
+      if (isSystem) setQuerySystem(""); else setQueryRestaurant("");
     }
 
-    const history = isSystem ? historySystem : historyRestaurant;
-    const updatedHistory: ChatMessage[] = [...history, { role: "user", content: activeText }];
-    
-    if (isSystem) {
-      setHistorySystem(updatedHistory);
-      setIsLoadingSystem(true);
-    } else {
-      setHistoryRestaurant(updatedHistory);
-      setIsLoadingRestaurant(true);
-    }
+    const currentHistory = isSystem ? historySystem : historyRestaurant;
+    const newHistory: ChatMessage[] = [...currentHistory, { role: "user", content: text }];
+    if (isSystem) { setHistorySystem(newHistory); setIsLoadingSystem(true); }
+    else { setHistoryRestaurant(newHistory); setIsLoadingRestaurant(true); }
+
+    // Optimistically add empty bot message for streaming
+    if (isSystem) setHistorySystem(prev => [...prev, { role: "model", content: "" }]);
+    else setHistoryRestaurant(prev => [...prev, { role: "model", content: "" }]);
 
     try {
-      const response = await fetch(isSystem ? "/api/ai/chat/system" : "/api/ai/chat/restaurant", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "text/event-stream"
-        },
-        body: JSON.stringify({
-          restaurantId: isSystem ? undefined : tenant?.id,
-          query: activeText,
-          history: updatedHistory.map(m => ({
-            role: m.role,
-            content: m.content
+      const endpoint = isSystem ? "/api/ai/chat/system" : "/api/ai/chat/restaurant";
+      const body = isSystem
+        ? { query: text, history: newHistory.map(m => ({ role: m.role, content: m.content })) }
+        : {
+          restaurantId: tenant?.id,
+          query: text,
+          history: newHistory.map(m => ({ role: m.role, content: m.content })),
+          userPreferences: user?.fullName ? `Khách hàng: ${user.fullName}` : undefined,
+          sessionId: sessionIdRestaurant || undefined,
+          cartItems: cartItems.map(item => ({
+            name: item.name,
+            price: Number(item.price),
+            quantity: item.quantity,
+            note: item.note || undefined
           })),
-          userPreferences: !isSystem && user?.fullName ? `Khách hàng: ${user.fullName}` : undefined,
-          sessionId: !isSystem ? (sessionIdRestaurant || undefined) : undefined
-        })
+        };
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "text/event-stream" },
+        body: JSON.stringify(body),
       });
 
-      if (!response.ok) {
-        throw new Error("Mạng lỗi hoặc máy chủ không phản hồi.");
-      }
+      if (!response.ok) throw new Error("Lỗi kết nối máy chủ.");
 
       const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error("Không thể khởi tạo Stream Reader.");
-      }
+      if (!reader) throw new Error("Không thể khởi tạo stream.");
 
       const decoder = new TextDecoder();
       let botResponse = "";
-      
-      if (isSystem) {
-        setHistorySystem(prev => [...prev, { role: "model", content: "" }]);
-      } else {
-        setHistoryRestaurant(prev => [...prev, { role: "model", content: "" }]);
-      }
+      let buf = "";
 
-      let buffer = "";
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
 
         for (const line of lines) {
-          const cleanLine = line.trim();
-          if (!cleanLine.startsWith("data: ")) continue;
-          const jsonStr = cleanLine.substring(6).trim();
-
-          if (jsonStr === "[DONE]") {
-            break;
-          }
-
+          const trimmed = line.trim();
+          if (!trimmed.startsWith("data: ")) continue;
+          const json = trimmed.slice(6).trim();
+          if (json === "[DONE]") break;
           try {
-            const parsed = JSON.parse(jsonStr);
-            if (parsed.error) {
-              botResponse = `Lỗi hệ thống: ${parsed.error}`;
-              break;
-            }
+            const parsed = JSON.parse(json);
+            if (parsed.error) { botResponse = `Lỗi: ${parsed.error}`; break; }
             if (parsed.text) {
               botResponse += parsed.text;
-              
+              const snapshot = botResponse;
               if (isSystem) {
                 setHistorySystem(prev => {
-                  const newHist = [...prev];
-                  if (newHist.length > 0) {
-                    newHist[newHist.length - 1] = {
-                      role: "model",
-                      content: botResponse
-                    };
-                  }
-                  return newHist;
+                  const next = [...prev];
+                  if (next.length > 0) next[next.length - 1] = { role: "model", content: snapshot };
+                  return next;
                 });
               } else {
                 setHistoryRestaurant(prev => {
-                  const newHist = [...prev];
-                  if (newHist.length > 0) {
-                    newHist[newHist.length - 1] = {
-                      role: "model",
-                      content: botResponse
-                    };
-                  }
-                  return newHist;
+                  const next = [...prev];
+                  if (next.length > 0) next[next.length - 1] = { role: "model", content: snapshot };
+                  return next;
                 });
               }
             }
-          } catch (err) {
-            console.warn("Parse stream chunk error:", err);
-          }
+          } catch { /* skip bad chunk */ }
         }
       }
 
+      // Execute any A2UI actions in restaurant chat
       if (!isSystem && botResponse.includes("[ACTION:")) {
-        executeA2UIActions(botResponse);
+        executeActions(botResponse);
       }
 
     } catch (err: any) {
-      console.error("[Chat API Error]", err);
-      if (isSystem) {
-        setHistorySystem(prev => {
-          const newHist = [...prev];
-          if (newHist.length > 0 && newHist[newHist.length - 1].content === "") newHist.pop();
-          return [
-            ...newHist,
-            { role: "model", content: "Xin lỗi, hệ thống đang bận hoặc có lỗi kết nối mạng xảy ra. Vui lòng thử lại." }
-          ];
-        });
-      } else {
-        setHistoryRestaurant(prev => {
-          const newHist = [...prev];
-          if (newHist.length > 0 && newHist[newHist.length - 1].content === "") newHist.pop();
-          return [
-            ...newHist,
-            { role: "model", content: "Xin lỗi, hệ thống đang bận hoặc có lỗi kết nối mạng xảy ra. Vui lòng thử lại." }
-          ];
-        });
-      }
+      const errMsg = "Xin lỗi, hệ thống đang bận hoặc có lỗi kết nối. Vui lòng thử lại.";
+      const updateHistory = (prev: ChatMessage[]) => {
+        const next = [...prev];
+        if (next.length > 0 && next[next.length - 1].content === "") next.pop();
+        return [...next, { role: "model" as const, content: errMsg }];
+      };
+      if (isSystem) setHistorySystem(updateHistory);
+      else setHistoryRestaurant(updateHistory);
     } finally {
       if (isSystem) setIsLoadingSystem(false);
       else setIsLoadingRestaurant(false);
     }
-  };
+  }, [querySystem, queryRestaurant, historySystem, historyRestaurant, tenant?.id, user?.fullName, sessionIdRestaurant, executeActions, cartItems]);
 
-  const handleSuggestionClick = async (type: "system" | "restaurant", suggestion: string) => {
-    if (suggestion === "CALL_WAITER") {
-      const userMsg = "Gọi nhân viên phục vụ 🔔";
-      const botResponse = "Dạ vâng, tôi đã chuyển yêu cầu của bạn đến nhân viên trực bàn rồi ạ. Nhân viên sẽ tới bàn hỗ trợ bạn ngay lập tức! Bạn có cần tôi tư vấn gì thêm trong thực đơn không?";
-      
-      setHistoryRestaurant(prev => [
-        ...prev,
-        { role: "user", content: userMsg },
-        { role: "model", content: botResponse }
-      ]);
-      message.success("🔔 Đã gửi yêu cầu gọi nhân viên phục vụ tới bàn của bạn!");
-      return;
+  /* ─────────────── Clear history ─────────────── */
+  const handleClear = useCallback((chatType: ChatType) => {
+    if (!window.confirm("Bạn có chắc chắn muốn xóa lịch sử trò chuyện này?")) return;
+    const config = chatType === "system" ? aiConfigSystem : aiConfigRestaurant;
+    const welcome = config.welcomeMessage ? [{ role: "model" as const, content: config.welcomeMessage }] : [];
+    if (chatType === "system") {
+      setHistorySystem(welcome);
+      localStorage.removeItem("xfoodi-chat-history-system");
+    } else {
+      setHistoryRestaurant(welcome);
+      if (tenant?.id && sessionIdRestaurant) {
+        localStorage.removeItem(`xfoodi-chat-history-restaurant-${tenant.id}-${sessionIdRestaurant}`);
+      }
     }
+  }, [aiConfigSystem, aiConfigRestaurant, tenant?.id, sessionIdRestaurant]);
 
-    if (suggestion === "MENU") {
-      handleSend("restaurant", "Cho tôi xem thực đơn của nhà hàng");
-    } else if (suggestion === "BOOKING") {
-      handleSend("restaurant", "Tôi muốn hướng dẫn cách đặt bàn");
-    } else if (suggestion === "PLATFORM_INFO") {
-      handleSend("system", "Giới thiệu cho tôi các tính năng của XFoodi");
-    } else if (suggestion === "PRICING") {
-      handleSend("system", "Các gói dịch vụ của XFoodi bao nhiêu tiền?");
-    }
-  };
+  /* ─────────────── Visibility logic ─────────────── */
+  if (isAdminDomain) return null;
 
-  const renderMessageContent = (text: string) => {
-    if (!text) return "";
-    const cleanText = text.replace(/\[ACTION:\s*[A-Z_]+(?:\s+{.*?})?\s*\]/g, "").trim();
-    if (!cleanText) return "";
-    
-    let html = cleanText
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-      
-    html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
-    html = html.replace(/\*(.*?)\*/g, "<em>$1</em>");
-    html = html.replace(/^\s*-\s+(.*?)$/gm, "<li>$1</li>");
-    html = html.replace(/(<li>[\s\S]*?<\/li>)/g, '<ul class="list-disc pl-5 my-1 font-sans">$1</ul>');
-    html = html.replace(/\n/g, "<br/>");
+  // Get accent color from CSS variable or tenant primary
+  const accentColor = tenant?.primaryColor || "var(--primary)";
+  const XFOODI_COLOR = "#FF380B"; // XFoodi system brand color
 
-    return <div dangerouslySetInnerHTML={{ __html: html }} />;
-  };
+  /* Restaurant domain: only restaurant chat, no system */
+  if (isRestaurantDomain) {
+    if (!aiConfigRestaurant.isChatEnabled) return null;
 
-  // Determine visibility states based on user and tenant configurations
-  const showSystemBtn = aiConfigSystem.isChatEnabled !== false;
-  const showRestaurantChat = !!user && !!tenant?.id && tenant.id !== "demo";
-  const showRestaurantBtn = showRestaurantChat && aiConfigRestaurant.isChatEnabled !== false;
+    const logoUrl = tenant?.logoUrl || "/images/logo/xfoodi-logo.png";
+    const botName = tenant?.name ? `${tenant.name} AI` : "Restaurant AI";
 
-  if (!showSystemBtn && !showRestaurantBtn) {
-    return null; // Both chats are disabled or user context doesn't permit
+    return (
+      <>
+        <style>{`
+          @keyframes chatDotBounce {
+            0%, 80%, 100% { transform: translateY(0); opacity: 0.5; }
+            40% { transform: translateY(-6px); opacity: 1; }
+          }
+          @keyframes chatPing {
+            75%, 100% { transform: scale(1.8); opacity: 0; }
+          }
+        `}</style>
+
+        {/* Floating Restaurant Chat Button */}
+        <button
+          id="xfoodi-restaurant-chat-toggle"
+          onClick={() => setActiveChat(activeChat === "restaurant" ? null : "restaurant")}
+          aria-label="Mở chatbot nhà hàng"
+          style={{
+            position: "fixed", bottom: 24, right: 24,
+            width: 56, height: 56,
+            borderRadius: "50%",
+            border: "none",
+            background: "white",
+            boxShadow: "0 6px 24px rgba(0,0,0,0.15), 0 2px 8px rgba(0,0,0,0.08)",
+            cursor: "pointer",
+            zIndex: 9999,
+            padding: 0,
+            overflow: "visible",
+            transition: "transform 0.2s, box-shadow 0.2s",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "scale(1.08)"; (e.currentTarget as HTMLElement).style.boxShadow = "0 10px 32px rgba(0,0,0,0.2)"; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = "scale(1)"; (e.currentTarget as HTMLElement).style.boxShadow = "0 6px 24px rgba(0,0,0,0.15), 0 2px 8px rgba(0,0,0,0.08)"; }}
+        >
+          <AnimatePresence mode="wait">
+            {activeChat === "restaurant" ? (
+              <motion.div key="close" initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.2 }}>
+                <X className="h-5 w-5 text-[var(--text)]" />
+              </motion.div>
+            ) : (
+              <motion.div key="logo" initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.8, opacity: 0 }} transition={{ duration: 0.2 }}
+                style={{ position: "relative", width: 56, height: 56 }}>
+                <span style={{
+                  position: "absolute", inset: 0, borderRadius: "50%",
+                  background: accentColor, opacity: 0.2,
+                  animation: "chatPing 2s cubic-bezier(0,0,0.2,1) infinite",
+                }} />
+                <img
+                  src={logoUrl}
+                  alt={botName}
+                  style={{ width: 56, height: 56, borderRadius: "50%", objectFit: "cover", border: `2.5px solid ${accentColor}` }}
+                  onError={(e) => { (e.target as HTMLImageElement).src = "/images/logo/xfoodi-logo.png"; }}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </button>
+
+        <AnimatePresence>
+          {activeChat === "restaurant" && (
+            <ChatWindow
+              chatType="restaurant"
+              history={historyRestaurant}
+              isLoading={isLoadingRestaurant}
+              query={queryRestaurant}
+              onQueryChange={setQueryRestaurant}
+              onSend={(t) => handleSend("restaurant", t)}
+              onClear={() => handleClear("restaurant")}
+              onClose={() => setActiveChat(null)}
+              config={aiConfigRestaurant}
+              logoUrl={logoUrl}
+              botName={botName}
+              accentColor={accentColor}
+              onAddToCart={(d) => addToCart({ id: d.id, name: d.name, price: String(d.price), quantity: Number(d.quantity || 1), category: "food", categoryId: d.categoryId || "dish" })}
+            />
+          )}
+        </AnimatePresence>
+      </>
+    );
   }
 
-  // Positioning of Restaurant Button shifts if System Button is disabled
-  const restaurantBtnRightClass = showSystemBtn ? "right-[88px]" : "right-6";
-
-  const currentOpenChat = activeChat;
-  const currentHistory = currentOpenChat === "system" ? historySystem : historyRestaurant;
-  const currentLoading = currentOpenChat === "system" ? isLoadingSystem : isLoadingRestaurant;
-  const currentQuery = currentOpenChat === "system" ? querySystem : queryRestaurant;
-  const currentSetQuery = currentOpenChat === "system" ? setQuerySystem : setQueryRestaurant;
-  const currentConfig = currentOpenChat === "system" ? aiConfigSystem : aiConfigRestaurant;
+  /* ─────────────── System / Landing domain: only system chat ─────────────── */
+  if (!aiConfigSystem.isChatEnabled) return null;
 
   return (
     <>
-      {/* Floating Toggle Buttons */}
-      {showSystemBtn && (
-        <button
-          onClick={() => setActiveChat(activeChat === "system" ? null : "system")}
-          className="fixed bottom-6 right-6 w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all duration-300 z-50 group focus:outline-none border border-[var(--border)]"
-          aria-label="Toggle System Chat Assistant"
-          style={{
-            boxShadow: "0 6px 20px rgba(0, 0, 0, 0.12)"
-          }}
-        >
+      <style>{`
+        @keyframes chatDotBounce {
+          0%, 80%, 100% { transform: translateY(0); opacity: 0.5; }
+          40% { transform: translateY(-6px); opacity: 1; }
+        }
+        @keyframes chatPing {
+          75%, 100% { transform: scale(1.8); opacity: 0; }
+        }
+      `}</style>
+
+      {/* Floating System Chat Button */}
+      <button
+        id="xfoodi-system-chat-toggle"
+        onClick={() => setActiveChat(activeChat === "system" ? null : "system")}
+        aria-label="Mở chatbot hệ thống XFoodi"
+        style={{
+          position: "fixed", bottom: 24, right: 24,
+          width: 56, height: 56,
+          borderRadius: "50%",
+          border: "none",
+          background: "white",
+          boxShadow: "0 6px 24px rgba(0,0,0,0.15), 0 2px 8px rgba(0,0,0,0.08)",
+          cursor: "pointer",
+          zIndex: 9999,
+          padding: 0,
+          overflow: "visible",
+          transition: "transform 0.2s, box-shadow 0.2s",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}
+        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "scale(1.08)"; (e.currentTarget as HTMLElement).style.boxShadow = "0 10px 32px rgba(0,0,0,0.2)"; }}
+        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = "scale(1)"; (e.currentTarget as HTMLElement).style.boxShadow = "0 6px 24px rgba(0,0,0,0.15), 0 2px 8px rgba(0,0,0,0.08)"; }}
+      >
+        <AnimatePresence mode="wait">
           {activeChat === "system" ? (
-            <CloseOutlined className="text-xl text-[var(--text)] transition-transform duration-300" />
+            <motion.div key="close" initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.2 }}>
+              <X className="h-5 w-5 text-[var(--text)]" />
+            </motion.div>
           ) : (
-            <div className="relative flex items-center justify-center w-full h-full p-0.5">
-              <span className="absolute inline-flex h-full w-full rounded-full bg-[var(--primary)] opacity-25 animate-ping group-hover:animate-none -z-10"></span>
+            <motion.div key="logo" initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.8, opacity: 0 }} transition={{ duration: 0.2 }}
+              style={{ position: "relative", width: 56, height: 56 }}>
+              <span style={{
+                position: "absolute", inset: 0, borderRadius: "50%",
+                background: XFOODI_COLOR, opacity: 0.18,
+                animation: "chatPing 2s cubic-bezier(0,0,0.2,1) infinite",
+              }} />
               <img
                 src="/images/logo/xfoodi-logo.png"
-                alt="System Support"
-                className="w-12 h-12 rounded-full object-cover bg-white"
+                alt="XFoodi AI Support"
+                style={{ width: 56, height: 56, borderRadius: "50%", objectFit: "cover", border: `2.5px solid ${XFOODI_COLOR}` }}
               />
-            </div>
+            </motion.div>
           )}
-        </button>
-      )}
+        </AnimatePresence>
+      </button>
 
-      {showRestaurantBtn && (
-        <button
-          onClick={() => setActiveChat(activeChat === "restaurant" ? null : "restaurant")}
-          className={`fixed bottom-6 ${restaurantBtnRightClass} w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all duration-300 z-50 group focus:outline-none border border-[var(--border)]`}
-          aria-label="Toggle Restaurant Chat Assistant"
-          style={{
-            boxShadow: "0 6px 20px rgba(0, 0, 0, 0.12)"
-          }}
-        >
-          {activeChat === "restaurant" ? (
-            <CloseOutlined className="text-xl text-[var(--text)] transition-transform duration-300" />
-          ) : (
-            <div className="relative flex items-center justify-center w-full h-full p-0.5">
-              <span className="absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-25 animate-ping group-hover:animate-none -z-10"></span>
-              <img
-                src={tenant?.logoUrl || "/images/restaurant/default-restaurant.png"}
-                alt="Restaurant Support"
-                className="w-12 h-12 rounded-full object-cover bg-white"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = "/images/logo/xfoodi-logo.png";
-                }}
-              />
-            </div>
-          )}
-        </button>
-      )}
-
-      {/* Floating Chat Box Window */}
-      {currentOpenChat && (
-        <div
-          className="fixed bottom-24 right-6 w-[360px] md:w-[400px] h-[550px] rounded-2xl flex flex-col shadow-2xl z-50 border border-[var(--border)] overflow-hidden transition-all duration-300 animate-in fade-in slide-in-from-bottom-5 duration-300"
-          style={{
-            background: "color-mix(in srgb, var(--card) 95%, transparent)",
-            backdropFilter: "blur(16px)",
-            boxShadow: "0 12px 40px rgba(0,0,0,0.15)"
-          }}
-        >
-          {/* Header */}
-          <div 
-            className="px-4 py-3 border-b border-[var(--border)] flex items-center justify-between"
-            style={{ background: "color-mix(in srgb, var(--surface) 90%, transparent)" }}
-          >
-            <div className="flex items-center gap-2.5">
-              <img
-                src={currentOpenChat === "system" ? "/images/logo/xfoodi-logo.png" : (tenant?.logoUrl || "/images/restaurant/default-restaurant.png")}
-                alt="Chat Logo"
-                className="w-8 h-8 rounded-full object-cover border border-[var(--border)] bg-white"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = "/images/logo/xfoodi-logo.png";
-                }}
-              />
-              <div>
-                <h3 className="font-bold text-sm text-[var(--text)] m-0 leading-tight">
-                  {currentOpenChat === "system" 
-                    ? "XFoodi AI Support" 
-                    : (tenant?.name ? `${tenant.name} AI Assistant` : "Restaurant AI Assistant")}
-                </h3>
-                <div className="flex items-center gap-1 mt-0.5">
-                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                  <span className="text-[10px] text-[var(--text-muted)] font-medium">Trực tuyến</span>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              {currentHistory.length > 1 && (
-                <button
-                  onClick={() => handleClearHistory(currentOpenChat)}
-                  className="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-[var(--text-muted)] hover:text-red-500 transition-colors focus:outline-none"
-                  title="Xóa lịch sử trò chuyện"
-                >
-                  <DeleteOutlined className="text-sm" />
-                </button>
-              )}
-              <button
-                onClick={() => setActiveChat(null)}
-                className="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-[var(--text-muted)] hover:text-[var(--text)] transition-colors focus:outline-none"
-              >
-                <CloseOutlined className="text-sm" />
-              </button>
-            </div>
-          </div>
-
-          {/* Chat Messages List */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {currentHistory.map((msg, idx) => (
-              <div
-                key={idx}
-                className={`flex items-start gap-2.5 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-              >
-                {msg.role === "model" && (
-                  <img
-                    src={currentOpenChat === "system" ? "/images/logo/xfoodi-logo.png" : (tenant?.logoUrl || "/images/restaurant/default-restaurant.png")}
-                    alt="AI Avatar"
-                    className="w-8 h-8 rounded-full object-cover border border-[var(--border)] bg-white flex-shrink-0"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = "/images/logo/xfoodi-logo.png";
-                    }}
-                  />
-                )}
-                <div
-                  className={`max-w-[78%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
-                    msg.role === "user"
-                      ? "bg-[var(--primary)] text-white rounded-tr-none shadow-sm"
-                      : "bg-[var(--surface)] text-[var(--text)] border border-[var(--border)] rounded-tl-none shadow-sm"
-                  }`}
-                >
-                  {renderMessageContent(msg.content)}
-                </div>
-              </div>
-            ))}
-
-            {/* Typing Indicator */}
-            {currentLoading && (
-              <div className="flex items-start gap-2.5 justify-start">
-                <img
-                  src={currentOpenChat === "system" ? "/images/logo/xfoodi-logo.png" : (tenant?.logoUrl || "/images/restaurant/default-restaurant.png")}
-                  alt="AI Avatar"
-                  className="w-8 h-8 rounded-full object-cover border border-[var(--border)] bg-white flex-shrink-0"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = "/images/logo/xfoodi-logo.png";
-                  }}
-                />
-                <div className="bg-[var(--surface)] text-[var(--text)] border border-[var(--border)] rounded-2xl rounded-tl-none px-4 py-3.5 flex items-center space-x-1.5 shadow-sm">
-                  <span className="w-2 h-2 bg-[var(--text-muted)] rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></span>
-                  <span className="w-2 h-2 bg-[var(--text-muted)] rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></span>
-                  <span className="w-2 h-2 bg-[var(--text-muted)] rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></span>
-                </div>
-              </div>
-            )}
-            <div ref={chatEndRef} />
-          </div>
-
-          {/* Quick Suggestion Chips */}
-          <div className="px-4 py-2 flex flex-wrap gap-1.5 border-t border-[var(--border)] bg-black/5 dark:bg-white/5">
-            {currentOpenChat === "restaurant" ? (
-              <>
-                <button
-                  onClick={() => handleSuggestionClick("restaurant", "CALL_WAITER")}
-                  className="px-2.5 py-1 text-xs bg-[var(--card)] hover:bg-[var(--primary)] hover:text-white text-[var(--primary)] border border-[var(--primary)] rounded-full transition-all focus:outline-none"
-                >
-                  Gọi phục vụ 🔔
-                </button>
-                <button
-                  onClick={() => handleSuggestionClick("restaurant", "MENU")}
-                  className="px-2.5 py-1 text-xs bg-[var(--card)] hover:bg-[var(--primary)] hover:text-white text-[var(--text)] border border-[var(--border)] rounded-full transition-all focus:outline-none"
-                >
-                  Xem thực đơn 📜
-                </button>
-                <button
-                  onClick={() => handleSuggestionClick("restaurant", "BOOKING")}
-                  className="px-2.5 py-1 text-xs bg-[var(--card)] hover:bg-[var(--primary)] hover:text-white text-[var(--text)] border border-[var(--border)] rounded-full transition-all focus:outline-none"
-                >
-                  Đặt bàn ăn 📅
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  onClick={() => handleSuggestionClick("system", "PLATFORM_INFO")}
-                  className="px-2.5 py-1 text-xs bg-[var(--card)] hover:bg-[var(--primary)] hover:text-white text-[var(--primary)] border border-[var(--primary)] rounded-full transition-all focus:outline-none"
-                >
-                  Tính năng 💡
-                </button>
-                <button
-                  onClick={() => handleSuggestionClick("system", "PRICING")}
-                  className="px-2.5 py-1 text-xs bg-[var(--card)] hover:bg-[var(--primary)] hover:text-white text-[var(--text)] border border-[var(--border)] rounded-full transition-all focus:outline-none"
-                >
-                  Gói dịch vụ 🏷️
-                </button>
-              </>
-            )}
-          </div>
-
-          {/* Input Footer Form */}
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSend(currentOpenChat);
-            }}
-            className="p-3 border-t border-[var(--border)] flex gap-2 items-center"
-            style={{ background: "color-mix(in srgb, var(--card) 95%, transparent)" }}
-          >
-            <input
-              type="text"
-              value={currentQuery}
-              onChange={(e) => currentSetQuery(e.target.value)}
-              placeholder="Nhập tin nhắn..."
-              disabled={currentLoading}
-              className="flex-1 px-3.5 py-2 text-sm rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--primary)] transition-all"
-            />
-            <button
-              type="submit"
-              disabled={currentLoading || !currentQuery.trim()}
-              className="w-9 h-9 rounded-xl bg-[var(--primary)] disabled:bg-gray-400 text-white flex items-center justify-center hover:scale-105 active:scale-95 transition-all focus:outline-none"
-            >
-              <SendOutlined className="text-base" />
-            </button>
-          </form>
-        </div>
-      )}
+      <AnimatePresence>
+        {activeChat === "system" && (
+          <ChatWindow
+            chatType="system"
+            history={historySystem}
+            isLoading={isLoadingSystem}
+            query={querySystem}
+            onQueryChange={setQuerySystem}
+            onSend={(t) => handleSend("system", t)}
+            onClear={() => handleClear("system")}
+            onClose={() => setActiveChat(null)}
+            config={aiConfigSystem}
+            logoUrl="/images/logo/xfoodi-logo.png"
+            botName="XFoodi AI Support"
+            accentColor={XFOODI_COLOR}
+          />
+        )}
+      </AnimatePresence>
     </>
   );
 }

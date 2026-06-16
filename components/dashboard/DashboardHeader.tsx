@@ -33,24 +33,37 @@ export default function DashboardHeader({
   const [notificationOpen, setNotificationOpen] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
 
-  // Resolve user from auth if props not passed
-  const currentUser = authService.getCurrentUser();
-  const resolvedName =
-    userName ||
-    currentUser?.fullName ||
-    currentUser?.name ||
-    "User";
-  const resolvedEmail =
-    userEmail ||
-    currentUser?.email ||
-    "";
-  const resolvedAvatar = currentUser?.avatar || "";
-  const initials = resolvedName
-    .split(" ")
-    .map((w: string) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase() || "U";
+  // Resolve user from auth if props not passed (with hydration-safe state)
+  const [resolvedName, setResolvedName] = useState(userName || "User");
+  const [resolvedEmail, setResolvedEmail] = useState(userEmail || "");
+  const [resolvedAvatar, setResolvedAvatar] = useState("");
+  const [initials, setInitials] = useState(() => {
+    const defaultName = userName || "User";
+    return defaultName
+      .split(" ")
+      .map((w: string) => w[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase() || "U";
+  });
+
+  useEffect(() => {
+    const currentUser = authService.getCurrentUser();
+    const name = userName || currentUser?.fullName || currentUser?.name || "User";
+    const email = userEmail || currentUser?.email || "";
+    const avatar = currentUser?.avatar || "";
+    const init = name
+      .split(" ")
+      .map((w: string) => w[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase() || "U";
+
+    setResolvedName(name);
+    setResolvedEmail(email);
+    setResolvedAvatar(avatar);
+    setInitials(init);
+  }, [userName, userEmail]);
 
   const chipLabel =
     role === "admin"
@@ -212,7 +225,7 @@ export default function DashboardHeader({
         justifyContent: "space-between",
         padding: "0 24px",
         height: "64px",
-        background: "rgba(var(--card-rgb, 255,255,255), 0.95)",
+        background: "color-mix(in srgb, var(--card) 95%, transparent)",
         backdropFilter: "blur(12px)",
         WebkitBackdropFilter: "blur(12px)",
         borderBottom: "1px solid var(--border)",

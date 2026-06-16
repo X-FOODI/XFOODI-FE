@@ -15,8 +15,33 @@ import PricingSection from "./components/PricingSection";
 import WorkflowSection from "./components/WorkflowSection";
 import RestaurantsSection from "./components/RestaurantsSection";
 import TestimonialsSection from "./components/TestimonialsSection";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/contexts/AuthContext";
+import { redirectAfterLogin } from "@/lib/auth/redirectAfterLogin";
 
 export default function Home() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const host = window.location.hostname;
+      const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || "xfoodi.website";
+      const isMainDomain = host === "localhost" || host === BASE_DOMAIN || host === `www.${BASE_DOMAIN}`;
+
+      if (isMainDomain && !loading && user) {
+        const roles = user.roles || (user.role ? [user.role] : []);
+        const isOwnerOrStaff = roles.some(
+          (r) => r.toLowerCase() === "owner" || r.toLowerCase() === "staff"
+        );
+        if (isOwnerOrStaff && user.restaurantSlug) {
+          redirectAfterLogin(router, user, null);
+        }
+      }
+    }
+  }, [user, loading, router]);
+
   return (
     <PageTransition minimumLoadingTime={2000}>
       <div style={{ minHeight: "100vh" }}>

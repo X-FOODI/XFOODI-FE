@@ -4,6 +4,7 @@ import type { User } from '@/lib/services/authService';
 import { motion } from 'framer-motion';
 import { useRef, useState } from 'react';
 import { EMOJI_LIST, getAvatarUrl, parseHashtags, parseMentions } from '../utils/socialHelpers';
+import { Image as ImageIcon, Smile, Hash, AtSign } from 'lucide-react';
 
 interface CreatePostProps {
   user: User | null;
@@ -131,34 +132,34 @@ export default function CreatePost({ user, disabled, onSubmit }: CreatePostProps
             type="button"
             disabled={disabled}
             onClick={() => fileRef.current?.click()}
-            className="rounded-lg px-3 py-1.5 text-sm text-[var(--text-muted)] hover:bg-[var(--surface)] disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-[var(--text-muted)] hover:bg-[var(--surface)] disabled:opacity-50"
             title="Ảnh"
           >
-            🖼️ Ảnh
+            <ImageIcon className="h-4 w-4" /> Ảnh
           </button>
           <button
             type="button"
             disabled={disabled}
             onClick={() => setShowEmoji((s) => !s)}
-            className="rounded-lg px-3 py-1.5 text-sm text-[var(--text-muted)] hover:bg-[var(--surface)] disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-[var(--text-muted)] hover:bg-[var(--surface)] disabled:opacity-50"
           >
-            😊 Emoji
+            <Smile className="h-4 w-4" /> Emoji
           </button>
           <button
             type="button"
             disabled={disabled}
             onClick={() => setContent((c) => c + (c.endsWith(' ') || !c ? '#' : ' #'))}
-            className="rounded-lg px-3 py-1.5 text-sm text-[var(--text-muted)] hover:bg-[var(--surface)] disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-[var(--text-muted)] hover:bg-[var(--surface)] disabled:opacity-50"
           >
-            # Hashtag
+            <Hash className="h-4 w-4" /> Hashtag
           </button>
           <button
             type="button"
             disabled={disabled}
             onClick={() => setContent((c) => c + (c.endsWith(' ') || !c ? '@' : ' @'))}
-            className="rounded-lg px-3 py-1.5 text-sm text-[var(--text-muted)] hover:bg-[var(--surface)] disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-[var(--text-muted)] hover:bg-[var(--surface)] disabled:opacity-50"
           >
-            @ Mention
+            <AtSign className="h-4 w-4" /> Mention
           </button>
         </div>
         <button
