@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { Search } from 'lucide-react';
 
 interface SocialSearchBarProps {
   className?: string;
@@ -21,9 +22,7 @@ export default function SocialSearchBar({ className = '', compact }: SocialSearc
 
   return (
     <form onSubmit={submit} className={`relative ${className}`}>
-      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">
-        🔍
-      </span>
+      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
       <input
         type="search"
         value={query}

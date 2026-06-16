@@ -4,13 +4,14 @@ import { formatRelativeTime } from '@/app/social/utils/socialHelpers';
 import { useSocialNotifications } from '@/hooks/social';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
+import { ThumbsUp, MessageSquare, UserPlus, AtSign, Share2, Bell } from 'lucide-react';
 
-const TYPE_ICON: Record<string, string> = {
-  like: '👍',
-  comment: '💬',
-  follow: '👤',
-  mention: '@',
-  share: '↗️',
+const TYPE_ICON: Record<string, React.ReactNode> = {
+  like: <ThumbsUp className="h-4 w-4 text-blue-500 fill-blue-500" />,
+  comment: <MessageSquare className="h-4 w-4 text-green-500" />,
+  follow: <UserPlus className="h-4 w-4 text-purple-500" />,
+  mention: <AtSign className="h-4 w-4 text-orange-500" />,
+  share: <Share2 className="h-4 w-4 text-pink-500" />,
 };
 
 export default function NotificationDropdown() {
@@ -36,10 +37,10 @@ export default function NotificationDropdown() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="relative flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface)] text-lg transition hover:bg-[var(--primary-soft)]"
+        className="relative flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface)] transition hover:bg-[var(--primary-soft)]"
         aria-label="Thông báo"
       >
-        🔔
+        <Bell className="h-5 w-5 text-[var(--text)]" />
         {unreadCount > 0 && (
           <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
             {unreadCount > 9 ? '9+' : unreadCount}
@@ -81,7 +82,9 @@ export default function NotificationDropdown() {
                       !n.read ? 'bg-[var(--primary-soft)]/30' : ''
                     }`}
                   >
-                    <span className="text-xl">{TYPE_ICON[n.type] ?? '🔔'}</span>
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--surface)]">
+                      {TYPE_ICON[n.type] ?? <Bell className="h-4 w-4 text-[var(--text-muted)]" />}
+                    </span>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm text-[var(--text)]">
                         <span className="font-semibold">{n.actor.fullName ?? n.actor.username}</span>{' '}

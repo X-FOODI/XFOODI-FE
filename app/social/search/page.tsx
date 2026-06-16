@@ -7,6 +7,7 @@ import type { SearchResults } from '@/lib/types/social';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useState } from 'react';
+import { Search } from 'lucide-react';
 
 function SocialSearchContent() {
   const searchParams = useSearchParams();
@@ -46,9 +47,7 @@ function SocialSearchContent() {
         }}
         className="relative"
       >
-        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">
-          🔍
-        </span>
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
         <input
           type="search"
           value={query}

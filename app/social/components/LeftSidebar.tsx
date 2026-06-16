@@ -4,12 +4,13 @@ import type { FeedFilter, SocialUser } from '@/lib/types/social';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { getAvatarUrl, getDisplayName } from '../utils/socialHelpers';
+import { Home, FileText, Flame, Bookmark, Search, User, Settings } from 'lucide-react';
 
-const MENU: { key: FeedFilter; label: string; icon: string }[] = [
-  { key: 'news', label: 'News Feed', icon: '🏠' },
-  { key: 'my', label: 'My Posts', icon: '📝' },
-  { key: 'trending', label: 'Trending', icon: '🔥' },
-  { key: 'saved', label: 'Saved Posts', icon: '🔖' },
+const MENU: { key: FeedFilter; label: string; icon: React.ReactNode }[] = [
+  { key: 'news', label: 'News Feed', icon: <Home className="h-4 w-4" /> },
+  { key: 'my', label: 'My Posts', icon: <FileText className="h-4 w-4" /> },
+  { key: 'trending', label: 'Trending', icon: <Flame className="h-4 w-4" /> },
+  { key: 'saved', label: 'Saved Posts', icon: <Bookmark className="h-4 w-4" /> },
 ];
 
 interface LeftSidebarProps {
@@ -74,7 +75,7 @@ export default function LeftSidebar({ profile, activeFeed, onFeedChange }: LeftS
           href="/social/search"
           className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-[var(--text-muted)] hover:bg-[var(--surface)]"
         >
-          <span>🔍</span>
+          <Search className="h-4 w-4" />
           Tìm kiếm
         </Link>
         {profile.id && (
@@ -82,7 +83,7 @@ export default function LeftSidebar({ profile, activeFeed, onFeedChange }: LeftS
             href="/social/profile"
             className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-[var(--text-muted)] hover:bg-[var(--surface)]"
           >
-            <span>👤</span>
+            <User className="h-4 w-4" />
             Trang cá nhân
           </Link>
         )}
@@ -90,7 +91,7 @@ export default function LeftSidebar({ profile, activeFeed, onFeedChange }: LeftS
           type="button"
           className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-[var(--text-muted)] hover:bg-[var(--surface)]"
         >
-          <span>⚙️</span>
+          <Settings className="h-4 w-4" />
           Settings
         </button>
       </nav>

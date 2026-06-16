@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { Search } from 'lucide-react';
 
 /**
  * Optional extras for the global Header on non-social routes.
@@ -16,7 +17,7 @@ export default function SocialHeaderExtras() {
       href="/social/search"
       className="hidden items-center gap-1 rounded-full border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-muted)] transition hover:border-[var(--primary)] hover:text-[var(--primary)] sm:flex"
     >
-      🔍 <span className="hidden md:inline">Tìm MXH</span>
+      <Search className="h-4 w-4" /> <span className="hidden md:inline">Tìm MXH</span>
     </Link>
   );
 }

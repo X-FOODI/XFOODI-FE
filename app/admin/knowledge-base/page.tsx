@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
 import axiosInstance from "@/lib/services/axiosInstance";
-import { message as antdMessage } from "antd";
+import { message as antdMessage, App } from "antd";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   MessageOutlined,
@@ -272,7 +272,7 @@ export default function SuperAdminKnowledgeBasePage() {
   const [selectedBucketId, setSelectedBucketId] = useState<string>("all");
   const [loadingBuckets, setLoadingBuckets] = useState(false);
   const [activeBucketView, setActiveBucketView] = useState<"list" | "detail">("list");
-  const [bucketDetailTab, setBucketDetailTab] = useState<"objects" | "properties" | "test">("objects");
+  const [bucketDetailTab, setBucketDetailTab] = useState<"objects" | "properties" | "test" | "history">("objects");
 
   /* ── Bucket CRUD ── */
   const [isCreateBucketOpen, setIsCreateBucketOpen] = useState(false);
@@ -289,7 +289,7 @@ export default function SuperAdminKnowledgeBasePage() {
   // KB Create States
   const [isCreateKbOpen, setIsCreateKbOpen] = useState(false);
   const [selectedKbBucketId, setSelectedKbBucketId] = useState("");
-  const [kbChunkingStrategy, setKbChunkingStrategy] = useState<"FIXED" | "SEMANTIC" | "NONE">("FIXED");
+  const [kbChunkingStrategy, setKbChunkingStrategy] = useState<"FIXED" | "SEMANTIC" | "NONE" | "ADAPTIVE">("FIXED");
   const [kbChunkSize, setKbChunkSize] = useState(800);
   const [kbChunkOverlap, setKbChunkOverlap] = useState(100);
   const [creatingKb, setCreatingKb] = useState(false);
@@ -313,7 +313,8 @@ export default function SuperAdminKnowledgeBasePage() {
   const [expandedPaths, setExpandedPaths] = useState<Record<string, boolean>>({});
 
   /* ── AI Config ── */
-  const [aiConfig, setAiConfig] = useState({ isChatEnabled: true, aiModel: "gemini-2.5-flash", temperature: 0.2, welcomeMessage: "", systemPrompt: "" });
+  const [aiConfig, setAiConfig] = useState<{ isChatEnabled: boolean; aiModel: string; temperature: number; welcomeMessage: string; systemPrompt: string; quickSuggestions: string[] }>({ isChatEnabled: true, aiModel: "gemini-2.5-flash", temperature: 0.2, welcomeMessage: "", systemPrompt: "", quickSuggestions: [] });
+  const [quickSuggestionsInput, setQuickSuggestionsInput] = useState("");
   const [loadingConfig, setLoadingConfig] = useState(false);
   const [savingConfig, setSavingConfig] = useState(false);
   const [activeHelp, setActiveHelp] = useState<Record<string, boolean>>({});
@@ -422,7 +423,11 @@ export default function SuperAdminKnowledgeBasePage() {
     setLoadingConfig(true);
     try {
       const response = await axiosInstance.get("/ai/config", { params: { restaurantId } });
-      if (response.data.success) setAiConfig(response.data.data);
+      if (response.data.success) {
+        const cfg = response.data.data;
+        setAiConfig({ ...cfg, quickSuggestions: Array.isArray(cfg.quickSuggestions) ? cfg.quickSuggestions : [] });
+        setQuickSuggestionsInput(Array.isArray(cfg.quickSuggestions) ? cfg.quickSuggestions.join(", ") : "");
+      }
     } catch (err: any) {
       console.error("[SuperAdmin KB Config] Fetch error:", err);
       message.error("Không thể tải cấu hình AI.");
@@ -645,11 +650,21 @@ export default function SuperAdminKnowledgeBasePage() {
   const handleSaveConfig = async () => {
     setSavingConfig(true);
     try {
-      const response = await axiosInstance.post("/ai/config", { restaurantId: selectedRestaurantId, ...aiConfig });
-      if (response.data.success) message.success("Lưu cấu hình AI thành công!");
+      // Parse quickSuggestionsInput: comma-separated string → array
+      const parsedSuggestions = quickSuggestionsInput
+        .split(",")
+        .map(s => s.trim())
+        .filter(Boolean);
+      const configToSave = { ...aiConfig, quickSuggestions: parsedSuggestions };
+      const response = await axiosInstance.post("/ai/config", { restaurantId: selectedRestaurantId, ...configToSave });
+      if (response.data.success) {
+        setAiConfig(prev => ({ ...prev, quickSuggestions: parsedSuggestions }));
+        message.success("Lưu cấu hình AI thành công!");
+      }
     } catch (err: any) { message.error(err.response?.data?.message || "Lưu cấu hình AI thất bại."); }
     finally { setSavingConfig(false); }
   };
+
 
   /* Upload files → chỉ lưu vào bucket, KHÔNG chunking ngay */
   const uploadFiles = async (files: FileList) => {
@@ -1153,7 +1168,7 @@ export default function SuperAdminKnowledgeBasePage() {
                 {/* Tab bar */}
                 {sidebarSection === "knowledge-base" && (
                   <div className="flex gap-0 border-b" style={{ borderColor: "var(--border)" }}>
-                    {(["objects", "properties", "test"] as const).map(tab => (
+                    {(["objects", "properties", "test", "history"] as const).map(tab => (
                       <button
                         key={tab}
                         onClick={() => setBucketDetailTab(tab)}
@@ -1163,7 +1178,9 @@ export default function SuperAdminKnowledgeBasePage() {
                           ? `Objects (${filteredDocuments.length})` 
                           : tab === "properties" 
                             ? "Properties & Knowledge Base" 
-                            : "Kiểm tra (Test KB)"}
+                            : tab === "history"
+                              ? "Lịch sử & Snapshots"
+                              : "Kiểm tra (Test KB)"}
                       </button>
                     ))}
                   </div>
@@ -1504,11 +1521,18 @@ export default function SuperAdminKnowledgeBasePage() {
                       </div>
                     </div>
                   )
-                ) : (
+                ) : bucketDetailTab === "test" ? (
                   /* ──── Test Tab ──── */
                   activeBucket && (
                     <div className="p-4">
                       <KbTestPanel bucketId={activeBucket.id} restaurantId={selectedRestaurantId} />
+                    </div>
+                  )
+                ) : (
+                  /* ──── History & Snapshots Tab ──── */
+                  activeBucket && (
+                    <div className="p-4">
+                      <KbHistoryPanel bucketId={activeBucket.id} restaurantId={selectedRestaurantId} />
                     </div>
                   )
                 )}
@@ -1621,6 +1645,33 @@ export default function SuperAdminKnowledgeBasePage() {
                         ))}
                       </div>
                     </div>
+                  </div>
+
+                  {/* Quick Suggestions */}
+                  <div className="p-4 rounded-xl border space-y-2" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+                    <div className="flex items-center gap-1.5">
+                      <label className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--text)" }}>Gợi ý nhanh (Quick Chips)</label>
+                      <button type="button" title="Nhập các gợi ý ngăn cách bởi dấu phẩy, ví dụ: Xem thực đơn 📜, Đặt bàn 📅" className="w-4 h-4 rounded-full bg-[var(--primary-soft)] text-[var(--primary)] text-[10px] font-bold flex items-center justify-center">!</button>
+                    </div>
+                    <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>Nhập các chip gợi ý hiển thị trong chatbox, ngăn cách bởi dấu phẩy. Tối đa 6 chip.</p>
+                    <input
+                      type="text"
+                      value={quickSuggestionsInput}
+                      onChange={e => setQuickSuggestionsInput(e.target.value)}
+                      placeholder="Xem thực đơn 📜, Giờ mở cửa 🕐, Đặt bàn 📅, Gọi phục vụ 🔔"
+                      className="w-full px-3 py-2 rounded-lg text-xs border focus:outline-none focus:border-[var(--primary)]"
+                      style={{ background: "var(--surface)", color: "var(--text)", borderColor: "var(--border)" }}
+                    />
+                    {/* Preview chips */}
+                    {quickSuggestionsInput.trim() && (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {quickSuggestionsInput.split(",").map(s => s.trim()).filter(Boolean).slice(0, 6).map((chip, i) => (
+                          <span key={i} className="px-2.5 py-1 rounded-full text-[11px] border font-medium" style={{ background: i === 0 ? "var(--primary-soft)" : "var(--surface)", color: i === 0 ? "var(--primary)" : "var(--text)", borderColor: i === 0 ? "var(--primary)" : "var(--border)" }}>
+                            {chip}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Save button */}
@@ -1884,11 +1935,12 @@ export default function SuperAdminKnowledgeBasePage() {
                   >
                     <option value="FIXED">Kích thước cố định (Fixed-size chunking)</option>
                     <option value="SEMANTIC">Phân mảnh ngữ nghĩa (Semantic chunking)</option>
+                    <option value="ADAPTIVE">Cắt mảnh tự thích ứng (Adaptive chunking)</option>
                     <option value="NONE">Không phân mảnh (None / Stored)</option>
                   </select>
                 </div>
 
-                {kbChunkingStrategy !== "NONE" && (
+                {kbChunkingStrategy !== "NONE" && kbChunkingStrategy !== "ADAPTIVE" && (
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <label className="text-xs font-bold uppercase tracking-wider block" style={{ color: "var(--text-muted)" }}>Kích thước mảnh (Chars)</label>
@@ -2038,6 +2090,7 @@ interface KbTestPanelProps {
 }
 
 function KbTestPanel({ bucketId, restaurantId }: KbTestPanelProps) {
+  const { message } = App.useApp();
   const [query, setQuery] = useState("");
   const [testMode, setTestMode] = useState<"retrieve" | "rag">("rag");
   const [retrievalSource, setRetrievalSource] = useState<"document" | "database" | "api">("document");
@@ -2143,7 +2196,7 @@ function KbTestPanel({ bucketId, restaurantId }: KbTestPanelProps) {
             }
           ]);
         } else {
-          antdMessage.error("Tìm kiếm tài liệu thất bại.");
+          message.error("Tìm kiếm tài liệu thất bại.");
         }
       } else {
         const res = await axiosInstance.post(reqPath, payload);
@@ -2187,7 +2240,7 @@ function KbTestPanel({ bucketId, restaurantId }: KbTestPanelProps) {
       }
     } catch (err: any) {
       console.error(err);
-      antdMessage.error(err.response?.data?.message || "Đã xảy ra lỗi khi thử nghiệm.");
+      message.error(err.response?.data?.message || "Đã xảy ra lỗi khi thử nghiệm.");
       
       const responseTime = Date.now() - requestStartTime;
       const logEntry = {
@@ -2764,7 +2817,7 @@ function KbTestPanel({ bucketId, restaurantId }: KbTestPanelProps) {
                         <button
                           onClick={() => {
                             navigator.clipboard.writeText(activeTrace.systemInstruction || "");
-                            antdMessage.success("Đã sao chép prompt hệ thống!");
+                            message.success("Đã sao chép prompt hệ thống!");
                           }}
                           className="p-1 rounded hover:bg-[var(--surface)] text-[var(--primary)] flex items-center gap-1 transition-colors text-[10px] font-bold"
                         >
@@ -3031,7 +3084,7 @@ function KbTestPanel({ bucketId, restaurantId }: KbTestPanelProps) {
                             <button
                               onClick={() => {
                                 navigator.clipboard.writeText(JSON.stringify(activeLog, null, 2));
-                                antdMessage.success("Đã copy toàn bộ log!");
+                                message.success("Đã copy toàn bộ log!");
                               }}
                               className="px-2 py-1 text-xs border rounded-lg hover:bg-[var(--surface)] flex items-center gap-1 font-semibold flex-shrink-0"
                               style={{ color: "var(--text)", borderColor: "var(--border)" }}
@@ -3150,7 +3203,7 @@ function KbTestPanel({ bucketId, restaurantId }: KbTestPanelProps) {
                                   setQuery(payload.text);
                                   setRetrievalSource(targetSource);
                                   setIsTestSuiteOpen(false);
-                                  antdMessage.info("Đã nạp kịch bản vào hộp thoại chat!");
+                                  message.info("Đã nạp kịch bản vào hộp thoại chat!");
                                 }}
                                 className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold border hover:bg-[var(--surface)]"
                                 style={{ color: "var(--text)", borderColor: "var(--border)" }}
@@ -3184,6 +3237,235 @@ function KbTestPanel({ bucketId, restaurantId }: KbTestPanelProps) {
           )}
         </AnimatePresence>,
         document.body
+      )}
+    </div>
+  );
+}
+
+interface KbHistoryPanelProps {
+  bucketId: string;
+  restaurantId: string;
+}
+
+function KbHistoryPanel({ bucketId, restaurantId }: KbHistoryPanelProps) {
+  const { message } = App.useApp();
+  const [snapshots, setSnapshots] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  
+  // Create snapshot states
+  const [versionName, setVersionName] = useState("");
+  const [description, setDescription] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [rollingBackId, setRollingBackId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (bucketId) {
+      fetchSnapshots();
+    }
+  }, [bucketId, restaurantId]);
+
+  const fetchSnapshots = async () => {
+    setLoading(true);
+    try {
+      const response = await axiosInstance.get(`/ai/kb/buckets/${bucketId}/snapshots`, {
+        params: { restaurantId }
+      });
+      if (response.data.success) {
+        setSnapshots(response.data.data);
+      }
+    } catch (err: any) {
+      console.error("[KB History] Fetch error:", err);
+      message.error("Không thể tải lịch sử phiên bản.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateSnapshot = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!versionName.trim()) {
+      message.error("Vui lòng nhập tên phiên bản.");
+      return;
+    }
+    setCreating(true);
+    try {
+      const response = await axiosInstance.post(`/ai/kb/buckets/${bucketId}/snapshots`, {
+        restaurantId,
+        versionName: versionName.trim(),
+        description: description.trim() || undefined
+      });
+      if (response.data.success) {
+        message.success(response.data.message || "Tạo bản lịch sử thành công!");
+        setVersionName("");
+        setDescription("");
+        setIsFormOpen(false);
+        fetchSnapshots();
+      }
+    } catch (err: any) {
+      message.error(err.response?.data?.message || "Tạo bản lịch sử thất bại.");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleRollback = async (snapshotId: string, name: string) => {
+    if (!confirm(`Bạn có chắc chắn muốn khôi phục bucket và database về phiên bản "${name}"? Thao tác này sẽ ghi đè tài liệu hiện tại!`)) {
+      return;
+    }
+    setRollingBackId(snapshotId);
+    try {
+      const response = await axiosInstance.post(`/ai/kb/buckets/${bucketId}/snapshots/${snapshotId}/rollback`, {
+        restaurantId
+      });
+      if (response.data.success) {
+        message.success(response.data.message || `Khôi phục về "${name}" thành công!`);
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      }
+    } catch (err: any) {
+      message.error(err.response?.data?.message || "Khôi phục thất bại.");
+    } finally {
+      setRollingBackId(null);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Header and Add Button */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h3 className="text-sm font-bold" style={{ color: "var(--text)" }}>Quản lý Phiên bản & Lịch sử</h3>
+          <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>Lưu các mốc tài liệu và khôi phục (Rollback) bất cứ lúc nào</p>
+        </div>
+        <button
+          onClick={() => setIsFormOpen(!isFormOpen)}
+          className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-[var(--primary)] hover:opacity-90 transition-all flex items-center gap-1.5"
+        >
+          {isFormOpen ? "Đóng form" : "Tạo Snapshot mới"}
+        </button>
+      </div>
+
+      {/* Create form */}
+      {isFormOpen && (
+        <motion.form
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          onSubmit={handleCreateSnapshot}
+          className="p-4 rounded-xl border space-y-3"
+          style={{ background: "var(--bg-base)", borderColor: "var(--border)" }}
+        >
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold uppercase tracking-wider block" style={{ color: "var(--text-muted)" }}>Tên phiên bản (Ví dụ: v1.0, Menu Hè 2026)</label>
+            <input
+              type="text"
+              value={versionName}
+              onChange={(e) => setVersionName(e.target.value)}
+              placeholder="v1.0 - Menu chính"
+              className="w-full px-3 py-2 rounded-lg text-xs border focus:outline-none focus:border-[var(--primary)] bg-[var(--card)]"
+              style={{ color: "var(--text)", borderColor: "var(--border)" }}
+              required
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold uppercase tracking-wider block" style={{ color: "var(--text-muted)" }}>Mô tả chi tiết</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Thêm mô tả về tài liệu được snapshot..."
+              rows={2}
+              className="w-full px-3 py-2 rounded-lg text-xs border focus:outline-none focus:border-[var(--primary)] bg-[var(--card)] resize-none"
+              style={{ color: "var(--text)", borderColor: "var(--border)" }}
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => setIsFormOpen(false)}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold border hover:bg-[var(--surface)]"
+              style={{ color: "var(--text)", borderColor: "var(--border)" }}
+            >
+              Hủy
+            </button>
+            <button
+              type="submit"
+              disabled={creating}
+              className="px-4 py-1.5 rounded-lg text-xs font-bold text-white bg-[var(--primary)] hover:opacity-90 disabled:opacity-60 transition-all flex items-center gap-1.5"
+            >
+              {creating ? (
+                <>
+                  <div className="w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                  Đang tạo...
+                </>
+              ) : "Lưu phiên bản"}
+            </button>
+          </div>
+        </motion.form>
+      )}
+
+      {/* Snapshots List */}
+      {loading ? (
+        <div className="flex justify-center py-10">
+          <div className="w-6 h-6 border-2 border-[var(--primary)] border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : snapshots.length === 0 ? (
+        <div className="text-center py-12 border rounded-xl border-dashed" style={{ borderColor: "var(--border)" }}>
+          <span className="text-3xl">🗄️</span>
+          <p className="text-xs font-bold mt-2" style={{ color: "var(--text)" }}>Chưa có bản lịch sử nào</p>
+          <p className="text-[10px] mt-1" style={{ color: "var(--text-muted)" }}>Nhấn nút "Tạo Snapshot mới" để ghi lại trạng thái hiện tại.</p>
+        </div>
+      ) : (
+        <div className="space-y-2.5">
+          {snapshots.map((snap) => {
+            const docs = Array.isArray(snap.documents) ? snap.documents : [];
+            const isRolling = rollingBackId === snap.id;
+
+            return (
+              <div
+                key={snap.id}
+                className="p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all hover:bg-[var(--surface)] bg-[var(--card)]"
+                style={{ borderColor: "var(--border)" }}
+              >
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold" style={{ color: "var(--text)" }}>{snap.versionName}</span>
+                    <span className="text-[9px] px-2 py-0.5 rounded bg-[var(--primary-soft)] text-[var(--primary)] font-bold">
+                      {docs.length} tài liệu
+                    </span>
+                  </div>
+                  {snap.description && (
+                    <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>{snap.description}</p>
+                  )}
+                  <p className="text-[9px] font-medium" style={{ color: "var(--text-muted)" }}>
+                    Tạo lúc: {new Date(snap.createdAt).toLocaleString("vi-VN")}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleRollback(snap.id, snap.versionName)}
+                    disabled={rollingBackId !== null}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-amber-600 bg-amber-500/10 hover:bg-amber-500/20 disabled:opacity-60 transition-all border border-amber-500/20"
+                  >
+                    {isRolling ? (
+                      <>
+                        <div className="w-3 h-3 rounded-full border-2 border-amber-600 border-t-transparent animate-spin" />
+                        Đang rollback...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Rollback
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );

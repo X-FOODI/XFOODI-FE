@@ -15,6 +15,7 @@ import CommentSection from './CommentSection';
 import ImageGallery from './ImageGallery';
 import ReactionPicker from './ReactionPicker';
 import ShareModal from './ShareModal';
+import { MoreHorizontal, MessageSquare, Bookmark, Share2 } from 'lucide-react';
 
 interface PostCardProps {
   post: SocialPost;
@@ -122,9 +123,9 @@ export default function PostCard({
             <button
               type="button"
               onClick={() => setMenuOpen((o) => !o)}
-              className="rounded-lg px-2 py-1 text-[var(--text-muted)] hover:bg-[var(--surface)]"
+              className="flex items-center justify-center rounded-lg p-1 text-[var(--text-muted)] hover:bg-[var(--surface)]"
             >
-              ⋯
+              <MoreHorizontal className="h-5 w-5" />
             </button>
             {menuOpen && (
               <div className="absolute right-0 z-10 mt-1 min-w-[120px] rounded-xl border border-[var(--border)] bg-[var(--card)] py-1 shadow-lg">
@@ -223,29 +224,32 @@ export default function PostCard({
           type="button"
           disabled={disabled}
           onClick={() => setShowComments((s) => !s)}
-          className="rounded-lg px-3 py-1.5 text-sm text-[var(--text-muted)] hover:bg-[var(--surface)] disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-[var(--text-muted)] hover:bg-[var(--surface)] disabled:opacity-50"
         >
-          💬 {post.commentsCount || comments.length}
+          <MessageSquare className="h-4 w-4" />
+          <span>{post.commentsCount || comments.length}</span>
         </button>
         <button
           type="button"
           disabled={disabled}
           onClick={() => onSave(post.id, !post.isSaved)}
-          className={`rounded-lg px-3 py-1.5 text-sm disabled:opacity-50 ${
+          className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm disabled:opacity-50 transition ${
             post.isSaved ? 'text-[var(--primary)]' : 'text-[var(--text-muted)] hover:bg-[var(--surface)]'
           }`}
         >
-          {post.isSaved ? '🔖 Đã lưu' : '🔖 Lưu'}
+          <Bookmark className={`h-4 w-4 ${post.isSaved ? 'fill-current' : ''}`} />
+          <span>{post.isSaved ? 'Đã lưu' : 'Lưu'}</span>
         </button>
         <button
           type="button"
-          className="rounded-lg px-3 py-1.5 text-sm text-[var(--text-muted)] hover:bg-[var(--surface)]"
+          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-[var(--text-muted)] hover:bg-[var(--surface)]"
           onClick={() => {
             setShareOpen(true);
             onShare(post.id);
           }}
         >
-          ↗ {post.shareCount}
+          <Share2 className="h-4 w-4" />
+          <span>{post.shareCount}</span>
         </button>
       </div>
 
