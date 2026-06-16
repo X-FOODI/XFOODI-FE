@@ -1,222 +1,961 @@
 "use client";
 
 import React, { useState, useRef, useCallback, useEffect } from "react";
+import { DraggableTable, TableData } from "./DraggableTable";
 import { useTranslation } from "react-i18next";
-import { DraggableTable, DraggableTableData } from "./DraggableTable";
 
-interface FloorInfo {
+export interface Floor {
   id: string;
   name: string;
+  backgroundImage?: string;
   width: number;
   height: number;
-  imageUrl: string | null;
+  tables: TableData[];
+}
+
+export interface Layout {
+  id: string;
+  name: string;
+  floors: Floor[];
+  activeFloorId: string;
 }
 
 interface TableMap2DProps {
-  floor: FloorInfo;
-  tables: DraggableTableData[];
-  selectedTableId: string | null;
-  readOnly: boolean;
-  onTableClick: (tableId: string) => void;
-  onTablePositionChange: (tableId: string, position: { x: number; y: number }) => void;
-  onTableResize: (tableId: string, size: { width: number; height: number }) => void;
+  layout: Layout;
+  onLayoutChange: (layout: Layout) => void;
+  onTableClick: (table: TableData) => void;
+  onTablePositionChange: (
+    tableId: string,
+    position: { x: number; y: number; zoneId?: string },
+  ) => void;
+  onTableMerge?: (sourceTableId: string, targetTableId: string) => void;
+  onTableResize?: (tableId: string, size: { width: number; height: number }) => void;
   onBackgroundImageUpload?: (floorId: string, file: File) => void;
+  renderTableContent?: (table: TableData) => React.ReactNode;
+  readOnly?: boolean;
+  selectedTableIds?: string[];
+  hideControls?: boolean;
+  focusOnSelected?: boolean;
 }
 
-const MIN_ZOOM_SCALE = 0.5;
-const MAX_ZOOM_SCALE = 2.5;
-
+/* ══════════════════════════════════════════════
+   Main TableMap2D Component
+   ══════════════════════════════════════════════ */
 export const TableMap2D: React.FC<TableMap2DProps> = ({
-  floor,
-  tables,
-  selectedTableId,
-  readOnly,
+  layout,
+  onLayoutChange,
   onTableClick,
   onTablePositionChange,
+  onTableMerge,
   onTableResize,
   onBackgroundImageUpload,
+  renderTableContent,
+  readOnly = false,
+  selectedTableIds = [],
+  hideControls = false,
+  focusOnSelected = false,
 }) => {
-  const { t } = useTranslation();
+  const MIN_ZOOM_SCALE = 0.8;
+  const MAX_ZOOM_SCALE = 2.8;
   const [showGrid, setShowGrid] = useState(true);
-  const [zoomScale, setZoomScale] = useState(1);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { t } = useTranslation();
+  const floorRef = useRef<HTMLDivElement>(null);
+  const scaleWrapperRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-
+  const [fitScale, setFitScale] = useState(1);
+  const [zoomScale, setZoomScale] = useState(1);
+  const isManualZoomRef = useRef(false);
+  const fitScaleRef = useRef(1);
+  const zoomScaleRef = useRef(1);
+  const pinchStartDistanceRef = useRef<number | null>(null);
+  const pinchStartZoomRef = useRef(1);
+  const isPinchingRef = useRef(false);
+  const pinchFrameRef = useRef<number | null>(null);
+  const pinchSampleRef = useRef<{ distance: number } | null>(null);
+  const pinchAnchorRef = useRef<{ anchorX: number; anchorY: number; worldX: number; worldY: number } | null>(null);
+  const pinchGestureRef = useRef(false);
+  const lastTapRef = useRef<{ time: number; x: number; y: number } | null>(null);
+  const lastDoubleTapZoomRef = useRef<{ from: number; to: number } | null>(null);
   const panStartPointRef = useRef<{ x: number; y: number } | null>(null);
   const panStartScrollRef = useRef<{ left: number; top: number } | null>(null);
+  const pointerLastSampleRef = useRef<{ x: number; y: number; time: number } | null>(null);
+  const panVelocityRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const inertiaFrameRef = useRef<number | null>(null);
   const [isPanning, setIsPanning] = useState(false);
+  const isIOSLikeRef = useRef(false);
+  const prefersReducedMotionRef = useRef(false);
+  const touchPanStartPointRef = useRef<{ x: number; y: number } | null>(null);
+  const touchPanStartScrollRef = useRef<{ left: number; top: number } | null>(null);
+  const touchLastSampleRef = useRef<{ x: number; y: number; time: number } | null>(null);
+  const touchMovedRef = useRef(false);
+  const [isGestureZooming, setIsGestureZooming] = useState(false);
 
-  // Pan the canvas only when not editing (so edit mode drag doesn't fight with pan)
-  const canPan = readOnly;
-
-  useEffect(() => {
-    setZoomScale(1);
-  }, [floor.id]);
-
-  const clampZoom = useCallback((next: number) => Math.min(MAX_ZOOM_SCALE, Math.max(MIN_ZOOM_SCALE, next)), []);
-
-  const handleZoomIn = () => setZoomScale((z) => clampZoom(z + 0.2));
-  const handleZoomOut = () => setZoomScale((z) => clampZoom(z - 0.2));
-  const handleZoomReset = () => setZoomScale(1);
-
-  const handleWheel = useCallback(
-    (event: WheelEvent) => {
-      if (!event.ctrlKey && !event.metaKey) return;
-      event.preventDefault();
-      setZoomScale((z) => clampZoom(z + (event.deltaY < 0 ? 0.08 : -0.08)));
-    },
-    [clampZoom]
-  );
+  const activeFloor = layout.floors.find((f) => f.id === layout.activeFloorId);
+  const selectedSet = React.useMemo(() => new Set(selectedTableIds), [selectedTableIds]);
+  const [hasFocused, setHasFocused] = useState(false);
+  const canDragPan = readOnly;
+  const scale = fitScale * zoomScale;
 
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    el.addEventListener("wheel", handleWheel, { passive: false });
-    return () => el.removeEventListener("wheel", handleWheel);
-  }, [handleWheel]);
+    fitScaleRef.current = fitScale;
+  }, [fitScale]);
 
-  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!canPan || !containerRef.current) return;
-    const targetElement = e.target as HTMLElement | null;
-    if (targetElement?.closest('[data-table-node="true"]')) return;
-    if (e.pointerType === "mouse" && e.button !== 0) return;
+  useEffect(() => {
+    zoomScaleRef.current = zoomScale;
+  }, [zoomScale]);
 
-    panStartPointRef.current = { x: e.clientX, y: e.clientY };
-    panStartScrollRef.current = { left: containerRef.current.scrollLeft, top: containerRef.current.scrollTop };
-    setIsPanning(true);
-    e.currentTarget.setPointerCapture(e.pointerId);
-  };
+  const applyVisualScale = useCallback((zoom: number) => {
+    const nextScale = fitScaleRef.current * zoom;
 
-  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!canPan || !isPanning || !containerRef.current) return;
-    if (!panStartPointRef.current || !panStartScrollRef.current) return;
-
-    const deltaX = e.clientX - panStartPointRef.current.x;
-    const deltaY = e.clientY - panStartPointRef.current.y;
-    containerRef.current.scrollLeft = panStartScrollRef.current.left - deltaX;
-    containerRef.current.scrollTop = panStartScrollRef.current.top - deltaY;
-  };
-
-  const handlePointerEnd = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!canPan) return;
-    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-      e.currentTarget.releasePointerCapture(e.pointerId);
+    if (scaleWrapperRef.current && activeFloor) {
+      scaleWrapperRef.current.style.width = `${activeFloor.width * nextScale}px`;
+      scaleWrapperRef.current.style.height = `${activeFloor.height * nextScale}px`;
     }
-    panStartPointRef.current = null;
-    panStartScrollRef.current = null;
+
+    if (floorRef.current) {
+      floorRef.current.style.transform = `translateZ(0) scale(${nextScale})`;
+    }
+  }, [activeFloor]);
+
+  const clampZoomScale = useCallback((next: number) => {
+    return Math.min(MAX_ZOOM_SCALE, Math.max(MIN_ZOOM_SCALE, next));
+  }, [MAX_ZOOM_SCALE, MIN_ZOOM_SCALE]);
+
+  const stopInertia = useCallback(() => {
+    if (inertiaFrameRef.current !== null) {
+      window.cancelAnimationFrame(inertiaFrameRef.current);
+      inertiaFrameRef.current = null;
+    }
+  }, []);
+
+  const applyZoomAtClientPoint = useCallback((nextZoom: number, clientX: number, clientY: number) => {
+    if (!containerRef.current) return;
+
+    const container = containerRef.current;
+    const rect = container.getBoundingClientRect();
+    const anchorX = clientX - rect.left - container.clientLeft;
+    const anchorY = clientY - rect.top - container.clientTop;
+
+    const currentFitScale = fitScaleRef.current;
+    const prevScale = currentFitScale * zoomScaleRef.current;
+    const nextScale = currentFitScale * nextZoom;
+
+    if (prevScale <= 0 || nextScale <= 0) {
+      setZoomScale(nextZoom);
+      return;
+    }
+
+    const worldX = (container.scrollLeft + anchorX) / prevScale;
+    const worldY = (container.scrollTop + anchorY) / prevScale;
+
+    zoomScaleRef.current = nextZoom;
+    setZoomScale(nextZoom);
+
+    requestAnimationFrame(() => {
+      if (!containerRef.current) return;
+      const targetLeft = worldX * nextScale - anchorX;
+      const targetTop = worldY * nextScale - anchorY;
+      containerRef.current.scrollLeft = targetLeft;
+      containerRef.current.scrollTop = targetTop;
+    });
+  }, []);
+
+  const startInertia = useCallback(() => {
+    if (!containerRef.current) return;
+    if (prefersReducedMotionRef.current) return;
+
+    const isIOSLike = isIOSLikeRef.current;
+    const friction = isIOSLike ? 0.85 : 0.92;
+    const stopThreshold = isIOSLike ? 0.22 : 0.1;
+    const maxFrameVelocity = isIOSLike ? 14 : 22;
+
+    panVelocityRef.current = {
+      x: Math.max(-maxFrameVelocity, Math.min(maxFrameVelocity, panVelocityRef.current.x)),
+      y: Math.max(-maxFrameVelocity, Math.min(maxFrameVelocity, panVelocityRef.current.y)),
+    };
+
+    const tick = () => {
+      if (!containerRef.current) return;
+      const container = containerRef.current;
+
+      container.scrollLeft -= panVelocityRef.current.x;
+      container.scrollTop -= panVelocityRef.current.y;
+
+      panVelocityRef.current.x *= friction;
+      panVelocityRef.current.y *= friction;
+
+      if (
+        Math.abs(panVelocityRef.current.x) < stopThreshold &&
+        Math.abs(panVelocityRef.current.y) < stopThreshold
+      ) {
+        stopInertia();
+        return;
+      }
+
+      inertiaFrameRef.current = window.requestAnimationFrame(tick);
+    };
+
+    stopInertia();
+    inertiaFrameRef.current = window.requestAnimationFrame(tick);
+  }, [stopInertia]);
+
+  useEffect(() => {
+    setHasFocused(false);
+  }, [activeFloor?.id, selectedTableIds.join(',')]);
+
+  useEffect(() => {
+    isManualZoomRef.current = false;
+    setZoomScale(1);
+  }, [activeFloor?.id]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const ua = window.navigator.userAgent || "";
+    const platform = window.navigator.platform || "";
+    const maxTouchPoints = window.navigator.maxTouchPoints || 0;
+
+    isIOSLikeRef.current =
+      /iPhone|iPad|iPod/i.test(ua) ||
+      (platform === "MacIntel" && maxTouchPoints > 1);
+
+    prefersReducedMotionRef.current =
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }, []);
+
+  // ── Auto-fit: scale canvas to fit container ──
+  useEffect(() => {
+    if (!containerRef.current || !activeFloor) return;
+
+    const updateScale = () => {
+      const container = containerRef.current;
+      if (!container) return;
+
+      // Avoid auto-fit recalculation while user is actively zooming.
+      // Recomputing fitScale during gesture causes center drift/flicker.
+      if (isGestureZooming || isManualZoomRef.current || zoomScaleRef.current !== 1) {
+        return;
+      }
+
+      const computedStyle = window.getComputedStyle(container);
+      const horizontalPadding =
+        (parseFloat(computedStyle.paddingLeft || '0') || 0) +
+        (parseFloat(computedStyle.paddingRight || '0') || 0);
+      const verticalPadding =
+        (parseFloat(computedStyle.paddingTop || '0') || 0) +
+        (parseFloat(computedStyle.paddingBottom || '0') || 0);
+      const availW = container.clientWidth - horizontalPadding;
+      const availH = container.clientHeight - verticalPadding;
+      if (availW <= 0 || availH <= 0) return;
+      const scaleX = availW / activeFloor.width;
+      const scaleY = availH / activeFloor.height;
+      // Fit within container; cap at 1 so we never upscale.
+      let finalScale = Math.min(scaleX, scaleY, 1);
+
+      if (focusOnSelected && selectedSet.size > 0) {
+        const selectedTables = activeFloor.tables.filter(t => selectedSet.has(t.id));
+        if (selectedTables.length > 0) {
+          const minX = Math.min(...selectedTables.map(t => t.position.x));
+          const maxX = Math.max(...selectedTables.map(t => t.position.x + (t.width || 80)));
+          const minY = Math.min(...selectedTables.map(t => t.position.y));
+          const maxY = Math.max(...selectedTables.map(t => t.position.y + (t.height || 80)));
+
+          const boxW = maxX - minX;
+          const boxH = maxY - minY;
+          // Add tight padding (e.g. 75px on each side)
+          const paddedW = boxW + 150;
+          const paddedH = boxH + 150;
+
+          finalScale = Math.min(availW / paddedW, availH / paddedH, 3.0);
+          setFitScale(finalScale);
+
+          // Scroll to center the bounding box exactly once
+          if (!hasFocused) {
+            setHasFocused(true);
+            setTimeout(() => {
+              if (containerRef.current) {
+                const cx = ((minX + maxX) / 2) * finalScale;
+                const cy = ((minY + maxY) / 2) * finalScale;
+                containerRef.current.scrollTo({
+                  left: Math.max(0, cx - availW / 2),
+                  top: Math.max(0, cy - availH / 2),
+                  behavior: 'smooth'
+                });
+              }
+            }, 100);
+          }
+          return;
+        }
+      }
+
+      const roundedScale = Math.round(finalScale * 10000) / 10000;
+      setFitScale((prev) => (Math.abs(prev - roundedScale) > 0.0005 ? roundedScale : prev));
+    };
+
+    updateScale();
+    const observer = new ResizeObserver(updateScale);
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [activeFloor?.width, activeFloor?.height, activeFloor?.id, focusOnSelected, selectedSet, hasFocused, isGestureZooming]);
+
+  const handleZoomIn = () => {
+    if (!containerRef.current) return;
+    isManualZoomRef.current = true;
+    lastDoubleTapZoomRef.current = null;
+    const rect = containerRef.current.getBoundingClientRect();
+    const next = clampZoomScale(zoomScale + 0.2);
+    applyZoomAtClientPoint(next, rect.left + rect.width / 2, rect.top + rect.height / 2);
+  };
+
+  const handleZoomOut = () => {
+    if (!containerRef.current) return;
+    isManualZoomRef.current = true;
+    lastDoubleTapZoomRef.current = null;
+    const rect = containerRef.current.getBoundingClientRect();
+    const next = clampZoomScale(zoomScale - 0.2);
+    applyZoomAtClientPoint(next, rect.left + rect.width / 2, rect.top + rect.height / 2);
+  };
+
+  const handleZoomReset = () => {
+    isManualZoomRef.current = false;
+    lastDoubleTapZoomRef.current = null;
+    setZoomScale(1);
+  };
+
+  const handleCanvasWheel = useCallback((event: WheelEvent) => {
+    if (!event.ctrlKey && !event.metaKey) return;
+    event.preventDefault();
+    lastDoubleTapZoomRef.current = null;
+    const next = zoomScale + (event.deltaY < 0 ? 0.08 : -0.08);
+    applyZoomAtClientPoint(clampZoomScale(next), event.clientX, event.clientY);
+  }, [zoomScale, applyZoomAtClientPoint, clampZoomScale]);
+
+  const getTouchDistance = (touches: React.TouchList) => {
+    const [first, second] = [touches[0], touches[1]];
+    if (!first || !second) return null;
+    const dx = first.clientX - second.clientX;
+    const dy = first.clientY - second.clientY;
+    return Math.hypot(dx, dy);
+  };
+
+  const handleTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (!canDragPan || !containerRef.current) return;
+
+    if (event.touches.length === 2) {
+      isManualZoomRef.current = true;
+      lastDoubleTapZoomRef.current = null;
+      const distance = getTouchDistance(event.touches);
+      if (!distance) return;
+      pinchGestureRef.current = true;
+      isPinchingRef.current = true;
+      setIsPanning(false);
+      stopInertia();
+      pinchStartDistanceRef.current = distance;
+      pinchStartZoomRef.current = zoomScaleRef.current;
+      setIsGestureZooming(true);
+
+      const [first, second] = [event.touches[0], event.touches[1]];
+      if (first && second) {
+        const rect = containerRef.current.getBoundingClientRect();
+        const centerX = (first.clientX + second.clientX) / 2;
+        const centerY = (first.clientY + second.clientY) / 2;
+        const anchorX = centerX - rect.left - containerRef.current.clientLeft;
+        const anchorY = centerY - rect.top - containerRef.current.clientTop;
+        const currentScale = fitScaleRef.current * zoomScaleRef.current;
+
+        if (currentScale > 0) {
+          pinchAnchorRef.current = {
+            anchorX,
+            anchorY,
+            worldX: (containerRef.current.scrollLeft + anchorX) / currentScale,
+            worldY: (containerRef.current.scrollTop + anchorY) / currentScale,
+          };
+        }
+      }
+
+      if (event.cancelable) {
+        event.preventDefault();
+      }
+
+      touchPanStartPointRef.current = null;
+      touchPanStartScrollRef.current = null;
+      touchLastSampleRef.current = null;
+      touchMovedRef.current = false;
+      return;
+    }
+
+    if (event.touches.length === 1 && !isPinchingRef.current) {
+      const touch = event.touches[0];
+      touchPanStartPointRef.current = { x: touch.clientX, y: touch.clientY };
+      touchLastSampleRef.current = {
+        x: touch.clientX,
+        y: touch.clientY,
+        time: performance.now(),
+      };
+      touchMovedRef.current = false;
+    }
+  };
+
+  const flushPinchZoom = useCallback(() => {
+    pinchFrameRef.current = null;
+    if (!canDragPan || !isPinchingRef.current || !pinchStartDistanceRef.current || !containerRef.current) return;
+
+    const sample = pinchSampleRef.current;
+    const anchor = pinchAnchorRef.current;
+    if (!sample || !anchor) return;
+
+    const ratio = sample.distance / pinchStartDistanceRef.current;
+    const nextZoom = clampZoomScale(pinchStartZoomRef.current * ratio);
+    // Keep a tiny epsilon only to avoid noisy no-op frames.
+    // Too large a threshold makes zoom-out feel sticky near fit.
+    if (Math.abs(nextZoom - zoomScaleRef.current) < 0.0015) {
+      return;
+    }
+    const nextScale = fitScaleRef.current * nextZoom;
+
+    zoomScaleRef.current = nextZoom;
+    applyVisualScale(nextZoom);
+
+    const targetLeft = anchor.worldX * nextScale - anchor.anchorX;
+    const targetTop = anchor.worldY * nextScale - anchor.anchorY;
+    containerRef.current.scrollLeft = targetLeft;
+    containerRef.current.scrollTop = targetTop;
+  }, [canDragPan, clampZoomScale, applyVisualScale]);
+
+  const handleTouchMove = useCallback((event: TouchEvent) => {
+    if (!canDragPan || !containerRef.current) return;
+
+    if (event.touches.length === 2 && pinchStartDistanceRef.current) {
+      const first = event.touches[0];
+      const second = event.touches[1];
+      if (!first || !second) return;
+      const dx = first.clientX - second.clientX;
+      const dy = first.clientY - second.clientY;
+      const nextDistance = Math.hypot(dx, dy);
+      if (!nextDistance) return;
+      if (event.cancelable) {
+        event.preventDefault();
+      }
+      const previousDistance = pinchSampleRef.current?.distance;
+      // Use light smoothing to damp sensor jitter without creating "pull-back" lag.
+      const stabilizedDistance = previousDistance
+        ? (previousDistance * 0.12) + (nextDistance * 0.88)
+        : nextDistance;
+
+      pinchSampleRef.current = {
+        distance: stabilizedDistance,
+      };
+
+      if (pinchFrameRef.current === null) {
+        pinchFrameRef.current = window.requestAnimationFrame(flushPinchZoom);
+      }
+      return;
+    }
+
+    if (event.touches.length === 1 && touchPanStartPointRef.current && !isPinchingRef.current) {
+      const touch = event.touches[0];
+      const deltaX = touch.clientX - touchPanStartPointRef.current.x;
+      const deltaY = touch.clientY - touchPanStartPointRef.current.y;
+
+      if (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2) {
+        touchMovedRef.current = true;
+      }
+
+      touchLastSampleRef.current = { x: touch.clientX, y: touch.clientY, time: performance.now() };
+    }
+  }, [canDragPan, flushPinchZoom]);
+
+  const handleTouchEnd = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (!canDragPan) return;
+
+    const targetElement = event.target as HTMLElement | null;
+    const endedOnTableNode = !!targetElement?.closest('[data-table-node="true"]');
+    let didTouchPan = false;
+    const wasPinchGesture = pinchGestureRef.current || isPinchingRef.current || !!pinchStartDistanceRef.current;
+
+    if (event.touches.length < 2) {
+      setZoomScale(zoomScaleRef.current);
+      pinchStartDistanceRef.current = null;
+      isPinchingRef.current = false;
+      pinchSampleRef.current = null;
+      pinchAnchorRef.current = null;
+      if (pinchFrameRef.current !== null) {
+        window.cancelAnimationFrame(pinchFrameRef.current);
+        pinchFrameRef.current = null;
+      }
+      setIsGestureZooming(false);
+    }
+
+    if (event.touches.length === 0) {
+      didTouchPan = touchMovedRef.current;
+
+      touchPanStartPointRef.current = null;
+      touchLastSampleRef.current = null;
+      touchMovedRef.current = false;
+      setIsPanning(false);
+
+      if (wasPinchGesture) {
+        // Ignore tap/double-tap detection after pinch to avoid post-gesture zoom drift.
+        pinchGestureRef.current = false;
+        lastTapRef.current = null;
+        lastDoubleTapZoomRef.current = null;
+        return;
+      }
+
+      if (endedOnTableNode) {
+        lastTapRef.current = null;
+        lastDoubleTapZoomRef.current = null;
+        return;
+      }
+    }
+
+    if (event.touches.length === 0 && event.changedTouches.length === 1 && !isPinchingRef.current) {
+      if (didTouchPan) return;
+
+      const touch = event.changedTouches[0];
+      const now = Date.now();
+      const lastTap = lastTapRef.current;
+
+      if (lastTap) {
+        const dt = now - lastTap.time;
+        const distance = Math.hypot(touch.clientX - lastTap.x, touch.clientY - lastTap.y);
+        if (dt < 280 && distance < 28) {
+          const previousZoomState = lastDoubleTapZoomRef.current;
+          const shouldToggleBack =
+            !!previousZoomState &&
+            Math.abs(zoomScale - previousZoomState.to) < 0.06;
+
+          if (shouldToggleBack && previousZoomState) {
+            const backToZoom = clampZoomScale(previousZoomState.from);
+            applyZoomAtClientPoint(backToZoom, touch.clientX, touch.clientY);
+            lastDoubleTapZoomRef.current = null;
+          } else {
+            const next = clampZoomScale(zoomScale + 0.35);
+            applyZoomAtClientPoint(next, touch.clientX, touch.clientY);
+            lastDoubleTapZoomRef.current = { from: zoomScale, to: next };
+          }
+
+          lastTapRef.current = null;
+          return;
+        }
+      }
+
+      lastTapRef.current = { time: now, x: touch.clientX, y: touch.clientY };
+    }
+  };
+
+  const handleTouchCancel = () => {
+    setZoomScale(zoomScaleRef.current);
+    pinchStartDistanceRef.current = null;
+    isPinchingRef.current = false;
+    pinchGestureRef.current = false;
+    pinchSampleRef.current = null;
+    pinchAnchorRef.current = null;
+    if (pinchFrameRef.current !== null) {
+      window.cancelAnimationFrame(pinchFrameRef.current);
+      pinchFrameRef.current = null;
+    }
+    setIsGestureZooming(false);
+    touchPanStartPointRef.current = null;
+    touchLastSampleRef.current = null;
+    touchMovedRef.current = false;
     setIsPanning(false);
   };
 
-  const handleBackgroundImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && onBackgroundImageUpload) {
-      onBackgroundImageUpload(floor.id, file);
+  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!canDragPan || !containerRef.current) return;
+    if (event.pointerType === "touch") return;
+    if (isPinchingRef.current) return;
+
+    const targetElement = event.target as HTMLElement | null;
+    if (targetElement?.closest('[data-table-node="true"]')) {
+      return;
     }
-    e.target.value = "";
+
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    stopInertia();
+
+    panStartPointRef.current = { x: event.clientX, y: event.clientY };
+    panStartScrollRef.current = {
+      left: containerRef.current.scrollLeft,
+      top: containerRef.current.scrollTop,
+    };
+    pointerLastSampleRef.current = { x: event.clientX, y: event.clientY, time: performance.now() };
+    panVelocityRef.current = { x: 0, y: 0 };
+    setIsPanning(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!canDragPan || !isPanning || !containerRef.current) return;
+    if (event.pointerType === "touch") return;
+    if (!panStartPointRef.current || !panStartScrollRef.current) return;
+    if (isPinchingRef.current) return;
+
+    const deltaX = event.clientX - panStartPointRef.current.x;
+    const deltaY = event.clientY - panStartPointRef.current.y;
+
+    containerRef.current.scrollLeft = panStartScrollRef.current.left - deltaX;
+    containerRef.current.scrollTop = panStartScrollRef.current.top - deltaY;
+
+    const now = performance.now();
+    const last = pointerLastSampleRef.current;
+    if (last) {
+      const dt = Math.max(1, now - last.time);
+      panVelocityRef.current = {
+        x: (event.clientX - last.x) / dt * 16,
+        y: (event.clientY - last.y) / dt * 16,
+      };
+    }
+    pointerLastSampleRef.current = { x: event.clientX, y: event.clientY, time: now };
+    event.preventDefault();
+  };
+
+  const handlePointerEnd = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!canDragPan) return;
+    if (event.pointerType === "touch") return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    panStartPointRef.current = null;
+    panStartScrollRef.current = null;
+    pointerLastSampleRef.current = null;
+    setIsPanning(false);
+
+    if (!isPinchingRef.current) {
+      const speed = Math.hypot(panVelocityRef.current.x, panVelocityRef.current.y);
+      if (speed > 0.8) {
+        startInertia();
+      }
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      stopInertia();
+      if (pinchFrameRef.current !== null) {
+        window.cancelAnimationFrame(pinchFrameRef.current);
+        pinchFrameRef.current = null;
+      }
+    };
+  }, [stopInertia]);
+
+  // Register wheel and touchmove with { passive: false } to allow preventDefault()
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    el.addEventListener('wheel', handleCanvasWheel, { passive: false });
+    el.addEventListener('touchmove', handleTouchMove, { passive: false });
+    return () => {
+      el.removeEventListener('wheel', handleCanvasWheel);
+      el.removeEventListener('touchmove', handleTouchMove);
+    };
+  }, [handleCanvasWheel, handleTouchMove]);
+
+  if (!activeFloor) {
+    return <div>No active floor selected</div>;
+  }
+
+  const handleFloorSwitch = (floorId: string) => {
+    onLayoutChange({
+      ...layout,
+      activeFloorId: floorId,
+    });
+  };
+
+  const handleBackgroundImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && activeFloor) {
+      // Notify parent about the file for BE upload
+      if (onBackgroundImageUpload) {
+        onBackgroundImageUpload(activeFloor.id, file);
+      }
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64Url = reader.result as string;
+        const img = new window.Image();
+        img.onload = () => {
+          const updatedFloors = layout.floors.map(f => {
+            if (f.id === activeFloor.id) {
+              return {
+                ...f,
+                backgroundImage: base64Url,
+                width: Math.max(f.width, img.width),
+                height: Math.max(f.height, img.height)
+              };
+            }
+            return f;
+          });
+          onLayoutChange({ ...layout, floors: updatedFloors });
+        };
+        img.src = base64Url;
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleTableDragEnd = (
+    tableId: string,
+    newPosition: { x: number; y: number },
+  ) => {
+    const table = activeFloor.tables.find(t => t.id === tableId);
+    if (!table) return;
+
+    const tableW = table.width || 80;
+    const tableH = table.height || 80;
+
+    let x = Math.max(0, newPosition.x);
+    let y = Math.max(0, newPosition.y);
+
+    let newWidth = activeFloor.width;
+    let newHeight = activeFloor.height;
+    let layoutChanged = false;
+
+    if (x + tableW > activeFloor.width) {
+      newWidth = x + tableW + 50;
+      layoutChanged = true;
+    }
+    if (y + tableH > activeFloor.height) {
+      newHeight = y + tableH + 50;
+      layoutChanged = true;
+    }
+
+    if (layoutChanged) {
+      const updatedFloors = layout.floors.map(f => {
+        if (f.id === activeFloor.id) {
+          return { ...f, width: newWidth, height: newHeight };
+        }
+        return f;
+      });
+      onLayoutChange({ ...layout, floors: updatedFloors });
+    }
+
+    // Collision detection (merge check) - skip if source or target is decoration
+    let merged = false;
+    const isSourceDeco = table.name.startsWith("DECO_");
+
+    if (!isSourceDeco && onTableMerge) {
+      const sourceCenterX = x + tableW / 2;
+      const sourceCenterY = y + tableH / 2;
+
+      for (const targetTable of activeFloor.tables) {
+        if (targetTable.id === tableId) continue;
+        if (targetTable.name.startsWith("DECO_")) continue;
+
+        const targetW = targetTable.width || 80;
+        const targetH = targetTable.height || 80;
+        const targetCenterX = targetTable.position.x + targetW / 2;
+        const targetCenterY = targetTable.position.y + targetH / 2;
+
+        const dx = sourceCenterX - targetCenterX;
+        const dy = sourceCenterY - targetCenterY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        const threshold = (Math.min(tableW, tableH) + Math.min(targetW, targetH)) / 5;
+
+        if (distance < threshold) {
+          onTableMerge(tableId, targetTable.id);
+          merged = true;
+          break;
+        }
+      }
+    }
+
+    if (!merged) {
+      onTablePositionChange(tableId, {
+        x,
+        y,
+      });
+    }
   };
 
   return (
-    <div className="flex flex-col gap-3 flex-1 w-full">
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border p-2" style={{ borderColor: "var(--border)" }}>
-        <div className="flex items-center gap-1 rounded-md border p-1" style={{ borderColor: "var(--border)" }}>
-          <button type="button" onClick={handleZoomOut} className="px-2 py-1 text-xs font-semibold text-gray-500 hover:text-gray-900 dark:hover:text-white" aria-label={t("staff.tables.map_controls.zoom_out", { defaultValue: "Zoom out" })}>
-            -
-          </button>
-          <span className="min-w-[48px] px-1 text-center text-xs tabular-nums text-gray-500">{Math.round(zoomScale * 100)}%</span>
-          <button type="button" onClick={handleZoomIn} className="px-2 py-1 text-xs font-semibold text-gray-500 hover:text-gray-900 dark:hover:text-white" aria-label={t("staff.tables.map_controls.zoom_in", { defaultValue: "Zoom in" })}>
-            +
-          </button>
-          <button type="button" onClick={handleZoomReset} className="px-2 py-1 text-xs font-semibold text-[#FF5A2C]">
-            {t("staff.tables.map_controls.zoom_fit", { defaultValue: "Fit" })}
-          </button>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {!readOnly && onBackgroundImageUpload && (
-            <>
-              <input type="file" ref={fileInputRef} accept="image/png, image/jpeg, image/webp" onChange={handleBackgroundImageChange} className="hidden" />
-              <button onClick={() => fileInputRef.current?.click()} className="text-xs font-semibold text-[#FF5A2C] hover:underline">
-                {t("staff.tables.map_controls.upload_floorplan", { defaultValue: "Upload floor plan" })}
+    <div className="flex flex-col gap-4 h-full">
+      {/* Floor Switcher & Toolbar */}
+      {!hideControls && (
+        <div className="flex flex-col gap-2 rounded-lg border border-[var(--border)] bg-[var(--card)] p-2">
+          <div className="flex items-center gap-2 overflow-x-auto pb-0.5">
+            {layout.floors.map((floor) => (
+              <button
+                key={floor.id}
+                onClick={() => handleFloorSwitch(floor.id)}
+                className={`shrink-0 rounded-md px-3 py-1.5 text-xs font-medium transition-all sm:px-4 sm:py-2 sm:text-sm ${layout.activeFloorId === floor.id
+                  ? "bg-[var(--primary)] text-white shadow-md"
+                  : "text-[var(--text-muted)] hover:bg-[var(--bg-base)] hover:text-[var(--text)]"
+                  }`}
+              >
+                {floor.name}
               </button>
-            </>
-          )}
-          <label className="flex items-center gap-1.5 cursor-pointer text-xs text-gray-500">
-            <input type="checkbox" checked={showGrid} onChange={(e) => setShowGrid(e.target.checked)} className="accent-[#FF5A2C]" />
-            {t("staff.tables.map_controls.show_grid", { defaultValue: "Show grid" })}
-          </label>
-        </div>
-      </div>
+            ))}
+          </div>
 
-      {/* Canvas */}
+          {readOnly && (
+            <p className="px-1 text-center text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)] md:hidden">
+              {t("landing.booking.table_map.zoom_hint")}
+            </p>
+          )}
+
+          <div className="flex flex-wrap items-center justify-between gap-2 md:justify-end">
+            <div className="flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--surface)] p-1">
+              <button
+                type="button"
+                onClick={handleZoomOut}
+                className="px-2 py-1 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text)]"
+                aria-label={t("dashboard.tables.map.zoom_out", { defaultValue: "Zoom out" })}
+              >
+                -
+              </button>
+              <span className="min-w-[56px] px-1 text-center text-xs tabular-nums text-[var(--text-muted)]">
+                {Math.round(zoomScale * 100)}%
+              </span>
+              <button
+                type="button"
+                onClick={handleZoomIn}
+                className="px-2 py-1 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text)]"
+                aria-label={t("dashboard.tables.map.zoom_in", { defaultValue: "Zoom in" })}
+              >
+                +
+              </button>
+              <button
+                type="button"
+                onClick={handleZoomReset}
+                className="px-2 py-1 text-xs font-semibold text-[var(--primary)]"
+                aria-label={t("dashboard.tables.map.zoom_reset", { defaultValue: "Reset zoom" })}
+              >
+                {t("dashboard.tables.map.zoom_fit", { defaultValue: "Fit" })}
+              </button>
+            </div>
+
+            {/* Upload Button */}
+            {!readOnly && (
+              <>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept="image/png, image/jpeg"
+                  onChange={handleBackgroundImageUpload}
+                  className="hidden"
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-1 px-1 text-sm text-[var(--primary)] hover:underline"
+                >
+                  <span className="material-symbols-outlined text-base">cloud_upload</span>
+                  {t("dashboard.tables.map.upload_floorplan")}
+                </button>
+              </>
+            )}
+            {/* Grid Toggle */}
+            <label className="flex items-center gap-2 cursor-pointer whitespace-nowrap px-1">
+              <input
+                type="checkbox"
+                checked={showGrid}
+                onChange={(e) => setShowGrid(e.target.checked)}
+                className="accent-[var(--primary)]"
+              />
+              <span className="text-sm text-[var(--text-muted)]">{t("dashboard.tables.map.show_grid")}</span>
+            </label>
+          </div>
+        </div>
+      )}
+
+      {/* Canvas Container */}
       <div
         ref={containerRef}
-        className="flex-1 w-full overflow-auto bg-gray-50 dark:bg-[#0E131F] rounded-2xl border p-4"
+        className="relative block flex-1 overflow-auto overscroll-contain rounded-xl border border-[var(--border)] bg-[var(--bg-base)] p-2 sm:p-4"
         style={{
-          borderColor: "var(--border)",
-          minHeight: "500px",
-          cursor: canPan ? (isPanning ? "grabbing" : "grab") : "default",
+          touchAction: canDragPan ? (isGestureZooming ? "none" : "pan-x pan-y") : "pan-x pan-y",
+          cursor: canDragPan ? (isPanning ? "grabbing" : "grab") : "default",
+          userSelect: canDragPan && isPanning ? "none" : "auto",
+          WebkitOverflowScrolling: canDragPan ? "auto" : "touch",
+          transform: "translateZ(0)",
+          backfaceVisibility: "hidden",
+          WebkitBackfaceVisibility: "hidden",
         }}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchCancel}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerEnd}
         onPointerCancel={handlePointerEnd}
         onPointerLeave={handlePointerEnd}
       >
+        {/* Scaled wrapper — preserves canvas coordinate system */}
         <div
-          className="relative bg-white dark:bg-[#181F2E] rounded-xl shadow-md border overflow-hidden mx-auto"
+          ref={scaleWrapperRef}
           style={{
-            width: `${floor.width * zoomScale}px`,
-            height: `${floor.height * zoomScale}px`,
-            borderColor: "var(--border)",
-            transform: "translateZ(0)",
+            width: activeFloor.width * scale,
+            height: activeFloor.height * scale,
+            flexShrink: 0,
           }}
         >
+          {/* The Floor Canvas — always renders at native resolution via transform */}
           <div
-            className="absolute top-0 left-0"
+            ref={floorRef}
+            className="relative shadow-lg"
             style={{
-              width: floor.width,
-              height: floor.height,
-              transform: `scale(${zoomScale})`,
+              width: activeFloor.width,
+              height: activeFloor.height,
+              transform: `translateZ(0) scale(${scale})`,
               transformOrigin: "top left",
-              backgroundImage: floor.imageUrl
-                ? `url(${floor.imageUrl})`
-                : showGrid
-                ? "radial-gradient(var(--border) 1px, transparent 1px)"
-                : undefined,
-              backgroundSize: floor.imageUrl ? "contain" : "20px 20px",
-              backgroundRepeat: floor.imageUrl ? "no-repeat" : undefined,
+              willChange: isGestureZooming ? "transform" : "auto",
+              backfaceVisibility: "hidden",
+              WebkitBackfaceVisibility: "hidden",
+              backgroundColor: "white",
+              backgroundImage: activeFloor.backgroundImage ? `url(${activeFloor.backgroundImage})` : undefined,
+              backgroundSize: "contain",
+              backgroundRepeat: "no-repeat",
               backgroundPosition: "center",
+              border: activeFloor.backgroundImage ? "none" : "1px solid var(--border)",
+              borderRadius: 8,
             }}
           >
-            <div className="absolute top-3 left-3 bg-black/5 dark:bg-white/5 backdrop-blur px-3 py-1 rounded-lg text-xs font-bold text-gray-500 pointer-events-none">
-              {floor.name} ({floor.width}px x {floor.height}px)
-            </div>
+            {/* Grid Overlay */}
+            {showGrid && !isGestureZooming && (
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  backgroundSize: "20px 20px",
+                  backgroundImage: `
+                            linear-gradient(to right, rgba(0,0,0,0.05) 1px, transparent 1px),
+                            linear-gradient(to bottom, rgba(0,0,0,0.05) 1px, transparent 1px)
+                        `,
+                  zIndex: 0
+                }}
+              />
+            )}
 
-            {tables.map((tableItem) => (
+            {/* Tables */}
+            {activeFloor.tables.map((table) => (
               <DraggableTable
-                key={tableItem.id}
-                table={tableItem}
-                isSelected={selectedTableId === tableItem.id}
-                draggable={!readOnly}
-                scale={zoomScale}
-                onDragEnd={onTablePositionChange}
-                onResize={onTableResize}
+                key={table.id}
+                table={{ ...table, status: selectedSet.has(table.id) ? "SELECTED" : table.status }}
+                onDragEnd={handleTableDragEnd}
                 onClick={onTableClick}
+                onResize={!readOnly ? onTableResize : undefined}
+                draggable={!readOnly}
+                renderContent={renderTableContent}
+                scale={scale}
+                reduceEffects={isGestureZooming}
               />
             ))}
           </div>
         </div>
       </div>
 
-      <div className="flex items-center justify-between text-xs text-gray-500 px-1">
-        <div>
-          {t("staff.tables.map_controls.floor_dimensions", { defaultValue: "Floor size" })}: {floor.width}px × {floor.height}px
+      {/* Floor Info Footer */}
+      {!hideControls && (
+        <div className="flex items-center justify-between text-xs text-[var(--text-muted)] px-1">
+          <div>
+            {t("dashboard.tables.map.floor_dimensions")}: {activeFloor.width}px × {activeFloor.height}px
+          </div>
+          <div className="flex items-center gap-3">
+            <span>{activeFloor.tables.length} {t("dashboard.tables.map.tables_on_floor")}</span>
+          </div>
         </div>
-        <div>
-          {tables.length} {t("staff.tables.map_controls.tables_on_floor", { defaultValue: "tables" })}
-        </div>
-      </div>
+      )}
     </div>
   );
 };
