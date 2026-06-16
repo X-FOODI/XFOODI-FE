@@ -87,13 +87,13 @@ export default function LeftSidebar({ profile, activeFeed, onFeedChange }: LeftS
             Trang cá nhân
           </Link>
         )}
-        <button
-          type="button"
+        <Link
+          href="/profile"
           className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-[var(--text-muted)] hover:bg-[var(--surface)]"
         >
           <Settings className="h-4 w-4" />
           Settings
-        </button>
+        </Link>
       </nav>
     </motion.aside>
   );
