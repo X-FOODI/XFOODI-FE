@@ -11,6 +11,8 @@ import axiosInstance from "@/lib/services/axiosInstance";
 import paymentService, { PaymentPurpose } from "@/lib/services/paymentService";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+console.log("[DEBUG] NEXT_PUBLIC_API_URL =", process.env.NEXT_PUBLIC_API_URL);
+console.log("[DEBUG] Socket will connect to:", BACKEND_URL.replace("/api", ""));
 
 interface OrderItem {
   id: string;
@@ -132,10 +134,15 @@ export default function LiveOrdersPage() {
     fetchOrders();
 
     if (user.restaurantId) {
-      // Connect to Socket.io with fallback to polling for proxy compatibility
+      // Connect to Socket.io — polling only for Render/Cloudflare proxy compatibility
       const newSocket = io(BACKEND_URL.replace("/api", ""), {
-        transports: ["polling", "websocket"],
+        transports: ["polling"],
         withCredentials: true,
+        reconnection: true,
+        reconnectionAttempts: Infinity,
+        reconnectionDelay: 2000,
+        reconnectionDelayMax: 10000,
+        timeout: 20000,
       });
 
       newSocket.on("connect", () => {
