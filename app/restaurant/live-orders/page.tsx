@@ -146,9 +146,17 @@ export default function LiveOrdersPage() {
       });
 
       newSocket.on("connect", () => {
-        console.log("Connected to WebSocket Server:", newSocket.id);
-        // Join the restaurant's room
+        console.log("[Socket] Connected:", newSocket.id);
         newSocket.emit("join_restaurant", user.restaurantId);
+        console.log("[Socket] Joined room:", user.restaurantId);
+      });
+
+      newSocket.on("connect_error", (err) => {
+        console.error("[Socket] Connect error:", err.message, err);
+      });
+
+      newSocket.on("disconnect", (reason) => {
+        console.warn("[Socket] Disconnected:", reason);
       });
 
       newSocket.on("NEW_ORDER", (order: any) => {
