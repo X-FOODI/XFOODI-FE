@@ -31,24 +31,37 @@ export default function DashboardHeader({
   const [notificationOpen, setNotificationOpen] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
 
-  // Resolve user from auth if props not passed
-  const currentUser = authService.getCurrentUser();
-  const resolvedName =
-    userName ||
-    currentUser?.fullName ||
-    currentUser?.name ||
-    "User";
-  const resolvedEmail =
-    userEmail ||
-    currentUser?.email ||
-    "";
-  const resolvedAvatar = currentUser?.avatar || "";
-  const initials = resolvedName
-    .split(" ")
-    .map((w: string) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase() || "U";
+  // Resolve user from auth if props not passed (with hydration-safe state)
+  const [resolvedName, setResolvedName] = useState(userName || "User");
+  const [resolvedEmail, setResolvedEmail] = useState(userEmail || "");
+  const [resolvedAvatar, setResolvedAvatar] = useState("");
+  const [initials, setInitials] = useState(() => {
+    const defaultName = userName || "User";
+    return defaultName
+      .split(" ")
+      .map((w: string) => w[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase() || "U";
+  });
+
+  useEffect(() => {
+    const currentUser = authService.getCurrentUser();
+    const name = userName || currentUser?.fullName || currentUser?.name || "User";
+    const email = userEmail || currentUser?.email || "";
+    const avatar = currentUser?.avatar || "";
+    const init = name
+      .split(" ")
+      .map((w: string) => w[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase() || "U";
+
+    setResolvedName(name);
+    setResolvedEmail(email);
+    setResolvedAvatar(avatar);
+    setInitials(init);
+  }, [userName, userEmail]);
 
   const chipLabel =
     role === "admin"

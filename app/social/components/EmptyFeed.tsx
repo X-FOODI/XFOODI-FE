@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import Link from 'next/link';
+import { Utensils } from 'lucide-react';
 
 interface EmptyFeedProps {
   title?: string;
@@ -20,8 +21,8 @@ export default function EmptyFeed({
       animate={{ opacity: 1, y: 0 }}
       className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border)] bg-[var(--card)]/80 px-8 py-16 text-center backdrop-blur-md"
     >
-      <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-[var(--primary-soft)] text-4xl">
-        🍽️
+      <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-[var(--primary-soft)] text-[var(--primary)]">
+        <Utensils className="h-10 w-10" />
       </div>
       <h3 className="mb-2 text-lg font-semibold text-[var(--text)]">{title}</h3>
       <p className="mb-6 max-w-sm text-sm text-[var(--text-muted)]">{description}</p>

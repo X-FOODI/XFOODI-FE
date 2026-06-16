@@ -3,13 +3,14 @@
 import { useSocialStoreOptional } from '@/store/social';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { Home, Search, Plus, Bell, User } from 'lucide-react';
 
-const ITEMS = [
-  { href: '/social', label: 'Feed', icon: '🏠' },
-  { href: '/social/search', label: 'Tìm', icon: '🔍' },
-  { href: '/social', label: 'Đăng', icon: '➕', action: 'create' as const },
-  { href: '/social', label: 'Thông báo', icon: '🔔' },
-  { href: '/social/profile', label: 'Tôi', icon: '👤' },
+const ITEMS: { href: string; label: string; icon: React.ReactNode; action?: 'create' }[] = [
+  { href: '/social', label: 'Feed', icon: <Home className="h-5 w-5" /> },
+  { href: '/social/search', label: 'Tìm', icon: <Search className="h-5 w-5" /> },
+  { href: '/social', label: 'Đăng', icon: <Plus className="h-5 w-5" />, action: 'create' as const },
+  { href: '/social', label: 'Thông báo', icon: <Bell className="h-5 w-5" /> },
+  { href: '/social/profile', label: 'Tôi', icon: <User className="h-5 w-5" /> },
 ];
 
 export default function SocialMobileNav() {
