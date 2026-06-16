@@ -176,10 +176,9 @@ export default function CustomerMenuPage() {
 
     // Establish WebSocket connection
     const socket = io(process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000", {
-      transports: ["websocket"],
+      transports: ["polling"],
+      withCredentials: true,
     });
-
-    const roomName = `restaurant_${table.restaurant.id}`;
     socket.on("connect", () => {
       socket.emit("join_restaurant", table.restaurant.id);
     });
