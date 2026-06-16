@@ -45,7 +45,7 @@ export interface Reservation {
     statusHistory?: any[];
 
     mustLeaveBy?: string | null;
-    cancellationInfo?: { cancelledReason?: string; at?: string; requestedAt?: string; rejectedAt?: string } | null;
+    cancellationInfo?: { cancelledReason?: string; at?: string; requestedAt?: string; rejectedAt?: string; refundAmount?: number } | null;
     isCancellationManualReviewPending?: boolean;
     noShowAutoPending?: boolean;
   };
