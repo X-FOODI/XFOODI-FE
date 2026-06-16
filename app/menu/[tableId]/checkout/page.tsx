@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import axiosInstance from "@/lib/services/axiosInstance";
 import paymentService, { PaymentStatus } from "@/lib/services/paymentService";
+import FeedbackModal from "@/components/feedback/FeedbackModal";
 import { 
   ArrowLeft, 
   CreditCard, 
@@ -39,6 +40,8 @@ interface ActiveOrder {
   reference: string;
   totalAmount: number;
   createdAt: string;
+  reservationId?: string | null;
+  depositPaid?: number; // tổng tiền cọc đã thanh toán
   items: Array<{
     id: string;
     name: string;
@@ -68,6 +71,7 @@ export default function CustomerCheckoutPage() {
   const [paymentId, setPaymentId] = useState<string | null>(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [polling, setPolling] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
 
   // Staff calling states
   const [callingStaff, setCallingStaff] = useState(false);
@@ -87,8 +91,23 @@ export default function CustomerCheckoutPage() {
         // 2. Get active orders for current session
         const orderRes = await axiosInstance.get("/orders", { params: { tableId } });
         if (orderRes.data?.success && orderRes.data.data.length > 0) {
-          // Find the latest active order (not completed or cancelled)
-          setActiveOrder(orderRes.data.data[0]);
+          const order = orderRes.data.data[0];
+
+          // Nếu order có reservation, fetch thêm tiền cọc đã thanh toán
+          if (order.reservationId) {
+            try {
+              const resRes = await axiosInstance.get(`/reservations/${order.reservationId}`);
+              if (resRes.data?.success) {
+                const reservation = resRes.data.data;
+                const depositPaid = (reservation.payments ?? [])
+                  .filter((p: any) => p.status === 1 /* COMPLETED */ )
+                  .reduce((sum: number, p: any) => sum + Number(p.amount), 0);
+                order.depositPaid = depositPaid;
+              }
+            } catch { /* không có reservation hoặc lỗi — bỏ qua */ }
+          }
+
+          setActiveOrder(order);
         }
       }
     } catch (err) {
@@ -107,9 +126,11 @@ export default function CustomerCheckoutPage() {
     if (!activeOrder || !table) return;
     try {
       setGeneratingQR(true);
+      const depositPaid = activeOrder.depositPaid ?? 0;
+      const amountDue = Math.max(0, activeOrder.totalAmount - depositPaid);
       const res = await paymentService.getTransferInfo({
         orderId: activeOrder.id,
-        amount: activeOrder.totalAmount,
+        amount: amountDue,
         restaurantId: table.restaurant.id,
       });
 
@@ -151,6 +172,8 @@ export default function CustomerCheckoutPage() {
       if (data.orderId === activeOrder?.id && data.status === "COMPLETED") {
         setPaymentSuccess(true);
         setPolling(false);
+        // Hiện feedback sau 1.5s để animation success kịp chạy
+        setTimeout(() => setShowFeedback(true), 1500);
       }
     });
 
@@ -162,6 +185,7 @@ export default function CustomerCheckoutPage() {
           setPaymentSuccess(true);
           setPolling(false);
           clearInterval(interval);
+          setTimeout(() => setShowFeedback(true), 1500);
         }
       } catch (err) {
         console.error("Lỗi kiểm tra trạng thái thanh toán:", err);
@@ -235,7 +259,8 @@ export default function CustomerCheckoutPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex justify-center pb-12 font-sans selection:bg-amber-500/30 selection:text-amber-200">
+    <>
+      <div className="min-h-screen bg-zinc-950 text-zinc-100 flex justify-center pb-12 font-sans selection:bg-amber-500/30 selection:text-amber-200">
       <div className="w-full max-w-md bg-zinc-900/40 min-h-screen flex flex-col relative border-x border-zinc-800/60 shadow-2xl backdrop-blur-2xl">
         
         {/* Success Screen */}
@@ -274,8 +299,16 @@ export default function CustomerCheckoutPage() {
                   </div>
                   <div className="flex justify-between border-t border-zinc-850 pt-1.5 mt-1.5 text-sm font-bold text-white">
                     <span>Đã thanh toán:</span>
-                    <span className="text-amber-400">{activeOrder.totalAmount.toLocaleString("vi-VN")}đ</span>
+                    <span className="text-amber-400">
+                      {Math.max(0, activeOrder.totalAmount - (activeOrder.depositPaid ?? 0)).toLocaleString("vi-VN")}đ
+                    </span>
                   </div>
+                  {(activeOrder.depositPaid ?? 0) > 0 && (
+                    <div className="flex justify-between text-emerald-400 text-[11px]">
+                      <span>Tiền cọc đã trừ:</span>
+                      <span>-{activeOrder.depositPaid!.toLocaleString("vi-VN")}đ</span>
+                    </div>
+                  )}
                 </div>
 
                 <button 
@@ -364,9 +397,21 @@ export default function CustomerCheckoutPage() {
                 <span>Thuế VAT (10%)</span>
                 <span>{(activeOrder.totalAmount - (activeOrder.totalAmount / 1.1)).toLocaleString("vi-VN")}đ</span>
               </div>
+              {(activeOrder.depositPaid ?? 0) > 0 && (
+                <div className="flex justify-between text-emerald-400">
+                  <span className="flex items-center gap-1">
+                    ✓ Đã đặt cọc
+                  </span>
+                  <span>-{(activeOrder.depositPaid!).toLocaleString("vi-VN")}đ</span>
+                </div>
+              )}
               <div className="flex justify-between text-sm font-extrabold text-white pt-2 border-t border-zinc-850">
-                <span className="flex items-center gap-1">Tổng tiền thanh toán</span>
-                <span className="text-amber-400 text-base">{activeOrder.totalAmount.toLocaleString("vi-VN")}đ</span>
+                <span className="flex items-center gap-1">
+                  {(activeOrder.depositPaid ?? 0) > 0 ? "Còn lại phải trả" : "Tổng tiền thanh toán"}
+                </span>
+                <span className="text-amber-400 text-base">
+                  {Math.max(0, activeOrder.totalAmount - (activeOrder.depositPaid ?? 0)).toLocaleString("vi-VN")}đ
+                </span>
               </div>
             </div>
           </div>
@@ -499,5 +544,18 @@ export default function CustomerCheckoutPage() {
 
       </div>
     </div>
+      
+      {/* ─── FEEDBACK MODAL — hiện phía khách sau khi thanh toán thành công ─── */}
+      {showFeedback && activeOrder && (
+        <FeedbackModal
+          orderId={activeOrder.id}
+          orderReference={activeOrder.reference}
+          restaurantName={table?.restaurant.name ?? ""}
+          brandColor="#f59e0b"
+          onClose={() => setShowFeedback(false)}
+          onSubmitted={() => setShowFeedback(false)}
+        />
+      )}
+    </>
   );
 }

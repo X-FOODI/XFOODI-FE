@@ -9,7 +9,6 @@ import { useAuth } from "@/lib/contexts/AuthContext";
 import { useTenant } from "@/lib/contexts/TenantContext";
 import axiosInstance from "@/lib/services/axiosInstance";
 import paymentService, { PaymentPurpose } from "@/lib/services/paymentService";
-import FeedbackModal from "@/components/feedback/FeedbackModal";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
@@ -36,6 +35,8 @@ interface Order {
   customerPhone?: string | null;
   customerEmail?: string | null;
   isPaid?: boolean;
+  reservationId?: string | null;
+  depositPaid?: number; // tiền cọc đã thanh toán, trừ vào bill
 }
 
 export default function LiveOrdersPage() {
@@ -69,8 +70,29 @@ export default function LiveOrdersPage() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    // Create an audio element programmatically
-    audioRef.current = new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg");
+    // Create an audio element programmatically with an MP3 chime sound
+    audioRef.current = new Audio("https://www.soundjay.com/buttons/sounds/button-10.mp3");
+    
+    // Unlock audio context on first user click/interaction to satisfy browser autoplay policy
+    const unlockAudio = () => {
+      if (audioRef.current) {
+        audioRef.current.play()
+          .then(() => {
+            audioRef.current?.pause();
+            if (audioRef.current) audioRef.current.currentTime = 0;
+            document.removeEventListener("click", unlockAudio);
+            document.removeEventListener("keydown", unlockAudio);
+          })
+          .catch(err => console.log("Silent audio unlock failed:", err));
+      }
+    };
+    document.addEventListener("click", unlockAudio);
+    document.addEventListener("keydown", unlockAudio);
+    
+    return () => {
+      document.removeEventListener("click", unlockAudio);
+      document.removeEventListener("keydown", unlockAudio);
+    };
   }, []);
 
   // Sync selectedOrder with latest orders data to show live updates of items status
@@ -110,9 +132,10 @@ export default function LiveOrdersPage() {
     fetchOrders();
 
     if (user.restaurantId) {
-      // Connect to Socket.io
+      // Connect to Socket.io with fallback to polling for proxy compatibility
       const newSocket = io(BACKEND_URL.replace("/api", ""), {
-        transports: ["websocket"],
+        transports: ["polling", "websocket"],
+        withCredentials: true,
       });
 
       newSocket.on("connect", () => {
@@ -242,14 +265,16 @@ export default function LiveOrdersPage() {
     setNotifications(prev => prev.filter(n => n.id !== notif.id));
     // Mở cash modal
     setCashModalOrder(order);
-    setCashReceived(order.totalAmount);
+    const amountDueNotif = Math.max(0, order.totalAmount - (order.depositPaid ?? 0));
+    setCashReceived(amountDueNotif);
     setIsCashModalOpen(true);
   };
 
   /** Mở modal xác nhận thu tiền mặt giống như RestX */
   const openCashPaymentModal = (order: Order) => {
     setCashModalOrder(order);
-    setCashReceived(order.totalAmount);
+    const amountDue = Math.max(0, order.totalAmount - (order.depositPaid ?? 0));
+    setCashReceived(amountDue);
     setIsCashModalOpen(true);
   };
 
@@ -270,8 +295,6 @@ export default function LiveOrdersPage() {
         delete next[cashModalOrder.id];
         return next;
       });
-      // Show feedback popup
-      setFeedbackOrder({ id: cashModalOrder.id, reference: cashModalOrder.reference || cashModalOrder.id.slice(0, 8).toUpperCase() });
       if (selectedOrder?.id === cashModalOrder.id) {
         setSelectedOrder(null);
       }
@@ -762,11 +785,29 @@ export default function LiveOrdersPage() {
             {/* Body */}
             <div className="p-6 space-y-6">
               {/* Summary */}
-              <div className="bg-zinc-900/40 border border-zinc-800/80 rounded-2xl p-4 flex justify-between items-center">
-                <span className="text-zinc-400 text-sm font-semibold">Tổng tiền thanh toán</span>
-                <span className="font-black text-xl text-amber-500">
-                  {cashModalOrder.totalAmount.toLocaleString('vi-VN')} đ
-                </span>
+              <div className="bg-zinc-900/40 border border-zinc-800/80 rounded-2xl p-4 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-zinc-400 text-sm">Tổng hoá đơn</span>
+                  <span className="font-bold text-zinc-300">
+                    {cashModalOrder.totalAmount.toLocaleString('vi-VN')} đ
+                  </span>
+                </div>
+                {(cashModalOrder.depositPaid ?? 0) > 0 && (
+                  <div className="flex justify-between items-center text-emerald-400">
+                    <span className="text-sm">✓ Đã đặt cọc</span>
+                    <span className="font-bold">
+                      -{cashModalOrder.depositPaid!.toLocaleString('vi-VN')} đ
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center pt-2 border-t border-zinc-800">
+                  <span className="text-zinc-300 text-sm font-semibold">
+                    {(cashModalOrder.depositPaid ?? 0) > 0 ? 'Còn lại phải thu' : 'Tổng tiền thanh toán'}
+                  </span>
+                  <span className="font-black text-xl text-amber-500">
+                    {Math.max(0, cashModalOrder.totalAmount - (cashModalOrder.depositPaid ?? 0)).toLocaleString('vi-VN')} đ
+                  </span>
+                </div>
               </div>
 
               {/* Input for cash received */}
@@ -791,49 +832,59 @@ export default function LiveOrdersPage() {
                 </div>
               </div>
 
-              {/* Suggestions */}
-              <div className="grid grid-cols-2 gap-2">
-                <button 
-                  onClick={() => setCashReceived(cashModalOrder.totalAmount)}
-                  className={`py-2 px-3 rounded-lg text-xs font-bold transition-all border ${
-                    cashReceived === cashModalOrder.totalAmount 
-                      ? "bg-amber-500 border-amber-500 text-black" 
-                      : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-850"
-                  }`}
-                >
-                  Đúng số tiền ({cashModalOrder.totalAmount.toLocaleString('vi-VN')}đ)
-                </button>
-                {[100000, 200000, 500000].map((amt) => (
-                  <button 
-                    key={amt}
-                    disabled={amt < cashModalOrder.totalAmount}
-                    onClick={() => setCashReceived(amt)}
-                    className={`py-2 px-3 rounded-lg text-xs font-bold transition-all border disabled:opacity-40 disabled:cursor-not-allowed ${
-                      cashReceived === amt 
-                        ? "bg-amber-500 border-amber-500 text-black" 
-                        : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-850"
-                    }`}
-                  >
-                    {amt.toLocaleString('vi-VN')} đ
-                  </button>
-                ))}
-              </div>
+              {/* Suggestions — dựa trên amountDue sau khi trừ cọc */}
+              {(() => {
+                const amountDue = Math.max(0, cashModalOrder.totalAmount - (cashModalOrder.depositPaid ?? 0));
+                return (
+                  <div className="grid grid-cols-2 gap-2">
+                    <button 
+                      onClick={() => setCashReceived(amountDue)}
+                      className={`py-2 px-3 rounded-lg text-xs font-bold transition-all border ${
+                        cashReceived === amountDue
+                          ? "bg-amber-500 border-amber-500 text-black" 
+                          : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-850"
+                      }`}
+                    >
+                      Đúng số tiền ({amountDue.toLocaleString('vi-VN')}đ)
+                    </button>
+                    {[100000, 200000, 500000].map((amt) => (
+                      <button 
+                        key={amt}
+                        disabled={amt < amountDue}
+                        onClick={() => setCashReceived(amt)}
+                        className={`py-2 px-3 rounded-lg text-xs font-bold transition-all border disabled:opacity-40 disabled:cursor-not-allowed ${
+                          cashReceived === amt 
+                            ? "bg-amber-500 border-amber-500 text-black" 
+                            : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-850"
+                        }`}
+                      >
+                        {amt.toLocaleString('vi-VN')} đ
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
 
               {/* Change (Cashback) block */}
-              <div className={`p-4 rounded-2xl border flex justify-between items-center transition-all ${
-                cashReceived >= cashModalOrder.totalAmount 
-                  ? "bg-emerald-500/5 border-emerald-500/20" 
-                  : "bg-rose-500/5 border-rose-500/20"
-              }`}>
-                <span className="text-zinc-400 text-xs font-bold">
-                  {cashReceived >= cashModalOrder.totalAmount ? "Tiền thối lại" : "Còn thiếu"}
-                </span>
-                <span className={`font-black text-base ${
-                  cashReceived >= cashModalOrder.totalAmount ? "text-emerald-400" : "text-rose-400"
-                }`}>
-                  {Math.abs(cashReceived - cashModalOrder.totalAmount).toLocaleString('vi-VN')} đ
-                </span>
-              </div>
+              {(() => {
+                const amountDue = Math.max(0, cashModalOrder.totalAmount - (cashModalOrder.depositPaid ?? 0));
+                return (
+                  <div className={`p-4 rounded-2xl border flex justify-between items-center transition-all ${
+                    cashReceived >= amountDue 
+                      ? "bg-emerald-500/5 border-emerald-500/20" 
+                      : "bg-rose-500/5 border-rose-500/20"
+                  }`}>
+                    <span className="text-zinc-400 text-xs font-bold">
+                      {cashReceived >= amountDue ? "Tiền thối lại" : "Còn thiếu"}
+                    </span>
+                    <span className={`font-black text-base ${
+                      cashReceived >= amountDue ? "text-emerald-400" : "text-rose-400"
+                    }`}>
+                      {Math.abs(cashReceived - amountDue).toLocaleString('vi-VN')} đ
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Footer */}
@@ -848,7 +899,7 @@ export default function LiveOrdersPage() {
                 Hủy
               </button>
               <button
-                disabled={cashReceived < cashModalOrder.totalAmount || confirmingPayment}
+                disabled={cashReceived < Math.max(0, cashModalOrder.totalAmount - (cashModalOrder.depositPaid ?? 0)) || confirmingPayment}
                 onClick={handleCashPayment}
                 className="flex-1 py-3 rounded-xl font-bold text-xs text-black bg-amber-500 hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 flex items-center justify-center gap-2"
               >
@@ -860,17 +911,7 @@ export default function LiveOrdersPage() {
         </div>
       )}
 
-      {/* Feedback Modal — hiện sau khi thanh toán xong */}
-      {feedbackOrder && (
-        <FeedbackModal
-          orderId={feedbackOrder.id}
-          orderReference={feedbackOrder.reference}
-          restaurantName={tenant?.name ?? ""}
-          brandColor={tenant?.primaryColor ?? "#FF380B"}
-          onClose={() => setFeedbackOrder(null)}
-          onSubmitted={() => setFeedbackOrder(null)}
-        />
-      )}
+      {/* Feedback được hiện phía khách hàng trong /menu/[tableId]/checkout sau khi thanh toán xong */}
 
       <style dangerouslySetInnerHTML={{__html: `
         .animate-fade-in-up {

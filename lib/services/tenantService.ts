@@ -13,6 +13,7 @@ import adminAxiosInstance from "./adminAxiosInstance";
 export interface TenantConfig {
   id: string;
   prefix: string;
+  slug?: string;
   name: string;
 
   // Branding & Assets
