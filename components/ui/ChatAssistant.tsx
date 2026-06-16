@@ -840,7 +840,8 @@ export function ChatAssistant() {
 
     console.log("[ChatAssistant Socket] Initializing connection to:", socketUrl);
     const socket = io(socketUrl, {
-      transports: ["websocket"],
+      transports: ["polling"],
+      withCredentials: true,
     });
 
     socket.on("connect", () => {
