@@ -223,7 +223,7 @@ export default function DashboardHeader({
         justifyContent: "space-between",
         padding: "0 24px",
         height: "64px",
-        background: "rgba(var(--card-rgb, 255,255,255), 0.95)",
+        background: "color-mix(in srgb, var(--card) 95%, transparent)",
         backdropFilter: "blur(12px)",
         WebkitBackdropFilter: "blur(12px)",
         borderBottom: "1px solid var(--border)",
