@@ -35,7 +35,7 @@ function LoginEmailPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectPath = searchParams.get('redirect');
-  const { login, updateUser } = useAuth();
+  const { login, updateUser, user, loading: authLoading } = useAuth();
   const { mode } = useThemeMode();
   const { tenant } = useTenant();
   const tenantName = tenant?.businessName || tenant?.name;
@@ -80,6 +80,12 @@ function LoginEmailPageContent() {
       setIsAdminDomain(hostname.startsWith('admin.') || hostname.includes('admin.localhost'));
     }
   }, []);
+
+  useEffect(() => {
+    if (mounted && !authLoading && user) {
+      navigateAfterLogin(user);
+    }
+  }, [mounted, authLoading, user]);
 
   useEffect(() => {
     let timer: NodeJS.Timeout;

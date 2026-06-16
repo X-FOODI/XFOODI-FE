@@ -75,7 +75,7 @@ export default function RestaurantDashboardPage() {
   // Owner/Staff are allowed on any subdomain (admin.localhost or demo.localhost).
   // No cross-subdomain redirect needed for local development.
   useEffect(() => {
-    if (!isAuthReady) return;
+    if (!isAuthReady || tenantLoading) return;
 
     if (!user) {
       router.replace("/login?redirect=/restaurant/dashboard");
@@ -99,6 +99,7 @@ export default function RestaurantDashboardPage() {
         // Enforce subdomain access! If user is Owner, redirect to their subdomain dashboard.
         if (user.restaurantSlug && typeof window !== "undefined") {
           const host = window.location.host;
+          const hostWithoutPort = host.includes(":") ? host.split(":")[0] : host;
           const protocol = window.location.protocol;
           const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || "xfoodi.website";
           const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1");
@@ -106,9 +107,11 @@ export default function RestaurantDashboardPage() {
             ? `${user.restaurantSlug}.localhost` 
             : `${user.restaurantSlug}.${BASE_DOMAIN}`;
           
-          const port = host.includes(":") ? `:${host.split(":")[1]}` : "";
-          window.location.href = `${protocol}//${targetTenantSubdomain}${port}/restaurant/dashboard`;
-          return;
+          if (hostWithoutPort !== targetTenantSubdomain) {
+            const port = host.includes(":") ? `:${host.split(":")[1]}` : "";
+            window.location.href = `${protocol}//${targetTenantSubdomain}${port}/restaurant/dashboard`;
+            return;
+          }
         }
         // Tạm thời comment lại để có thể xem giao diện dashboard
         // setUnauthorized(true);
@@ -129,7 +132,7 @@ export default function RestaurantDashboardPage() {
       .catch(() => {
         // API not available or returned error — show dashboard anyway with fallback data
       });
-  }, [isAuthReady, user, router]);
+  }, [isAuthReady, user, router, tenant, tenantLoading]);
 
   if (!isAuthReady || (!user && !unauthorized)) {
     return (
