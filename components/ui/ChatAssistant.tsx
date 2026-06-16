@@ -23,6 +23,8 @@ import {
   BookOpen,
   Bell,
   Clock,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 
 /* ─────────────────────────── Types ─────────────────────────── */
@@ -506,6 +508,7 @@ function ChatWindow({
 }: ChatWindowProps) {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [isMaximized, setIsMaximized] = useState(false);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -531,8 +534,8 @@ function ChatWindow({
         position: "fixed",
         bottom: 88,
         right: 24,
-        width: "min(400px, calc(100vw - 32px))",
-        height: "min(580px, calc(100dvh - 120px))",
+        width: isMaximized ? "min(850px, calc(100vw - 32px))" : "min(400px, calc(100vw - 32px))",
+        height: isMaximized ? "min(800px, calc(100dvh - 120px))" : "min(580px, calc(100dvh - 120px))",
         borderRadius: 20,
         display: "flex",
         flexDirection: "column",
@@ -541,6 +544,7 @@ function ChatWindow({
         background: "var(--card)",
         overflow: "hidden",
         zIndex: 9998,
+        transition: "width 0.25s cubic-bezier(0.4, 0, 0.2, 1), height 0.25s cubic-bezier(0.4, 0, 0.2, 1), bottom 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
       }}
     >
       {/* ── Header ── */}
@@ -585,6 +589,22 @@ function ChatWindow({
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <button
+            type="button"
+            onClick={() => setIsMaximized(!isMaximized)}
+            title={isMaximized ? "Thu nhỏ" : "Phóng to"}
+            style={{
+              width: 30, height: 30, borderRadius: 8,
+              border: "none", background: "transparent",
+              color: "var(--text-muted)", cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "background 0.15s",
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.06)"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+          >
+            {isMaximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+          </button>
           {history.length > 1 && (
             <button
               onClick={onClear}
