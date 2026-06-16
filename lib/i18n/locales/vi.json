@@ -3083,7 +3083,7 @@
   "homepage": {
     "header": {
       "logo_alt": "Logo nhà hàng",
-      "brand": "XFoodi",
+      "brand": "Nhà hàng",
       "product": "Sản phẩm",
       "workflow": "Quy trình",
       "restaurants": "Nhà hàng",
@@ -3100,13 +3100,13 @@
       "logout": "Đăng xuất"
     },
     "hero": {
-      "tag": "Nền tảng Multi-Tenant SaaS F&B #1",
-      "title": "Biến mỗi nhà hàng thành một nền tảng riêng",
-      "description": "Tạo website, menu QR, đặt món, CRM khách hàng và marketing tự động chỉ trong vài phút.",
-      "get_started": "Dùng thử miễn phí",
-      "watch_demo": "Xem demo nhà hàng",
+      "tag": "Nền tảng vận hành nhà hàng toàn diện",
+      "title": "Tối ưu vận hành nhà hàng với XFoodi",
+      "description": "Quản lý đặt bàn, order, bếp, kho và báo cáo trên một nền tảng duy nhất.",
+      "get_started": "Bắt đầu ngay",
+      "watch_demo": "Xem Demo",
       "stats": {
-        "brands": "Thương hiệu tin dùng",
+        "brands": "Thương hiệu",
         "years": "Năm kinh nghiệm",
         "branches": "Chi nhánh"
       },
@@ -3117,18 +3117,18 @@
         "orders": "Đơn hàng",
         "recent_orders": "Đơn hàng gần đây"
       },
-      "trusted_by": "Được tin dùng bởi các đối tác hàng đầu"
+      "trusted_by": "Được tin dùng bởi các thương hiệu hàng đầu"
     },
     "about": {
-      "tag": "SỨ MỆNH & CHỈ SỐ",
-      "title_prefix": "Hàng nghìn nhà hàng đã ",
-      "title_highlight": "tin tưởng XFoodi",
-      "description": "Từ quán cafe bình dân đến chuỗi nhà hàng lớn, XFoodi giúp chủ quán tối ưu quy trình vận hành và tăng trưởng bền vững nhờ công nghệ đám mây cô lập dữ liệu.",
+      "tag": "Câu chuyện của chúng tôi",
+      "title_prefix": "Cách mạng hóa ",
+      "title_highlight": "Ngành Ẩm thực",
+      "description": "Nền tảng Nhà hàng ra đời với sứ mệnh đơn giản: trao quyền cho các chủ nhà hàng bằng công nghệ cho cảm giác tự nhiên như tay nghề của họ. Chúng tôi thu hẹp khoảng cách giữa lòng hiếu khách truyền thống và hiệu quả hiện đại, giúp bạn tập trung vào điều quan trọng nhất—món ăn ngon và khách hàng hài lòng.",
       "stats": {
-        "restaurants": "Nhà hàng đang hoạt động",
-        "countries": "Đơn hàng xử lý",
-        "chefs": "Khách hàng cuối",
-        "team": "Tỷ lệ Uptime"
+        "restaurants": "Nhà hàng Tin dùng",
+        "countries": "Quốc gia Hỗ trợ",
+        "chefs": "Đầu bếp Hài lòng",
+        "team": "Thành viên Đội ngũ"
       },
       "mission": {
         "title": "Sứ mệnh Dẫn lối",
@@ -3138,37 +3138,37 @@
         "title": "Đổi mới Đi đầu",
         "desc": "Luôn đón đầu xu hướng"
       },
-      "cta": "Tham gia cộng đồng"
+      "cta": "Tham gia cùng chúng tôi"
     },
     "features": {
-      "tag": "Tính năng nổi bật",
-      "title_prefix": "Tất cả công cụ bạn cần, ",
-      "brand": "trong một nơi",
-      "description": "Tối ưu hóa quy trình, tăng hiệu suất hoạt động và mang lại trải nghiệm tuyệt vời cho thực khách.",
+      "tag": "Tính năng",
+      "title_prefix": "Tính năng nổi bật của ",
+      "brand": "Nhà hàng",
+      "description": "Tất cả công cụ bạn cần để vận hành nhà hàng – trong một giao diện trực quan.",
       "items": {
         "analytics": {
-          "title": "Báo cáo realtime",
-          "description": "Theo dõi doanh thu, món bán chạy, hiệu suất phục vụ theo thời gian thực."
+          "title": "Analytics",
+          "description": "Xem dữ liệu bán hàng chảy vào biểu đồ và báo cáo theo thời gian thực."
         },
         "tables": {
-          "title": "Sơ đồ bàn thông minh",
-          "description": "Quản lý tình trạng bàn trống, đang dùng bữa hay đang dọn dẹp trực quan."
+          "title": "Tables",
+          "description": "Quan sát sơ đồ bàn và trạng thái phục vụ tức thì trên toàn bộ khu vực."
         },
         "menu": {
-          "title": "Thực đơn số hóa",
-          "description": "Tự động cập nhật món ăn, giá bán và trạng thái tồn kho tức thì."
+          "title": "Menu",
+          "description": "Admin tạo món, chỉnh menu và khách nhìn thấy thay đổi ngay lập tức."
         },
         "reservations": {
-          "title": "Đặt bàn trực tuyến",
-          "description": "Khách chọn vị trí, bàn yêu thích trên sơ đồ 3D thực tế ảo."
+          "title": "Reservations",
+          "description": "Customer đặt bàn, Admin xử lý và Staff check-in theo luồng rõ ràng."
         },
         "customer": {
-          "title": "Chăm sóc khách hàng (CRM)",
-          "description": "Tích hợp hệ thống loyalty, tích điểm và phân hạng thành viên tự động."
+          "title": "Customer",
+          "description": "Theo dõi lịch sử đơn hàng, khách quay lại và dữ liệu loyalty của từng khách."
         },
         "staff_ops": {
-          "title": "Vận hành tinh gọn",
-          "description": "Kết nối luồng gọi món từ khách đến nhà bếp và quầy thu ngân tức thì."
+          "title": "Staff Ops",
+          "description": "KDS và quy trình vận hành cho Staff, Kitchen và Admin trong một màn hình."
         },
         "table_management": {
           "title": "Quản lý đặt bàn thông minh",
@@ -3198,47 +3198,47 @@
       }
     },
     "workflow": {
-      "title": "Lên sàn trong 3 bước đơn giản",
-      "description": "Không cần thiết lập phức tạp — nhà hàng của bạn có thể sẵn sàng phục vụ khách hàng chỉ sau 10 phút.",
+      "title": "Cách Nền tảng Nhà hàng vận hành trong nhà hàng của bạn",
+      "description": "Từ lúc khách đặt bàn đến khi chốt bill, mọi bước đều được Nền tảng Nhà hàng hỗ trợ.",
       "steps": {
         "setup": {
           "title": "Thiết lập nhà hàng & menu",
-          "description": "Khởi tạo menu, bàn và phân quyền nhân viên chỉ trong 10 phút."
+          "description": "Cấu hình thông tin nhà hàng, tạo menu, thiết lập bàn ghế và phân quyền nhân viên chỉ trong vài phút."
         },
         "operation": {
-          "title": "In QR Code và kích hoạt",
-          "description": "Mỗi bàn có một mã QR riêng. Khách scan là gọi món, xem thực đơn ngay tại bàn."
+          "title": "Vận hành & đồng bộ realtime",
+          "description": "Nhận order, xử lý thanh toán, gửi lệnh xuống bếp tự động. Mọi thay đổi được cập nhật ngay lập tức trên tất cả thiết bị."
         },
         "analysis": {
-          "title": "Vận hành & Tăng trưởng",
-          "description": "Kiểm soát mọi order từ nhà bếp đến quầy thanh toán. Thống kê báo cáo doanh thu theo thời gian thực."
+          "title": "Phân tích & tối ưu",
+          "description": "Xem báo cáo chi tiết về doanh thu, món bán chạy, chi phí. Sử dụng dữ liệu để ra quyết định kinh doanh thông minh hơn."
         }
       }
     },
     "testimonials": {
-      "title": "Nhà hàng thực, kết quả thực",
-      "description": "Xem các chủ nhà hàng chia sẻ về cách XFoodi đã giúp họ tối ưu quy trình và tăng trưởng doanh thu.",
+      "title": "Nhà hàng nói gì về Nền tảng Nhà hàng?",
+      "description": "Hàng trăm chủ nhà hàng và quản lý đã tin tưởng Nền tảng Nhà hàng để tối ưu vận hành của họ.",
       "items": {
         "nam": {
-          "role": "Chủ nhà hàng Seafood 123",
-          "quote": "XFoodi đã giúp chúng tôi tự động hóa hoàn toàn từ khâu đặt bàn đến gọi món qua QR. Nhân viên phục vụ nhàn hơn, ít sai sót hơn và doanh số tăng rõ rệt."
+          "role": "Owner, Nhà hàng Hải Sản 123",
+          "quote": "Nền tảng Nhà hàng đã thay đổi hoàn toàn cách chúng tôi vận hành. Từ việc đặt bàn đến quản lý kho, mọi thứ đều được tự động hóa và chính xác hơn rất nhiều."
         },
         "huong": {
-          "role": "Quản lý chuỗi Phở 24h",
-          "quote": "Báo cáo đa chi nhánh của XFoodi cực kỳ chính xác và cập nhật theo thời gian thực. Tôi có thể nắm bắt doanh thu bất kỳ lúc nào ngay trên điện thoại."
+          "role": "Manager, Chuỗi Phở 24h",
+          "quote": "Trước đây tôi phải mất hàng giờ để tổng hợp báo cáo từ 5 chi nhánh. Giờ với Nền tảng Nhà hàng, tất cả dữ liệu đều có sẵn trên dashboard trong vài cú click."
         },
         "tuan": {
-          "role": "Sáng lập Cơm Tấm Sài Gòn",
-          "quote": "Khách hàng của chúng tôi rất thích tự quét QR để gọi món và xem hóa đơn. Tính năng này giúp giảm thời gian chờ đợi đáng kể trong giờ cao điểm."
+          "role": "Owner, Quán Cơm Tấm Sài Gòn",
+          "quote": "Giao diện đơn giản, nhân viên học rất nhanh. Hệ thống ổn định, chưa bao giờ gặp lỗi trong giờ cao điểm. Recommend cho mọi nhà hàng!"
         },
         "lan": {
-          "role": "Chủ Cafe & Bistro Xanh",
-          "quote": "Trợ lý AI gợi ý món của XFoodi hoạt động rất thông minh. Khách hàng cảm thấy được chăm sóc chu đáo và gọi thêm nhiều món hơn."
+          "role": "Manager, Cafe & Bistro Xanh",
+          "quote": "Chúng tôi yêu tính năng đồng bộ realtime. Order từ app đến bếp chỉ trong 1 giây, khách hàng rất hài lòng về tốc độ phục vụ."
         }
       }
     },
     "footer": {
-      "tagline": "Nền tảng vận hành và tối ưu doanh thu thế hệ mới cho mọi mô hình F&B. Giúp bạn số hóa quy trình và kết nối khách hàng hiệu quả.",
+      "tagline": "Nền tảng vận hành nhà hàng thế hệ mới. Giúp bạn quản lý mọi khía cạnh của nhà hàng trên một hệ thống duy nhất.",
       "columns": {
         "product": {
           "title": "Sản phẩm",
@@ -3250,8 +3250,8 @@
         "resources": {
           "title": "Tài nguyên",
           "blog": "Blog",
-          "help_center": "Trung tâm hỗ trợ",
-          "faqs": "Câu hỏi thường gặp",
+          "help_center": "Trung tâm trợ giúp",
+          "faqs": "FAQs",
           "documentation": "Tài liệu"
         },
         "company": {
@@ -3265,11 +3265,11 @@
           "title": "Pháp lý",
           "privacy": "Chính sách bảo mật",
           "terms": "Điều khoản dịch vụ",
-          "cookies": "Chính sách cookie",
+          "cookies": "Chính sách Cookie",
           "gdpr": "GDPR"
         }
       },
-      "copyright": "© {year} XFoodi. Bảo lưu mọi quyền.",
+      "copyright": "© {year} Nền tảng Nhà hàng. All rights reserved.",
       "privacy": "Bảo mật",
       "terms": "Điều khoản",
       "cookies": "Cookies"
@@ -3698,13 +3698,13 @@
     }
   },
   "menu_page": {
-    "logo_title": "XFOODI PREMIUM DINING",
+    "logo_title": "XFoodi PREMIUM DINING",
     "title": "Thực đơn hôm nay",
     "loading": "Đang tải thực đơn...",
     "retry": "Thử lại",
     "error_load": "Không thể tải thực đơn. Vui lòng thử lại sau.",
     "items": "món",
-    "XFoodi_menu": "XFOODI MENU",
+    "XFoodi_menu": "XFoodi MENU",
     "search_placeholder": "Tìm món...",
     "viewing_category": "Đang xem danh mục",
     "showing_items": "Hiển thị {{count}} món ăn",

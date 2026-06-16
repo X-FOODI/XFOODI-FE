@@ -3,13 +3,21 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { io, Socket } from "socket.io-client";
-import { message, Modal, Input, Select, InputNumber, Button, Tooltip } from "antd";
+import { message, Spin, Button, Tooltip, Modal } from "antd";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import { useAuth } from "@/lib/contexts/AuthContext";
 import { useTenant } from "@/lib/contexts/TenantContext";
 import axiosInstance from "@/lib/services/axiosInstance";
-import { TableMap2D } from "./components/TableMap2D";
+import { TableMap2D, Layout, Floor } from "./components/TableMap2D";
+import { TableData as Map2DTableData } from "./components/DraggableTable";
+import { AddTableModal } from "./components/AddTableModal";
+import { AddAreaModal } from "./components/AddAreaModal";
+import { TableDetailsDrawer } from "./components/TableDetailsDrawer";
+import { DeleteConfirmModal } from "./components/DeleteConfirmModal";
+import { tableService, floorService, TableStatus } from "@/lib/services/tableService";
+import { extractApiErrorMessage } from "@/lib/utils/extractApiErrorMessage";
+import { useTranslation } from "react-i18next";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 const getQrDownloadUrl = (qrText: string) => {
@@ -17,85 +25,125 @@ const getQrDownloadUrl = (qrText: string) => {
   return `${base}/api/upload/qr?text=${encodeURIComponent(qrText)}`;
 };
 
-interface Floor {
-  id: string;
-  name: string;
-  width: number;
-  height: number;
-  imageUrl: string | null;
-}
-
-interface TableSession {
-  id: string;
-  startedAt: string;
-  order: {
-    id: string;
-    reference: string;
-    totalAmount: number;
-  } | null;
-}
-
 interface Table {
   id: string;
-  code: string;
-  seatingCapacity: number;
-  type: string; // 'Normal' | 'VIP'
-  shape: string; // 'Square' | 'Round' | 'Rectangle'
+  number: string;
+  capacity: number;
+  status: "available" | "occupied";
+  area: string;
+  floorId?: string;
+  currentOrder?: string;
+  reservationTime?: string;
+  shape: "Square" | "Circle" | "Rectangle" | "Oval";
   positionX: number;
   positionY: number;
   width: number;
   height: number;
   rotation: number;
-  status: string; // 'AVAILABLE' | 'OCCUPIED' | 'RESERVED'
-  statusName: string;
-  statusColor: string;
-  qrCodeUrl: string;
-  floorId: string;
-  floorName?: string;
-  activeSession: TableSession | null;
+  isActive: boolean;
+  has3DView?: boolean;
+  viewDescription?: string;
+  defaultViewUrl?: string;
+  qrCodeUrl?: string;
+  cubeFrontImageUrl?: string;
 }
 
 export default function TablesManagementPage() {
+  const { t } = useTranslation();
   const { user, isAuthReady } = useAuth();
   const { tenant, loading: tenantLoading } = useTenant();
   const router = useRouter();
 
   const [socket, setSocket] = useState<Socket | null>(null);
   const [loading, setLoading] = useState(true);
-  const [floors, setFloors] = useState<Floor[]>([]);
+  const [beFloors, setBeFloors] = useState<any[]>([]);
   const [selectedFloorId, setSelectedFloorId] = useState<string>("");
   const [tables, setTables] = useState<Table[]>([]);
-  const [allTablesList, setAllTablesList] = useState<Table[]>([]); // For list/grid view
-
+  
   // View Mode: 'view' (Operating / Realtime map), 'edit' (Layout position editor), 'list' (List grid CRUD)
   const [viewMode, setViewMode] = useState<"view" | "edit" | "list">("view");
 
-  // Selection & drag states
-  const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
-  const [isModified, setIsModified] = useState(false);
+  // Selection & modal states
+  const [selectedTable, setSelectedTable] = useState<Table | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [addModalOpen, setAddModalOpen] = useState(false);
+  
+  // Floor Modals
+  const [addAreaModalOpen, setAddAreaModalOpen] = useState(false);
+  const [editAreaModalOpen, setEditAreaModalOpen] = useState(false);
+  const [zoneToDelete, setZoneToDelete] = useState<string | null>(null);
 
-  // Modals visibility
-  const [isFloorModalOpen, setIsFloorModalOpen] = useState(false);
-  const [isTableModalOpen, setIsTableModalOpen] = useState(false);
+  // Table Delete Modal
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+
+  // Session Operational Modals
   const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
-
-  // Form states
-  const [floorForm, setFloorForm] = useState({ id: "", name: "", width: 600, height: 400 });
-  const [tableForm, setTableForm] = useState({
-    id: "",
-    code: "",
-    seatingCapacity: 4,
-    type: "Normal",
-    shape: "Square",
-    floorId: "",
-  });
   const [sessionActionTable, setSessionActionTable] = useState<Table | null>(null);
   const [transferTargetTableId, setTransferTargetTableId] = useState<string>("");
   const [mergeTargetTableId, setMergeTargetTableId] = useState<string>("");
 
-  // 1. Initial Page Authorization & Data Loading
+  // List search & filters
+  const [statusFilter, setStatusFilter] = useState<"all" | "available" | "occupied">("all");
+  const [floorFilter, setFloorFilter] = useState<string>("all");
+  const [keyword, setKeyword] = useState("");
+
+  const [isUploadingPanorama, setIsUploadingPanorama] = useState(false);
+
+  // 1. Load Data
+  const fetchTables = async () => {
+    try {
+      const [tablesData, floorsData] = await Promise.all([
+        tableService.getAllTables(),
+        floorService.getAllFloors(),
+      ]);
+
+      setBeFloors(floorsData);
+
+      const cacheBust = Date.now();
+      const withCacheBust = (url?: string) => {
+        if (!url) return undefined;
+        return `${url}${url.includes('?') ? '&' : '?'}v=${cacheBust}`;
+      };
+
+      const mappedTables: Table[] = tablesData.map(item => {
+        let status: Table['status'] = 'available';
+        if (item.tableStatusId === TableStatus.Occupied) status = 'occupied';
+
+        return {
+          id: item.id,
+          number: item.code || '',
+          capacity: item.seatingCapacity || 4,
+          status: status,
+          area: item.floorName || item.type || 'Indoor',
+          floorId: item.floorId,
+          shape: (item.shape as any) || 'Square',
+          positionX: Number(item.positionX) || 50,
+          positionY: Number(item.positionY) || 50,
+          width: Number(item.width) || 80,
+          height: Number(item.height) || 80,
+          rotation: Number(item.rotation) || 0,
+          isActive: item.isActive !== false,
+          has3DView: item.has3DView,
+          viewDescription: item.viewDescription,
+          defaultViewUrl: item.defaultViewUrl,
+          qrCodeUrl: item.qrCodeUrl,
+          cubeFrontImageUrl: withCacheBust(item.cubeFrontImageUrl),
+        };
+      });
+
+      setTables(mappedTables);
+      
+      if (floorsData.length > 0 && !selectedFloorId) {
+        setSelectedFloorId(floorsData[0].id);
+      }
+    } catch (error) {
+      console.error("Failed to fetch tables:", error);
+    }
+  };
+
+  // Initial authentication & fetch
   useEffect(() => {
     if (!isAuthReady || tenantLoading) return;
     if (!user) {
@@ -103,65 +151,10 @@ export default function TablesManagementPage() {
       return;
     }
     setLoading(false);
-    loadFloors();
+    fetchTables();
   }, [isAuthReady, user, router, tenantLoading]);
 
-  // Load floors
-  const loadFloors = async () => {
-    try {
-      const res = await axiosInstance.get("/floors");
-      if (res.data.success) {
-        setFloors(res.data.data);
-        if (res.data.data.length > 0 && !selectedFloorId) {
-          setSelectedFloorId(res.data.data[0].id);
-        }
-      }
-    } catch (err: any) {
-      message.error(err.response?.data?.message || "Không thể tải danh sách tầng");
-    }
-  };
-
-  // Load tables for selected floor
-  const loadFloorLayout = async (floorId: string) => {
-    if (!floorId) return;
-    try {
-      const res = await axiosInstance.get(`/floors/${floorId}/layout`);
-      if (res.data.success) {
-        setTables(res.data.data.tables);
-        setIsModified(false);
-      }
-    } catch (err: any) {
-      message.error(err.response?.data?.message || "Không thể tải sơ đồ tầng");
-    }
-  };
-
-  // Load all tables (for grid/list view)
-  const loadAllTables = async () => {
-    try {
-      const res = await axiosInstance.get("/tables");
-      if (res.data.success) {
-        setAllTablesList(res.data.data);
-      }
-    } catch (err: any) {
-      message.error(err.response?.data?.message || "Không thể tải danh sách bàn");
-    }
-  };
-
-  useEffect(() => {
-    if (selectedFloorId) {
-      loadFloorLayout(selectedFloorId);
-    }
-  }, [selectedFloorId]);
-
-  useEffect(() => {
-    if (viewMode === "list") {
-      loadAllTables();
-    } else if (selectedFloorId) {
-      loadFloorLayout(selectedFloorId);
-    }
-  }, [viewMode, selectedFloorId]);
-
-  // 2. Realtime Updates via Socket.io
+  // Realtime Socket updates
   useEffect(() => {
     if (!user?.restaurantId) return;
 
@@ -181,15 +174,9 @@ export default function TablesManagementPage() {
     });
 
     const handleRealtimeRefresh = () => {
-      if (selectedFloorId) {
-        loadFloorLayout(selectedFloorId);
-      }
-      if (viewMode === "list") {
-        loadAllTables();
-      }
+      fetchTables();
     };
 
-    // Socket listeners
     newSocket.on("TABLE_CREATED", handleRealtimeRefresh);
     newSocket.on("TABLE_UPDATED", handleRealtimeRefresh);
     newSocket.on("TABLE_DELETED", handleRealtimeRefresh);
@@ -197,267 +184,412 @@ export default function TablesManagementPage() {
     newSocket.on("TABLE_SESSIONS_MERGED", handleRealtimeRefresh);
     newSocket.on("TABLE_SESSION_TRANSFERRED", handleRealtimeRefresh);
     newSocket.on("TABLE_SESSION_CLOSED", handleRealtimeRefresh);
-    newSocket.on("FLOOR_LAYOUT_CHANGED", (data) => {
-      if (data.floorId === selectedFloorId) {
-        loadFloorLayout(selectedFloorId);
-      }
-    });
+    newSocket.on("FLOOR_LAYOUT_CHANGED", handleRealtimeRefresh);
 
     setSocket(newSocket);
 
     return () => {
       newSocket.disconnect();
     };
-  }, [user?.restaurantId, selectedFloorId, viewMode]);
+  }, [user?.restaurantId]);
 
-  // 3. Drag and Drop Layout Editor Logic
-  const handleTablePositionChange = (tableId: string, position: { x: number; y: number }) => {
-    setTables((prev) =>
-      prev.map((t) => (t.id === tableId ? { ...t, positionX: position.x, positionY: position.y } : t))
-    );
-    setSelectedTableId(tableId);
-    setIsModified(true);
-  };
+  // Layout synchronization
+  const [layout, setLayout] = useState<Layout | null>(null);
 
-  const handleTableResize = (tableId: string, size: { width: number; height: number }) => {
-    setTables((prev) =>
-      prev.map((t) => (t.id === tableId ? { ...t, width: size.width, height: size.height } : t))
-    );
-    setIsModified(true);
-  };
+  useEffect(() => {
+    if (beFloors.length === 0 && tables.length === 0) return;
 
-  const uploadFloorBackground = async (floorId: string, file: File) => {
-    try {
-      const formData = new FormData();
-      formData.append("image", file);
-      formData.append("folder", "xfoodi/floors");
-      const uploadRes = await axiosInstance.post("/upload/image", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      const imageUrl = uploadRes.data?.data?.url || uploadRes.data?.url;
-      if (!imageUrl) throw new Error("Không nhận được URL ảnh");
+    const floorsMapped: Floor[] = beFloors.map(bf => {
+      const floorTables = tables
+        .filter(table => table.floorId === bf.id && table.isActive)
+        .map(table => ({
+          id: table.id,
+          tenantId: 'tenant-1',
+          name: table.number,
+          seats: table.capacity,
+          status: table.status === 'available' ? 'AVAILABLE' : 'OCCUPIED',
+          area: table.area,
+          position: { x: table.positionX, y: table.positionY },
+          shape: table.shape as any,
+          width: table.width || 80,
+          height: table.height || 80,
+          rotation: table.rotation,
+        } as Map2DTableData));
 
-      const res = await axiosInstance.put(`/floors/${floorId}`, { imageUrl });
-      if (res.data.success) {
-        message.success("Đã cập nhật ảnh sơ đồ mặt bằng");
-        loadFloors();
-      }
-    } catch (err: any) {
-      message.error(err.response?.data?.message || "Không thể tải ảnh sơ đồ mặt bằng");
-    }
-  };
-
-  const saveLayout = async () => {
-    try {
-      const layoutData = tables.map((t) => ({
-        id: t.id,
-        positionX: t.positionX,
-        positionY: t.positionY,
-        width: t.width,
-        height: t.height,
-        rotation: t.rotation,
-      }));
-      const res = await axiosInstance.put(`/floors/${selectedFloorId}/layout`, { layout: layoutData });
-      if (res.data.success) {
-        message.success("Lưu sơ đồ bàn thành công");
-        setIsModified(false);
-      }
-    } catch (err: any) {
-      message.error(err.response?.data?.message || "Lỗi khi lưu sơ đồ bàn");
-    }
-  };
-
-  // 4. Floor Management CRUD Actions
-  const handleOpenFloorModal = (floor?: Floor) => {
-    if (floor) {
-      setFloorForm({ id: floor.id, name: floor.name, width: floor.width, height: floor.height });
-    } else {
-      setFloorForm({ id: "", name: "", width: 600, height: 400 });
-    }
-    setIsFloorModalOpen(true);
-  };
-
-  const handleSaveFloor = async () => {
-    if (!floorForm.name.trim()) {
-      message.warning("Vui lòng nhập tên tầng");
-      return;
-    }
-    try {
-      if (floorForm.id) {
-        // Update
-        const res = await axiosInstance.put(`/floors/${floorForm.id}`, floorForm);
-        if (res.data.success) {
-          message.success("Cập nhật tầng thành công");
-          loadFloors();
-        }
-      } else {
-        // Create
-        const res = await axiosInstance.post("/floors", floorForm);
-        if (res.data.success) {
-          message.success("Tạo tầng mới thành công");
-          loadFloors();
-          setSelectedFloorId(res.data.data.id);
-        }
-      }
-      setIsFloorModalOpen(false);
-    } catch (err: any) {
-      message.error(err.response?.data?.message || "Không thể lưu thông tin tầng");
-    }
-  };
-
-  const handleDeleteFloor = (floorId: string) => {
-    Modal.confirm({
-      title: "Xóa tầng",
-      content: "Bạn có chắc chắn muốn xóa tầng này? Thao tác này không thể hoàn tác.",
-      okText: "Xóa",
-      okType: "danger",
-      cancelText: "Hủy",
-      onOk: async () => {
-        try {
-          const res = await axiosInstance.delete(`/floors/${floorId}`);
-          if (res.data.success) {
-            message.success("Xóa tầng thành công");
-            setSelectedFloorId("");
-            loadFloors();
-          }
-        } catch (err: any) {
-          message.error(err.response?.data?.message || "Không thể xóa tầng");
-        }
-      },
+      return {
+        id: bf.id,
+        name: bf.name,
+        width: Number(bf.width) || 1200,
+        height: Number(bf.height) || 800,
+        backgroundImage: bf.imageUrl || undefined,
+        tables: floorTables,
+      };
     });
-  };
 
-  // 5. Table Management CRUD Actions
-  const handleOpenTableModal = (table?: Table) => {
-    if (table) {
-      setTableForm({
-        id: table.id,
-        code: table.code,
-        seatingCapacity: table.seatingCapacity,
-        type: table.type,
-        shape: table.shape,
-        floorId: table.floorId,
-      });
-    } else {
-      setTableForm({
-        id: "",
-        code: "",
-        seatingCapacity: 4,
-        type: "Normal",
-        shape: "Square",
-        floorId: selectedFloorId,
-      });
-    }
-    setIsTableModalOpen(true);
-  };
+    if (floorsMapped.length === 0) return;
 
-  const handleSaveTable = async () => {
-    if (!tableForm.code.trim()) {
-      message.warning("Vui lòng nhập số bàn/mã bàn");
-      return;
-    }
-    if (!tableForm.floorId) {
-      message.warning("Vui lòng chọn tầng");
-      return;
-    }
-    try {
-      if (tableForm.id) {
-        // Update
-        const res = await axiosInstance.put(`/tables/${tableForm.id}`, tableForm);
-        if (res.data.success) {
-          message.success("Cập nhật bàn thành công");
-          if (viewMode === "list") loadAllTables();
-          else loadFloorLayout(selectedFloorId);
-        }
-      } else {
-        // Create
-        const res = await axiosInstance.post("/tables", {
-          ...tableForm,
-          positionX: 50,
-          positionY: 50,
-        });
-        if (res.data.success) {
-          message.success("Tạo bàn thành công");
-          if (viewMode === "list") loadAllTables();
-          else loadFloorLayout(selectedFloorId);
-        }
-      }
-      setIsTableModalOpen(false);
-    } catch (err: any) {
-      message.error(err.response?.data?.message || "Không thể lưu thông tin bàn");
-    }
-  };
-
-  const handleDeleteTable = (tableId: string) => {
-    Modal.confirm({
-      title: "Xóa bàn",
-      content: "Bạn có chắc chắn muốn xóa bàn này?",
-      okText: "Xóa",
-      okType: "danger",
-      cancelText: "Hủy",
-      onOk: async () => {
-        try {
-          const res = await axiosInstance.delete(`/tables/${tableId}`);
-          if (res.data.success) {
-            message.success("Xóa bàn thành công");
-            if (viewMode === "list") loadAllTables();
-            else loadFloorLayout(selectedFloorId);
-          }
-        } catch (err: any) {
-          message.error(err.response?.data?.message || "Không thể xóa bàn");
-        }
-      },
+    setLayout({
+      id: 'be-layout',
+      name: tenant?.name || 'Restaurant',
+      activeFloorId: selectedFloorId && floorsMapped.some(f => f.id === selectedFloorId) ? selectedFloorId : floorsMapped[0].id,
+      floors: floorsMapped,
     });
+  }, [tables, beFloors, selectedFloorId, tenant]);
+
+  const handleLayoutChange = (newLayout: Layout) => {
+    setLayout(newLayout);
   };
 
-  // 6. Table Session Control Actions
+  // Immediate drag update on database
+  const handleMap2DTablePositionChange = async (tableId: string, position: { x: number; y: number; zoneId?: string }) => {
+    try {
+      const tableToUpdate = tables.find(t => t.id === tableId);
+      if (!tableToUpdate) return;
+
+      const effectiveFloorId = tableToUpdate.floorId || selectedFloorId;
+
+      const apiData: any = {
+        id: tableToUpdate.id,
+        code: tableToUpdate.number,
+        seatingCapacity: tableToUpdate.capacity,
+        type: tableToUpdate.area,
+        floorId: effectiveFloorId,
+        shape: tableToUpdate.shape,
+        positionX: position.x,
+        positionY: position.y,
+        width: tableToUpdate.width,
+        height: tableToUpdate.height,
+        rotation: tableToUpdate.rotation,
+        isActive: tableToUpdate.isActive,
+        tableStatusId: tableToUpdate.status === 'occupied' ? TableStatus.Occupied : TableStatus.Available
+      };
+
+      await tableService.updateTable(tableId, apiData);
+      
+      // Update local state optimistically
+      setTables(prev => prev.map(t =>
+        t.id === tableId ? { ...t, positionX: position.x, positionY: position.y, floorId: effectiveFloorId } : t
+      ));
+    } catch (err) {
+      console.error("Failed to move table:", err);
+      message.error(extractApiErrorMessage(err, "Không thể di chuyển bàn"));
+      fetchTables();
+    }
+  };
+
+  // Immediate resize update on database
+  const handleMap2DTableResize = async (tableId: string, size: { width: number; height: number }) => {
+    try {
+      const tableToUpdate = tables.find(t => t.id === tableId);
+      if (!tableToUpdate) return;
+
+      const apiData: any = {
+        id: tableToUpdate.id,
+        code: tableToUpdate.number,
+        seatingCapacity: tableToUpdate.capacity,
+        type: tableToUpdate.area,
+        floorId: tableToUpdate.floorId || selectedFloorId,
+        shape: tableToUpdate.shape,
+        positionX: tableToUpdate.positionX,
+        positionY: tableToUpdate.positionY,
+        width: size.width,
+        height: size.height,
+        rotation: tableToUpdate.rotation,
+        isActive: tableToUpdate.isActive,
+        tableStatusId: tableToUpdate.status === 'occupied' ? TableStatus.Occupied : TableStatus.Available
+      };
+
+      await tableService.updateTable(tableId, apiData);
+      
+      // Update local state optimistically
+      setTables(prev => prev.map(t =>
+        t.id === tableId ? { ...t, width: size.width, height: size.height } : t
+      ));
+    } catch (err) {
+      console.error("Failed to resize table:", err);
+      message.error(extractApiErrorMessage(err, "Không thể thay đổi kích thước bàn"));
+      fetchTables();
+    }
+  };
+
+  // Table click Router/Session/Details trigger
   const handleTableClick = (table: Table) => {
     if (viewMode === "edit") {
-      setSelectedTableId(table.id);
-      return;
+      setSelectedTable(table);
+      setDrawerOpen(true);
+    } else {
+      setSessionActionTable(table);
+      setIsSessionModalOpen(true);
     }
-    setSessionActionTable(table);
-    setIsSessionModalOpen(true);
   };
 
+  const handleMap2DTableClick = (mapTable: Map2DTableData) => {
+    const table = tables.find(t => t.id === mapTable.id);
+    if (table) {
+      handleTableClick(table);
+    }
+  };
+
+  // Table CRUD Handlers
+  const handleAddTable = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+
+    try {
+      const selectedFloorId = formData.get('area') as string;
+      const selectedFloor = beFloors.find(f => f.id === selectedFloorId);
+      const floorName = selectedFloor?.name || 'Indoor';
+      const code = formData.get('number') as string;
+      const seatingCapacity = parseInt(formData.get('capacity') as string);
+
+      const isDeco = code.startsWith("DECO_");
+
+      const newTableData = {
+        code,
+        seatingCapacity,
+        type: floorName,
+        floorId: selectedFloorId,
+        tableStatusId: TableStatus.Available,
+        isActive: true,
+        shape: isDeco ? 'Rectangle' : 'Square',
+        positionX: 50,
+        positionY: 50,
+        width: isDeco ? 60 : 80,
+        height: isDeco ? 60 : 80,
+        rotation: 0
+      };
+
+      await tableService.createTable(newTableData);
+      message.success("Tạo bàn ăn thành công");
+      setAddModalOpen(false);
+      fetchTables();
+    } catch (err) {
+      console.error("Failed to add table:", err);
+      message.error(extractApiErrorMessage(err, "Không thể tạo bàn ăn"));
+    }
+  };
+
+  const handleUpdateTable = async (values: Partial<Table>) => {
+    if (!selectedTable) return;
+    try {
+      const selectedFloor = beFloors.find(f => f.id === values.area);
+      
+      const apiData: any = {
+        id: selectedTable.id,
+        code: values.number,
+        seatingCapacity: values.capacity,
+        type: selectedFloor ? selectedFloor.name : selectedTable.area,
+        floorId: values.area,
+        shape: values.shape,
+        width: values.width,
+        height: values.height,
+        rotation: values.rotation,
+        isActive: selectedTable.isActive,
+        tableStatusId: selectedTable.status === 'occupied' ? TableStatus.Occupied : TableStatus.Available
+      };
+
+      await tableService.updateTable(selectedTable.id, apiData);
+      message.success("Cập nhật bàn thành công");
+      fetchTables();
+    } catch (err) {
+      console.error("Failed to update table:", err);
+      message.error(extractApiErrorMessage(err, "Không thể cập nhật thông tin"));
+    }
+  };
+
+  const handleDeleteTable = () => {
+    if (selectedTable) {
+      setDeleteConfirmOpen(true);
+    }
+  };
+
+  const confirmDeleteTable = async () => {
+    if (selectedTable) {
+      try {
+        await tableService.deleteTable(selectedTable.id);
+        setTables(prev => prev.filter(t => t.id !== selectedTable.id));
+        setDrawerOpen(false);
+        setSelectedTable(null);
+        message.success("Xóa bàn thành công");
+      } catch (err) {
+        console.error("Delete failed", err);
+        message.error(extractApiErrorMessage(err, "Không thể xóa bàn ăn này"));
+      } finally {
+        setDeleteConfirmOpen(false);
+      }
+    }
+  };
+
+  // Upload Background Image for Floor
+  const handleFloorImageUpload = async (floorId: string, file: File) => {
+    try {
+      const floor = beFloors.find(f => f.id === floorId);
+      await floorService.updateFloor(floorId, {
+        name: floor?.name ?? 'Floor',
+        width: floor?.width ?? 1200,
+        height: floor?.height ?? 800,
+        image: file,
+      });
+      message.success("Tải lên ảnh nền thành công");
+      fetchTables();
+    } catch (err) {
+      console.error('Failed to upload background image:', err);
+      message.error(extractApiErrorMessage(err, "Tải lên ảnh nền thất bại"));
+    }
+  };
+
+  // Upload Panorama Image
+  const handleSavePanorama = async (tableId: string, file: File | null, clear: boolean) => {
+    const tableToUpdate = tables.find(t => t.id === tableId);
+    if (!tableToUpdate) return;
+
+    try {
+      const tableData = {
+        id: tableToUpdate.id,
+        code: String(tableToUpdate.number),
+        seatingCapacity: tableToUpdate.capacity,
+        type: tableToUpdate.area,
+        floorId: tableToUpdate.floorId || selectedFloorId,
+        shape: tableToUpdate.shape,
+        positionX: tableToUpdate.positionX,
+        positionY: tableToUpdate.positionY,
+        width: tableToUpdate.width,
+        height: tableToUpdate.height,
+        rotation: tableToUpdate.rotation,
+        isActive: tableToUpdate.isActive,
+        tableStatusId: tableToUpdate.status === 'occupied' ? TableStatus.Occupied : TableStatus.Available,
+        has3DView: clear ? false : Boolean(file || tableToUpdate.cubeFrontImageUrl || tableToUpdate.defaultViewUrl),
+        viewDescription: clear ? '' : 'Panorama',
+        defaultViewUrl: clear ? '' : (tableToUpdate.cubeFrontImageUrl || tableToUpdate.defaultViewUrl || ''),
+        qrCodeUrl: tableToUpdate.qrCodeUrl,
+        cubeFrontImageUrl: clear ? '' : tableToUpdate.cubeFrontImageUrl,
+      };
+
+      const panoramaPayload = {
+        front: file,
+      };
+
+      setIsUploadingPanorama(true);
+      await tableService.updateTableWithPanorama(tableId, tableData, panoramaPayload, clear);
+      setIsUploadingPanorama(false);
+      message.success("Lưu ảnh panorama thành công");
+      fetchTables();
+    } catch (err) {
+      setIsUploadingPanorama(false);
+      console.error('Failed to save panorama:', err);
+      message.error(extractApiErrorMessage(err, "Lưu ảnh panorama thất bại"));
+    }
+  };
+
+  // Floor CRUD handlers
+  const handleAddArea = async (values: { name: string; width: number; height: number }) => {
+    try {
+      const newId = await floorService.createFloor({ name: values.name, width: values.width, height: values.height });
+      message.success("Thêm tầng mới thành công");
+      setSelectedFloorId(newId);
+      setAddAreaModalOpen(false);
+      fetchTables();
+    } catch (err) {
+      console.error("Failed to add floor:", err);
+      message.error(extractApiErrorMessage(err, "Không thể thêm tầng mới"));
+    }
+  };
+
+  const handleEditArea = async (values: { name: string; width: number; height: number }) => {
+    if (!selectedFloorId) return;
+    try {
+      await floorService.updateFloor(selectedFloorId, {
+        name: values.name,
+        width: values.width,
+        height: values.height,
+      });
+      message.success("Cập nhật tầng thành công");
+      setEditAreaModalOpen(false);
+      fetchTables();
+    } catch (err) {
+      console.error("Failed to update floor:", err);
+      message.error(extractApiErrorMessage(err, "Không thể cập nhật tầng"));
+    }
+  };
+
+  const confirmDeleteFloor = async () => {
+    if (zoneToDelete) {
+      try {
+        await floorService.deleteFloor(zoneToDelete);
+        message.success("Xóa tầng thành công");
+        setSelectedFloorId("");
+        setZoneToDelete(null);
+        fetchTables();
+      } catch (err) {
+        console.error("Failed to delete floor:", err);
+        message.error(extractApiErrorMessage(err, "Không thể xóa tầng này"));
+      }
+    }
+  };
+
+  // Table Session Operations (Vận hành)
   const startSession = async () => {
     if (!sessionActionTable) return;
     try {
-      const res = await axiosInstance.post("/tables/sessions", {
-        tableId: sessionActionTable.id,
-      });
-      if (res.data.success) {
-        message.success(`Đã mở bàn ${sessionActionTable.code}`);
-        setIsSessionModalOpen(false);
-        loadFloorLayout(selectedFloorId);
-      }
-    } catch (err: any) {
-      message.error(err.response?.data?.message || "Không thể mở bàn");
+      await tableService.createTableSession(sessionActionTable.id);
+      message.success(`Đã mở khóa bàn ${sessionActionTable.number}`);
+      setIsSessionModalOpen(false);
+      fetchTables();
+    } catch (err) {
+      console.error("Failed to start session:", err);
+      message.error(extractApiErrorMessage(err, "Không thể mở khóa bàn ăn"));
     }
   };
 
   const closeSession = async () => {
     if (!sessionActionTable) return;
-    Modal.confirm({
-      title: `Thanh toán & Đóng bàn ${sessionActionTable.code}`,
-      content: "Bạn muốn kết thúc phiên và thanh toán cho bàn này?",
-      okText: "Xác nhận",
-      cancelText: "Hủy",
-      onOk: async () => {
-        try {
-          const res = await axiosInstance.post("/tables/sessions/close", {
-            tableId: sessionActionTable.id,
-          });
-          if (res.data.success) {
-            message.success(`Đã thanh toán bàn ${sessionActionTable.code}`);
-            setIsSessionModalOpen(false);
-            loadFloorLayout(selectedFloorId);
-          }
-        } catch (err: any) {
-          message.error(err.response?.data?.message || "Không thể đóng bàn");
-        }
-      },
-    });
+    try {
+      await tableService.closeTableSession([sessionActionTable.id]);
+      message.success(`Đã đóng bàn ăn và thanh toán thành công`);
+      setIsSessionModalOpen(false);
+      fetchTables();
+    } catch (err) {
+      console.error("Failed to close session:", err);
+      message.error(extractApiErrorMessage(err, "Không thể đóng bàn ăn"));
+    }
+  };
+
+  const executeTransfer = async () => {
+    if (!sessionActionTable || !transferTargetTableId) return;
+    try {
+      await tableService.moveTable({
+        sourceTableId: sessionActionTable.id,
+        targetTableId: transferTargetTableId,
+      });
+      message.success("Chuyển bàn thành công");
+      setIsTransferModalOpen(false);
+      setIsSessionModalOpen(false);
+      fetchTables();
+    } catch (err) {
+      console.error("Failed to transfer table:", err);
+      message.error(extractApiErrorMessage(err, "Không thể chuyển bàn ăn"));
+    }
+  };
+
+  const executeMerge = async () => {
+    if (!sessionActionTable || !mergeTargetTableId) return;
+    try {
+      const response = await tableService.mergeTables({
+        tableIds: [sessionActionTable.id, mergeTargetTableId],
+      });
+      
+      if (response.requiresManualResolution) {
+        message.warning("Cần xử lý thủ công do phát hiện nhiều đơn hàng đang hoạt động.");
+      } else {
+        message.success("Gộp bàn ăn thành công");
+      }
+      setIsMergeModalOpen(false);
+      setIsSessionModalOpen(false);
+      fetchTables();
+    } catch (err) {
+      console.error("Failed to merge tables:", err);
+      message.error(extractApiErrorMessage(err, "Không thể gộp bàn ăn"));
+    }
   };
 
   const handleOpenTransfer = () => {
@@ -465,72 +597,36 @@ export default function TablesManagementPage() {
     setIsTransferModalOpen(true);
   };
 
-  const executeTransfer = async () => {
-    if (!sessionActionTable || !transferTargetTableId) return;
-    try {
-      const res = await axiosInstance.post("/tables/sessions/transfer", {
-        fromTableId: sessionActionTable.id,
-        toTableId: transferTargetTableId,
-      });
-      if (res.data.success) {
-        message.success("Chuyển bàn thành công");
-        setIsTransferModalOpen(false);
-        setIsSessionModalOpen(false);
-        loadFloorLayout(selectedFloorId);
-      }
-    } catch (err: any) {
-      message.error(err.response?.data?.message || "Không thể chuyển bàn");
-    }
-  };
-
   const handleOpenMerge = () => {
     setMergeTargetTableId("");
     setIsMergeModalOpen(true);
   };
 
-  const executeMerge = async () => {
-    if (!sessionActionTable || !mergeTargetTableId) return;
-    try {
-      const res = await axiosInstance.post("/tables/sessions/merge", {
-        sourceTableId: sessionActionTable.id,
-        targetTableId: mergeTargetTableId,
-      });
-      if (res.data.success) {
-        message.success("Gộp bàn thành công");
-        setIsMergeModalOpen(false);
-        setIsSessionModalOpen(false);
-        loadFloorLayout(selectedFloorId);
-      }
-    } catch (err: any) {
-      message.error(err.response?.data?.message || "Không thể gộp bàn");
-    }
-  };
+  // Search & Filter list logic
+  const filteredTables = tables.filter((table) => {
+    const isDeco = table.number.startsWith("DECO_");
+    // List view hides decorations to keep lists simple and table-centric
+    if (viewMode === "list" && isDeco) return false;
 
-  const updateSelectedTableProperty = (property: string, value: any) => {
-    if (!selectedTableId) return;
-    setTables((prev) =>
-      prev.map((t) => (t.id === selectedTableId ? { ...t, [property]: value } : t))
-    );
-    setIsModified(true);
-  };
+    const matchStatus = statusFilter === "all" || table.status === statusFilter;
+    const matchFloor = floorFilter === "all" || table.floorId === floorFilter;
+    const matchKeyword = !keyword.trim() || table.number.toLowerCase().includes(keyword.trim().toLowerCase());
+    return matchStatus && matchFloor && matchKeyword;
+  });
 
-  const activeSelectedTable = tables.find((t) => t.id === selectedTableId);
-
-  // 7. Render Layout Coordinates logic
-  const activeFloor = floors.find((f) => f.id === selectedFloorId);
-  const canvasWidth = activeFloor?.width || 600;
-  const canvasHeight = activeFloor?.height || 400;
+  const activeFloor = beFloors.find((f) => f.id === selectedFloorId);
 
   if (loading || tenantLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0A0E14]">
-        <div className="w-8 h-8 rounded-full border-2 animate-spin border-[#FF5A2C] border-t-transparent" />
+      <div className="min-h-screen flex items-center justify-center bg-[#F8F9FA] dark:bg-[#090D16]">
+        <div className="w-10 h-10 rounded-full border-4 animate-spin border-[#FF5A2C] border-t-transparent" />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden" style={{ background: "var(--bg-base)" }}>
+    <div className="flex flex-col h-screen overflow-hidden bg-[#FAF9F6] dark:bg-[#090D16] text-[#1A1A1A] dark:text-[#E2E8F0] transition-colors duration-200">
+      <Spin fullscreen spinning={isUploadingPanorama} tip="Đang lưu ảnh panorama..." size="large" />
       <DashboardHeader
         role="restaurant"
         restaurantName={tenant?.name ?? "Cửa hàng"}
@@ -549,367 +645,285 @@ export default function TablesManagementPage() {
           <div className="flex flex-col gap-6 max-w-[1400px] mx-auto w-full flex-1">
             
             {/* Header section with view toggle */}
-            <div className="flex flex-wrap items-center justify-between gap-4 border-b pb-5" style={{ borderColor: "var(--border)" }}>
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b pb-5 border-gray-200 dark:border-gray-800">
               <div>
-                <h1 className="text-2xl font-bold" style={{ color: "var(--text)" }}>Sơ đồ bàn ăn</h1>
-                <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                  Quản lý khu vực bàn ăn, sơ đồ mặt bằng và trạng thái bàn realtime.
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Sơ đồ bàn ăn &amp; Thiết kế</h1>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Quản lý mặt bằng khu vực, đặt bàn ăn, vẽ tường, cây cảnh, quầy lễ tân, và theo dõi trạng thái bàn trực quan.
                 </p>
               </div>
 
               {/* View mode toggle */}
-              <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-xl border" style={{ borderColor: "var(--border)" }}>
+              <div className="flex bg-gray-100 dark:bg-gray-800/80 p-1.5 rounded-xl border border-gray-200 dark:border-gray-700/80 shadow-inner">
                 <button
                   onClick={() => setViewMode("view")}
-                  className={`px-4 py-2 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 ${
+                  className={`px-4 py-2.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
                     viewMode === "view"
-                      ? "bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-white"
+                      ? "bg-white text-gray-900 shadow-md dark:bg-gray-700 dark:text-white"
                       : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                   }`}
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                   </svg>
                   Vận hành
                 </button>
                 <button
                   onClick={() => setViewMode("edit")}
-                  className={`px-4 py-2 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 ${
+                  className={`px-4 py-2.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
                     viewMode === "edit"
-                      ? "bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-white"
+                      ? "bg-white text-gray-900 shadow-md dark:bg-gray-700 dark:text-white"
                       : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                   }`}
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                   </svg>
                   Chỉnh sơ đồ
                 </button>
                 <button
                   onClick={() => setViewMode("list")}
-                  className={`px-4 py-2 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 ${
+                  className={`px-4 py-2.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
                     viewMode === "list"
-                      ? "bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-white"
+                      ? "bg-white text-gray-900 shadow-md dark:bg-gray-700 dark:text-white"
                       : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                   }`}
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
                   </svg>
                   Danh sách bàn
                 </button>
               </div>
             </div>
 
-            {/* Main Area: Split by Mode */}
+            {/* Main Area */}
             {viewMode !== "list" ? (
               <div className="flex flex-col gap-6">
                 
-                {/* Floor select tabs */}
+                {/* Floor select tabs & edit actions */}
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div className="flex flex-wrap gap-2">
-                    {floors.map((f) => (
+                    {beFloors.map((f) => (
                       <div
                         key={f.id}
-                        className={`group relative flex items-center gap-1.5 px-4 py-2.5 rounded-xl border text-sm font-semibold cursor-pointer transition-all ${
+                        className={`group relative flex items-center gap-2 px-4.5 py-3 rounded-xl border text-sm font-bold cursor-pointer transition-all shadow-sm ${
                           selectedFloorId === f.id
-                            ? "bg-[#FF5A2C] border-[#FF5A2C] text-white shadow-sm"
+                            ? "bg-[#FF5A2C] border-[#FF5A2C] text-white"
                             : "bg-white dark:bg-[#1E293B] border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-600"
                         }`}
                         onClick={() => setSelectedFloorId(f.id)}
                       >
                         <span>{f.name}</span>
-                        {/* Edit / Delete hover actions */}
-                        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 ml-1">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenFloorModal(f);
-                            }}
-                            className="p-0.5 rounded hover:bg-black/10 text-xs"
-                          >
-                            ✏️
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteFloor(f.id);
-                            }}
-                            className="p-0.5 rounded hover:bg-black/10 text-xs"
-                          >
-                            🗑️
-                          </button>
-                        </div>
+                        {/* Floor edit actions (visible in edit mode) */}
+                        {viewMode === "edit" && (
+                          <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 ml-2.5 bg-black/10 px-1.5 py-0.5 rounded">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditAreaModalOpen(true);
+                              }}
+                              title="Sửa tầng"
+                              className="text-xs hover:scale-110"
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setZoneToDelete(f.id);
+                              }}
+                              title="Xóa tầng"
+                              className="text-xs hover:scale-110"
+                              disabled={beFloors.length <= 1}
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ))}
-                    <button
-                      onClick={() => handleOpenFloorModal()}
-                      className="px-4 py-2.5 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 hover:border-[#FF5A2C] dark:hover:border-[#FF5A2C] text-gray-500 hover:text-[#FF5A2C] text-sm font-semibold transition-colors flex items-center gap-1.5"
-                    >
-                      ➕ Thêm tầng
-                    </button>
+                    {viewMode === "edit" && (
+                      <button
+                        onClick={() => setAddAreaModalOpen(true)}
+                        className="px-4.5 py-3 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 hover:border-[#FF5A2C] dark:hover:border-[#FF5A2C] text-gray-500 hover:text-[#FF5A2C] text-sm font-bold transition-all flex items-center gap-1.5 bg-transparent"
+                      >
+                        ➕ Thêm khu vực
+                      </button>
+                    )}
                   </div>
 
-                  {/* Actions for active floor */}
+                  {/* Add design buttons for edit mode */}
                   {viewMode === "edit" && selectedFloorId && (
                     <div className="flex items-center gap-2">
                       <Button
                         type="primary"
-                        onClick={() => handleOpenTableModal()}
+                        onClick={() => setAddModalOpen(true)}
+                        className="font-bold h-11 px-6 rounded-xl"
                         style={{ background: "#22c55e", borderColor: "#22c55e" }}
                       >
-                        ➕ Thêm bàn ăn
-                      </Button>
-                      <Button
-                        type="primary"
-                        onClick={saveLayout}
-                        disabled={!isModified}
-                        style={{ background: isModified ? "#FF5A2C" : "gray", borderColor: isModified ? "#FF5A2C" : "gray" }}
-                      >
-                        💾 Lưu vị trí bàn
+                        ➕ Thiết kế Bàn / Vật phẩm
                       </Button>
                     </div>
                   )}
                 </div>
 
-                {/* The Map Editor/Operating Canvas */}
-                {floors.length === 0 ? (
-                  <div className="text-center py-20 bg-white dark:bg-[#1E293B] rounded-2xl border flex flex-col items-center justify-center p-6" style={{ borderColor: "var(--border)" }}>
-                    <svg className="w-16 h-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {/* Visual Panning Canvas */}
+                {beFloors.length === 0 ? (
+                  <div className="text-center py-24 bg-white dark:bg-[#1E293B] rounded-2xl border border-gray-200 dark:border-gray-800 flex flex-col items-center justify-center p-6 shadow-sm">
+                    <svg className="w-16 h-16 text-gray-300 dark:text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                     </svg>
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white">Chưa cấu hình khu vực tầng</h3>
                     <p className="text-sm text-gray-500 max-w-sm mt-1">
-                      Vui lòng nhấp vào nút "Thêm tầng" phía trên để khởi tạo sơ đồ tầng đầu tiên của nhà hàng.
+                      Nhấp vào nút "Thêm khu vực" phía trên để khởi tạo sơ đồ tầng đầu tiên của nhà hàng.
                     </p>
                   </div>
                 ) : (
-                  <div className="flex flex-col lg:flex-row gap-6 items-start">
-
-                    {/* The Visual map container */}
-                    <div className="flex-1 w-full">
-                      {tables.length === 0 && (
-                        <div className="text-center text-gray-400 dark:text-gray-500 text-sm pb-2">
-                          Không có bàn ăn trên tầng này
-                          {viewMode === "edit" && <span className="text-xs ml-1">— Chọn "Thêm bàn ăn" để bắt đầu đặt bàn</span>}
-                        </div>
-                      )}
+                  <div className="w-full h-[calc(100vh-270px)] rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-800 shadow-lg relative bg-white dark:bg-[#111827]">
+                    {layout && (
                       <TableMap2D
-                        floor={{
-                          id: activeFloor!.id,
-                          name: activeFloor!.name,
-                          width: canvasWidth,
-                          height: canvasHeight,
-                          imageUrl: activeFloor!.imageUrl,
-                        }}
-                        tables={tables}
-                        selectedTableId={viewMode === "edit" ? selectedTableId : null}
+                        layout={layout}
+                        onLayoutChange={handleLayoutChange}
+                        onTableClick={handleMap2DTableClick}
+                        onTablePositionChange={handleMap2DTablePositionChange}
+                        onTableResize={handleMap2DTableResize}
+                        onBackgroundImageUpload={handleFloorImageUpload}
                         readOnly={viewMode !== "edit"}
-                        onTableClick={(tableId) => {
-                          const target = tables.find((t) => t.id === tableId);
-                          if (target) handleTableClick(target);
+                        selectedTableIds={selectedTable?.id ? [selectedTable.id] : []}
+                        renderTableContent={(table) => {
+                          const hasOrder = table.status === "OCCUPIED";
+                          return hasOrder && (
+                            <div className="absolute -top-1 -right-1 bg-red-500 w-3 h-3 rounded-full animate-ping" />
+                          );
                         }}
-                        onTablePositionChange={handleTablePositionChange}
-                        onTableResize={handleTableResize}
-                        onBackgroundImageUpload={uploadFloorBackground}
                       />
-                    </div>
-
-                    {/* Properties panel on the right (only for Edit Mode) */}
-                    {viewMode === "edit" && activeSelectedTable && (
-                      <div className="w-full lg:w-80 bg-white dark:bg-[#1E293B] rounded-2xl border p-5 flex flex-col gap-4 shadow-sm" style={{ borderColor: "var(--border)" }}>
-                        <div className="flex justify-between items-center pb-3 border-b border-gray-100 dark:border-gray-800">
-                          <h3 className="font-bold text-gray-900 dark:text-white text-sm">Cài đặt Bàn {activeSelectedTable.code}</h3>
-                          <button onClick={() => setSelectedTableId(null)} className="text-gray-400 hover:text-gray-600">✕</button>
-                        </div>
-
-                        <div>
-                          <label className="text-xs font-semibold text-gray-500 block mb-1">Mã bàn ăn</label>
-                          <Input
-                            value={activeSelectedTable.code}
-                            onChange={(e) => updateSelectedTableProperty("code", e.target.value)}
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="text-xs font-semibold text-gray-500 block mb-1">Số chỗ ngồi</label>
-                            <InputNumber
-                              min={1}
-                              max={30}
-                              value={activeSelectedTable.seatingCapacity}
-                              onChange={(val) => updateSelectedTableProperty("seatingCapacity", val)}
-                              className="w-full"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-xs font-semibold text-gray-500 block mb-1">Phân loại</label>
-                            <Select
-                              value={activeSelectedTable.type}
-                              onChange={(val) => updateSelectedTableProperty("type", val)}
-                              options={[
-                                { value: "Normal", label: "Thường" },
-                                { value: "VIP", label: "VIP" },
-                              ]}
-                              className="w-full"
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="text-xs font-semibold text-gray-500 block mb-1">Hình dáng</label>
-                          <Select
-                            value={activeSelectedTable.shape}
-                            onChange={(val) => updateSelectedTableProperty("shape", val)}
-                            options={[
-                              { value: "Square", label: "Hình vuông" },
-                              { value: "Round", label: "Hình tròn" },
-                              { value: "Rectangle", label: "Hình chữ nhật" },
-                            ]}
-                            className="w-full"
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="text-xs font-semibold text-gray-500 block mb-1">Chiều rộng (px)</label>
-                            <InputNumber
-                              min={40}
-                              max={200}
-                              value={activeSelectedTable.width}
-                              onChange={(val) => updateSelectedTableProperty("width", val)}
-                              className="w-full"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-xs font-semibold text-gray-500 block mb-1">Chiều cao (px)</label>
-                            <InputNumber
-                              min={40}
-                              max={200}
-                              value={activeSelectedTable.height}
-                              onChange={(val) => updateSelectedTableProperty("height", val)}
-                              className="w-full"
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="text-xs font-semibold text-gray-500 block mb-1">Xoay bàn (độ)</label>
-                          <InputNumber
-                            min={0}
-                            max={360}
-                            value={activeSelectedTable.rotation}
-                            onChange={(val) => updateSelectedTableProperty("rotation", val)}
-                            className="w-full"
-                          />
-                        </div>
-
-                        <div className="pt-3 border-t border-gray-100 dark:border-gray-800 flex gap-2">
-                          <Button
-                            danger
-                            onClick={() => handleDeleteTable(activeSelectedTable.id)}
-                            className="flex-1"
-                          >
-                            🗑️ Xóa bàn ăn
-                          </Button>
-                          <Button
-                            onClick={() => {
-                              // Open detail table edit modal
-                              handleOpenTableModal(activeSelectedTable);
-                            }}
-                            className="flex-1"
-                          >
-                            ⚙️ Nâng cao
-                          </Button>
-                        </div>
-                      </div>
                     )}
                   </div>
                 )}
               </div>
             ) : (
-              /* GRID LIST VIEW (CRUD interface) */
-              <div className="bg-white dark:bg-[#1E293B] rounded-2xl border p-6 shadow-sm overflow-hidden" style={{ borderColor: "var(--border)" }}>
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="font-bold text-gray-900 dark:text-white text-md">Danh sách bàn ăn ({allTablesList.length})</h3>
-                  <Button type="primary" onClick={() => handleOpenTableModal()} style={{ background: "#FF5A2C", borderColor: "#FF5A2C" }}>
-                    ➕ Thêm bàn ăn mới
-                  </Button>
+              /* Premium Table List View */
+              <div className="bg-white dark:bg-[#1E293B] rounded-2xl border border-gray-200 dark:border-gray-800 p-6 shadow-sm overflow-hidden flex flex-col gap-6">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <h3 className="font-bold text-gray-900 dark:text-white text-lg">Danh sách bàn ăn ({filteredTables.length})</h3>
+                  
+                  {/* Filters bar */}
+                  <div className="flex flex-wrap items-center gap-3">
+                    <input
+                      type="text"
+                      placeholder="Tìm kiếm mã bàn..."
+                      value={keyword}
+                      onChange={(e) => setKeyword(e.target.value)}
+                      className="px-4 py-2 border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-slate-900 rounded-xl text-sm outline-none focus:border-[#FF5A2C] transition-all text-gray-800 dark:text-gray-200"
+                    />
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value as any)}
+                      className="px-4 py-2 border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-slate-900 rounded-xl text-sm outline-none focus:border-[#FF5A2C] text-gray-800 dark:text-gray-200"
+                    >
+                      <option value="all">Tất cả trạng thái</option>
+                      <option value="available">Trống (Available)</option>
+                      <option value="occupied">Đang sử dụng (Occupied)</option>
+                    </select>
+                    <select
+                      value={floorFilter}
+                      onChange={(e) => setFloorFilter(e.target.value)}
+                      className="px-4 py-2 border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-slate-900 rounded-xl text-sm outline-none focus:border-[#FF5A2C] text-gray-800 dark:text-gray-200"
+                    >
+                      <option value="all">Tất cả tầng</option>
+                      {beFloors.map(f => (
+                        <option key={f.id} value={f.id}>{f.name}</option>
+                      ))}
+                    </select>
+                    <Button
+                      type="primary"
+                      onClick={() => setAddModalOpen(true)}
+                      className="font-bold rounded-xl"
+                      style={{ background: "#FF5A2C", borderColor: "#FF5A2C", height: "38px" }}
+                    >
+                      ➕ Thêm bàn
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="border-b" style={{ borderColor: "var(--border)" }}>
-                        <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase">Số bàn/Mã bàn</th>
-                        <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase">Khu vực tầng</th>
-                        <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase">Số chỗ ngồi</th>
-                        <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase">Loại bàn</th>
-                        <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase">Hình dáng</th>
-                        <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase">Trạng thái</th>
-                        <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase">QR Code</th>
-                        <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase">Hành động</th>
+                      <tr className="border-b border-gray-100 dark:border-gray-800">
+                        <th className="py-4 px-5 text-xs font-bold text-gray-400 uppercase tracking-wider">Mã bàn ăn</th>
+                        <th className="py-4 px-5 text-xs font-bold text-gray-400 uppercase tracking-wider">Khu vực tầng</th>
+                        <th className="py-4 px-5 text-xs font-bold text-gray-400 uppercase tracking-wider">Sức chứa</th>
+                        <th className="py-4 px-5 text-xs font-bold text-gray-400 uppercase tracking-wider">Hình dáng</th>
+                        <th className="py-4 px-5 text-xs font-bold text-gray-400 uppercase tracking-wider">Trạng thái</th>
+                        <th className="py-4 px-5 text-xs font-bold text-gray-400 uppercase tracking-wider">Menu QR Code</th>
+                        <th className="py-4 px-5 text-xs font-bold text-gray-400 uppercase tracking-wider">Hành động</th>
                       </tr>
                     </thead>
-                    <tbody>
-                      {allTablesList.length === 0 ? (
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                      {filteredTables.length === 0 ? (
                         <tr>
-                          <td colSpan={8} className="py-8 text-center text-gray-400">Không có bàn ăn nào được ghi nhận.</td>
+                          <td colSpan={7} className="py-10 text-center text-gray-400 dark:text-gray-500">Không tìm thấy bàn ăn phù hợp.</td>
                         </tr>
                       ) : (
-                        allTablesList.map((t) => (
-                          <tr key={t.id} className="border-b hover:bg-gray-50/50 dark:hover:bg-gray-800/30" style={{ borderColor: "var(--border)" }}>
-                            <td className="py-3.5 px-4 font-bold text-gray-900 dark:text-white">{t.code}</td>
-                            <td className="py-3.5 px-4 text-sm text-gray-600 dark:text-gray-300">{t.floorName || "Chưa gắn"}</td>
-                            <td className="py-3.5 px-4 text-sm text-gray-600 dark:text-gray-300">{t.seatingCapacity} người</td>
-                            <td className="py-3.5 px-4 text-sm">
-                              <span className={`px-2 py-0.5 rounded text-xs font-bold ${t.type === "VIP" ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400" : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"}`}>
-                                {t.type}
+                        filteredTables.map((t) => (
+                          <tr key={t.id} className="hover:bg-gray-50/50 dark:hover:bg-slate-800/20 transition-colors">
+                            <td className="py-4 px-5 font-bold text-gray-900 dark:text-white">{t.number}</td>
+                            <td className="py-4 px-5 text-sm text-gray-600 dark:text-gray-300">{t.area}</td>
+                            <td className="py-4 px-5 text-sm text-gray-600 dark:text-gray-300">{t.capacity} người</td>
+                            <td className="py-4 px-5 text-sm text-gray-600 dark:text-gray-300">{t.shape}</td>
+                            <td className="py-4 px-5 text-sm">
+                              <span className={`flex items-center gap-1.5 font-bold ${t.status === "occupied" ? "text-red-500" : "text-emerald-500"}`}>
+                                <span className={`h-2 w-2 rounded-full ${t.status === "occupied" ? "bg-red-500" : "bg-emerald-500"}`} />
+                                {t.status === "occupied" ? "Đang sử dụng" : "Trống"}
                               </span>
                             </td>
-                            <td className="py-3.5 px-4 text-sm text-gray-600 dark:text-gray-300">{t.shape}</td>
-                            <td className="py-3.5 px-4 text-sm">
-                              <span className="flex items-center gap-1.5 font-bold" style={{ color: t.statusColor }}>
-                                <span className="h-1.5 w-1.5 rounded-full" style={{ background: t.statusColor }} />
-                                {t.statusName}
-                              </span>
-                            </td>
-                            <td className="py-3.5 px-4 text-sm">
-                              <div className="flex flex-col gap-1">
-                                <Tooltip title="Tải xuống QR Code cho bàn này">
+                            <td className="py-4 px-5 text-sm">
+                              {t.qrCodeUrl ? (
+                                <div className="flex items-center gap-3">
+                                  <Tooltip title="Tải xuống QR Code để in">
+                                    <a
+                                      href={getQrDownloadUrl(t.qrCodeUrl)}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-blue-500 hover:underline text-xs font-bold flex items-center gap-1"
+                                    >
+                                      📥 Tải QR
+                                    </a>
+                                  </Tooltip>
                                   <a
-                                    href={getQrDownloadUrl(t.qrCodeUrl)}
+                                    href={t.qrCodeUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-blue-500 hover:underline text-xs flex items-center gap-1 font-bold"
+                                    className="text-emerald-500 hover:underline text-xs font-bold flex items-center gap-1"
                                   >
-                                    📥 QR Code
+                                    🔗 Link Menu
                                   </a>
-                                </Tooltip>
-                                <a
-                                  href={t.qrCodeUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-emerald-500 hover:underline text-xs flex items-center gap-1 font-bold"
-                                >
-                                  🔗 Mở Menu Bàn
-                                </a>
-                              </div>
+                                </div>
+                              ) : (
+                                <span className="text-gray-400 text-xs">—</span>
+                              )}
                             </td>
-                            <td className="py-3.5 px-4 text-sm">
-                              <div className="flex gap-2">
+                            <td className="py-4 px-5 text-sm">
+                              <div className="flex gap-3">
                                 <button
-                                  onClick={() => handleOpenTableModal(t)}
+                                  onClick={() => {
+                                    setSelectedTable(t);
+                                    setDrawerOpen(true);
+                                  }}
                                   className="text-blue-500 hover:text-blue-700 text-xs font-bold"
                                 >
-                                  Sửa
+                                  ⚙️ Cấu hình
                                 </button>
                                 <button
-                                  onClick={() => handleDeleteTable(t.id)}
+                                  onClick={() => {
+                                    setSelectedTable(t);
+                                    setDeleteConfirmOpen(true);
+                                  }}
                                   className="text-red-500 hover:text-red-700 text-xs font-bold"
                                 >
-                                  Xóa
+                                  🗑️ Xóa
                                 </button>
                               </div>
                             </td>
@@ -921,129 +935,76 @@ export default function TablesManagementPage() {
                 </div>
               </div>
             )}
+
           </div>
         </main>
       </div>
 
-      {/* 8. Modals Section */}
+      {/* ─── ADD/EDIT TABLE MODAL ─── */}
+      <AddTableModal
+        open={addModalOpen}
+        onClose={() => setAddModalOpen(false)}
+        onAdd={handleAddTable}
+        floors={beFloors.map(f => ({ id: f.id, name: f.name }))}
+      />
 
-      {/* Floor Modal (Add/Edit) */}
+      {/* ─── TABLE CONFIG DETAILS DRAWER ─── */}
+      <TableDetailsDrawer
+        open={drawerOpen}
+        table={selectedTable}
+        onClose={() => {
+          setDrawerOpen(false);
+          setSelectedTable(null);
+        }}
+        onSave={handleUpdateTable}
+        onSavePanorama={handleSavePanorama}
+        onDelete={handleDeleteTable}
+        floors={beFloors.map(f => ({ id: f.id, name: f.name }))}
+      />
+
+      {/* ─── FLOOR ADD AREA MODAL ─── */}
+      <AddAreaModal
+        open={addAreaModalOpen}
+        onClose={() => setAddAreaModalOpen(false)}
+        onSubmit={handleAddArea}
+        existingNames={beFloors.map((f) => f.name)}
+      />
+
+      {/* ─── FLOOR EDIT AREA MODAL ─── */}
+      <AddAreaModal
+        open={editAreaModalOpen}
+        onClose={() => setEditAreaModalOpen(false)}
+        onSubmit={handleEditArea}
+        initialName={beFloors.find(f => f.id === selectedFloorId)?.name || ""}
+        initialWidth={beFloors.find(f => f.id === selectedFloorId)?.width || 1200}
+        initialHeight={beFloors.find(f => f.id === selectedFloorId)?.height || 800}
+        existingNames={beFloors.map((f) => f.name)}
+        showDimensions
+        title="Chỉnh sửa thông số khu vực"
+        submitText="Lưu lại"
+      />
+
+      {/* ─── TABLE DELETE CONFIRM MODAL ─── */}
+      <DeleteConfirmModal
+        open={deleteConfirmOpen}
+        itemName={selectedTable?.number || ""}
+        itemType="Table"
+        onClose={() => setDeleteConfirmOpen(false)}
+        onConfirm={confirmDeleteTable}
+      />
+
+      {/* ─── FLOOR DELETE CONFIRM MODAL ─── */}
+      <DeleteConfirmModal
+        open={!!zoneToDelete}
+        itemName={beFloors.find(f => f.id === zoneToDelete)?.name || ""}
+        itemType="Floor"
+        onClose={() => setZoneToDelete(null)}
+        onConfirm={confirmDeleteFloor}
+      />
+
+      {/* ─── REALTIME TABLE SESSION OPERATIONS MODAL ─── */}
       <Modal
-        title={floorForm.id ? "Chỉnh sửa thông tin Tầng" : "Thêm Tầng mới"}
-        open={isFloorModalOpen}
-        onOk={handleSaveFloor}
-        onCancel={() => setIsFloorModalOpen(false)}
-        okText="Lưu lại"
-        cancelText="Hủy bỏ"
-      >
-        <div className="space-y-4 pt-3">
-          <div>
-            <label className="text-xs font-bold text-gray-500 block mb-1">Tên khu vực/Tầng *</label>
-            <Input
-              value={floorForm.name}
-              onChange={(e) => setFloorForm({ ...floorForm, name: e.target.value })}
-              placeholder="Ví dụ: Tầng 1, Sân thượng, VIP Lounge..."
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-bold text-gray-500 block mb-1">Chiều ngang sơ đồ (px)</label>
-              <InputNumber
-                min={400}
-                max={2000}
-                value={floorForm.width}
-                onChange={(val) => setFloorForm({ ...floorForm, width: val ?? 600 })}
-                className="w-full"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-gray-500 block mb-1">Chiều dọc sơ đồ (px)</label>
-              <InputNumber
-                min={300}
-                max={2000}
-                value={floorForm.height}
-                onChange={(val) => setFloorForm({ ...floorForm, height: val ?? 400 })}
-                className="w-full"
-              />
-            </div>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Table Modal (Add/Edit) */}
-      <Modal
-        title={tableForm.id ? "Chỉnh sửa bàn ăn" : "Thêm bàn ăn mới"}
-        open={isTableModalOpen}
-        onOk={handleSaveTable}
-        onCancel={() => setIsTableModalOpen(false)}
-        okText="Lưu lại"
-        cancelText="Hủy bỏ"
-      >
-        <div className="space-y-4 pt-3">
-          <div>
-            <label className="text-xs font-bold text-gray-500 block mb-1">Số bàn / Mã bàn *</label>
-            <Input
-              value={tableForm.code}
-              onChange={(e) => setTableForm({ ...tableForm, code: e.target.value })}
-              placeholder="Ví dụ: Bàn 01, Bàn 12, VIP-01..."
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-bold text-gray-500 block mb-1">Số chỗ ngồi *</label>
-              <InputNumber
-                min={1}
-                max={30}
-                value={tableForm.seatingCapacity}
-                onChange={(val) => setTableForm({ ...tableForm, seatingCapacity: val ?? 4 })}
-                className="w-full"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-gray-500 block mb-1">Khu vực / Tầng *</label>
-              <Select
-                value={tableForm.floorId}
-                onChange={(val) => setTableForm({ ...tableForm, floorId: val })}
-                options={floors.map((f) => ({ value: f.id, label: f.name }))}
-                className="w-full"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-bold text-gray-500 block mb-1">Phân loại</label>
-              <Select
-                value={tableForm.type}
-                onChange={(val) => setTableForm({ ...tableForm, type: val })}
-                options={[
-                  { value: "Normal", label: "Thường" },
-                  { value: "VIP", label: "VIP" },
-                ]}
-                className="w-full"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-gray-500 block mb-1">Hình dáng</label>
-              <Select
-                value={tableForm.shape}
-                onChange={(val) => setTableForm({ ...tableForm, shape: val })}
-                options={[
-                  { value: "Square", label: "Hình vuông" },
-                  { value: "Round", label: "Hình tròn" },
-                  { value: "Rectangle", label: "Hình chữ nhật" },
-                ]}
-                className="w-full"
-              />
-            </div>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Table Session Action Modal */}
-      <Modal
-        title={`Điều khiển Bàn ${sessionActionTable?.code}`}
+        title={sessionActionTable ? `Quản lý Bàn: ${sessionActionTable.number}` : "Quản lý Bàn"}
         open={isSessionModalOpen}
         onCancel={() => setIsSessionModalOpen(false)}
         footer={null}
@@ -1052,53 +1013,43 @@ export default function TablesManagementPage() {
         {sessionActionTable && (
           <div className="space-y-6 pt-3">
             
-            {/* Status overview */}
-            <div className="p-4 rounded-xl border flex items-center justify-between" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
+            {/* Current status info */}
+            <div className="p-4 rounded-xl border flex items-center justify-between bg-gray-50 dark:bg-slate-900 border-gray-100 dark:border-gray-800">
               <div>
-                <p className="text-xs text-gray-500 font-semibold uppercase">Trạng thái hiện tại</p>
-                <h4 className="font-bold text-lg mt-0.5" style={{ color: sessionActionTable.statusColor }}>
-                  {sessionActionTable.statusName}
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Trạng thái hiện tại</p>
+                <h4 className={`font-extrabold text-lg mt-0.5 ${sessionActionTable.status === "occupied" ? "text-red-500" : "text-emerald-500"}`}>
+                  {sessionActionTable.status === "occupied" ? "Đang có khách" : "Trống (Sẵn sàng)"}
                 </h4>
               </div>
-              <span className={`px-3 py-1 rounded-full text-xs font-bold ${sessionActionTable.type === "VIP" ? "bg-yellow-100 text-yellow-800" : "bg-gray-100 text-gray-800"}`}>
-                {sessionActionTable.type === "VIP" ? "Bàn VIP" : "Bàn thường"}
+              <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#FF5A2C]/10 text-[#FF5A2C]">
+                {sessionActionTable.capacity} ghế
               </span>
             </div>
 
             {/* Session details */}
-            {sessionActionTable.status === "OCCUPIED" && sessionActionTable.activeSession && (
-              <div className="space-y-2.5">
+            {sessionActionTable.status === "occupied" && sessionActionTable.currentOrder && (
+              <div className="space-y-2">
                 <h5 className="font-bold text-xs text-gray-400 uppercase tracking-wider">Thông tin phiên ăn</h5>
-                <div className="bg-gray-50 dark:bg-gray-800/20 p-3.5 rounded-xl border space-y-1.5" style={{ borderColor: "var(--border)" }}>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Giờ bắt đầu:</span>
-                    <span className="font-bold text-gray-900 dark:text-white">
-                      {new Date(sessionActionTable.activeSession.startedAt).toLocaleTimeString("vi-VN")}
-                    </span>
+                <div className="bg-gray-50 dark:bg-slate-950 p-3.5 rounded-xl border border-gray-100 dark:border-gray-900 space-y-1.5 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Mã đơn hàng:</span>
+                    <span className="font-bold text-[#FF5A2C]">#{sessionActionTable.currentOrder}</span>
                   </div>
-                  {sessionActionTable.activeSession.order && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Mã đơn hàng:</span>
-                      <span className="font-bold text-primary">
-                        #{sessionActionTable.activeSession.order.reference}
-                      </span>
-                    </div>
-                  )}
                 </div>
               </div>
             )}
 
-            {/* Buttons grid based on status */}
+            {/* Action buttons */}
             <div className="flex flex-col gap-2.5 pt-2">
-              {sessionActionTable.status === "AVAILABLE" ? (
+              {sessionActionTable.status === "available" ? (
                 <Button
                   type="primary"
                   size="large"
                   onClick={startSession}
-                  className="w-full flex items-center justify-center gap-2"
-                  style={{ background: "#22c55e", borderColor: "#22c55e", height: "48px", fontWeight: "bold" }}
+                  className="w-full flex items-center justify-center gap-2 h-12 font-bold"
+                  style={{ background: "#22c55e", borderColor: "#22c55e" }}
                 >
-                  🟢 Mở khóa / Sử dụng bàn ăn
+                  🟢 Mở khóa &amp; Sử dụng bàn ăn
                 </Button>
               ) : (
                 <>
@@ -1106,16 +1057,14 @@ export default function TablesManagementPage() {
                     <Button
                       size="large"
                       onClick={handleOpenTransfer}
-                      className="flex items-center justify-center gap-1.5"
-                      style={{ height: "44px", fontWeight: "bold" }}
+                      className="flex items-center justify-center gap-1.5 h-11 font-bold"
                     >
                       🔄 Chuyển bàn
                     </Button>
                     <Button
                       size="large"
                       onClick={handleOpenMerge}
-                      className="flex items-center justify-center gap-1.5"
-                      style={{ height: "44px", fontWeight: "bold" }}
+                      className="flex items-center justify-center gap-1.5 h-11 font-bold"
                     >
                       🔗 Gộp bàn
                     </Button>
@@ -1125,40 +1074,41 @@ export default function TablesManagementPage() {
                     size="large"
                     danger
                     onClick={closeSession}
-                    className="w-full flex items-center justify-center gap-2 mt-1"
-                    style={{ height: "48px", fontWeight: "bold" }}
+                    className="w-full flex items-center justify-center gap-2 h-12 font-bold mt-1"
                   >
-                    🔴 Thanh toán & Trả bàn
+                    🔴 Thanh toán &amp; Đóng bàn
                   </Button>
                 </>
               )}
 
-              {/* Advanced info: QR Code detail */}
-              <div className="text-center pt-3 border-t flex flex-col gap-2" style={{ borderColor: "var(--border)" }}>
-                <a
-                  href={getQrDownloadUrl(sessionActionTable.qrCodeUrl)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-blue-500 hover:underline font-bold"
-                >
-                  📥 Nhấp để tải xuống QR Code của bàn ăn này
-                </a>
-                <a
-                  href={sessionActionTable.qrCodeUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-[#FF5A2C] hover:underline font-bold"
-                >
-                  🔗 Đi tới trang gọi món (Menu) của bàn
-                </a>
-              </div>
+              {/* QR and Menu links */}
+              {sessionActionTable.qrCodeUrl && (
+                <div className="text-center pt-4 border-t border-gray-100 dark:border-gray-800 flex flex-col gap-2">
+                  <a
+                    href={getQrDownloadUrl(sessionActionTable.qrCodeUrl)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-500 hover:underline font-bold"
+                  >
+                    📥 Tải xuống hình ảnh QR Code của bàn này
+                  </a>
+                  <a
+                    href={sessionActionTable.qrCodeUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-[#FF5A2C] hover:underline font-bold"
+                  >
+                    🔗 Đi tới trang gọi món (Menu) của bàn
+                  </a>
+                </div>
+              )}
             </div>
 
           </div>
         )}
       </Modal>
 
-      {/* Transfer Table Modal */}
+      {/* ─── TRANSFER SESSION MODAL ─── */}
       <Modal
         title="Chuyển phiên sang bàn khác"
         open={isTransferModalOpen}
@@ -1168,26 +1118,31 @@ export default function TablesManagementPage() {
         cancelText="Hủy bỏ"
       >
         <div className="space-y-4 pt-3">
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             Chọn một bàn ăn đang trống để chuyển toàn bộ phiên sử dụng và đơn hàng (nếu có) từ bàn{" "}
-            <strong>{sessionActionTable?.code}</strong> sang.
+            <strong>{sessionActionTable?.number}</strong> sang.
           </p>
           <div>
             <label className="text-xs font-bold text-gray-500 block mb-1">Chọn bàn trống đích *</label>
-            <Select
-              placeholder="Chọn bàn trống"
+            <select
               value={transferTargetTableId}
-              onChange={(val) => setTransferTargetTableId(val)}
-              className="w-full"
-              options={tables
-                .filter((t) => t.status === "AVAILABLE" && t.id !== sessionActionTable?.id)
-                .map((t) => ({ value: t.id, label: `${t.code} (${t.seatingCapacity} chỗ) - ${t.type}` }))}
-            />
+              onChange={(e) => setTransferTargetTableId(e.target.value)}
+              className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-slate-900 rounded-xl text-sm outline-none focus:border-[#FF5A2C] text-gray-800 dark:text-gray-200"
+            >
+              <option value="">Chọn bàn trống</option>
+              {tables
+                .filter((t) => t.status === "available" && t.id !== sessionActionTable?.id && !t.number.startsWith("DECO_"))
+                .map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.number} ({t.capacity} chỗ) - {t.area}
+                  </option>
+                ))}
+            </select>
           </div>
         </div>
       </Modal>
 
-      {/* Merge Table Modal */}
+      {/* ─── MERGE SESSION MODAL ─── */}
       <Modal
         title="Gộp bàn ăn"
         open={isMergeModalOpen}
@@ -1197,21 +1152,26 @@ export default function TablesManagementPage() {
         cancelText="Hủy bỏ"
       >
         <div className="space-y-4 pt-3">
-          <p className="text-sm text-gray-500">
-            Chọn một bàn ăn đang được sử dụng để gộp phiên của bàn{" "}
-            <strong>{sessionActionTable?.code}</strong> vào đó. Cả hai bàn sẽ cùng liên kết tới một đơn hàng chung.
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Chọn một bàn ăn đang hoạt động (đang có khách) để gộp phiên của bàn{" "}
+            <strong>{sessionActionTable?.number}</strong> vào đó. Cả hai bàn sẽ cùng liên kết tới một đơn hàng chung.
           </p>
           <div>
             <label className="text-xs font-bold text-gray-500 block mb-1">Chọn bàn gộp đích *</label>
-            <Select
-              placeholder="Chọn bàn đang hoạt động"
+            <select
               value={mergeTargetTableId}
-              onChange={(val) => setMergeTargetTableId(val)}
-              className="w-full"
-              options={tables
-                .filter((t) => t.status === "OCCUPIED" && t.id !== sessionActionTable?.id)
-                .map((t) => ({ value: t.id, label: `${t.code} (Bàn đang bận)` }))}
-            />
+              onChange={(e) => setMergeTargetTableId(e.target.value)}
+              className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-slate-900 rounded-xl text-sm outline-none focus:border-[#FF5A2C] text-gray-800 dark:text-gray-200"
+            >
+              <option value="">Chọn bàn bận</option>
+              {tables
+                .filter((t) => t.status === "occupied" && t.id !== sessionActionTable?.id && !t.number.startsWith("DECO_"))
+                .map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.number} (Đang bận) - {t.area}
+                  </option>
+                ))}
+            </select>
           </div>
         </div>
       </Modal>
