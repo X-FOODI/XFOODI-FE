@@ -595,6 +595,15 @@
         "grid": "Lưới",
         "map": "Bản đồ"
       },
+      "map_controls": {
+        "zoom_out": "Thu nhỏ",
+        "zoom_in": "Phóng to",
+        "zoom_fit": "Vừa khung",
+        "upload_floorplan": "Tải sơ đồ mặt bằng",
+        "show_grid": "Hiện lưới",
+        "floor_dimensions": "Kích thước tầng",
+        "tables_on_floor": "bàn"
+      },
       "zones": {
         "all": "Tất cả",
         "zone_a": "Khu A",
