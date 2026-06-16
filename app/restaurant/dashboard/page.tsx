@@ -107,8 +107,10 @@ export default function RestaurantDashboardPage() {
             : `${user.restaurantSlug}.${BASE_DOMAIN}`;
           
           const port = host.includes(":") ? `:${host.split(":")[1]}` : "";
-          window.location.href = `${protocol}//${targetTenantSubdomain}${port}/restaurant/dashboard`;
-          return;
+          if (host.toLowerCase() !== `${targetTenantSubdomain}${port}`.toLowerCase()) {
+            window.location.href = `${protocol}//${targetTenantSubdomain}${port}/restaurant/dashboard`;
+            return;
+          }
         }
         // Tạm thời comment lại để có thể xem giao diện dashboard
         // setUnauthorized(true);

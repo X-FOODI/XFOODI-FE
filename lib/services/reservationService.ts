@@ -40,7 +40,15 @@ export interface Reservation {
   depositAmount: number;
   checkedInAt?: string;
   completedAt?: string;
-  metadata?: { qrCodeUrl?: string | null; statusHistory?: any[] };
+  metadata?: {
+    qrCodeUrl?: string | null;
+    statusHistory?: any[];
+
+    mustLeaveBy?: string | null;
+    cancellationInfo?: { cancelledReason?: string; at?: string; requestedAt?: string; rejectedAt?: string } | null;
+    isCancellationManualReviewPending?: boolean;
+    noShowAutoPending?: boolean;
+  };
   refunds?: RefundInfo[];
   createdAt: string;
   updatedAt: string;
@@ -75,6 +83,13 @@ export interface CreateReservationDto {
   fullName?: string;
   phoneNumber?: string;
   email?: string;
+  bankRefund?: {
+    bankBin: string;
+    bankCode: string;
+    bankName: string;
+    accountNumber: string;
+    accountName: string;
+  };
 }
 
 export interface AvailableTable {
@@ -85,6 +100,14 @@ export interface AvailableTable {
   floorId: string;
   floor: { id: string; name: string };
   tableStatus: { id: string; code: string; name: string };
+  isAvailable?: boolean;
+  conflictTime?: string | null;
+  positionX?: number;
+  positionY?: number;
+  width?: number;
+  height?: number;
+  rotation?: number;
+  shape?: string;
 }
 
 export interface ReservationFilterParams {
@@ -174,8 +197,8 @@ const reservationService = {
     return unwrap<Reservation>(res.data);
   },
 
-  async cancel(id: string): Promise<Reservation> {
-    const res = await axiosInstance.post(API_ROUTES.RESERVATIONS.CANCEL(id));
+  async cancel(id: string, approveReview?: boolean, reason?: string): Promise<Reservation> {
+    const res = await axiosInstance.post(API_ROUTES.RESERVATIONS.CANCEL(id), { approveReview, reason });
     return unwrap<Reservation>(res.data);
   },
 
@@ -191,6 +214,11 @@ const reservationService = {
 
   async complete(id: string): Promise<Reservation> {
     const res = await axiosInstance.post(API_ROUTES.RESERVATIONS.COMPLETE(id));
+    return unwrap<Reservation>(res.data);
+  },
+
+  async resolveNoShow(id: string): Promise<Reservation> {
+    const res = await axiosInstance.post(`/reservations/${id}/resolve-noshow`);
     return unwrap<Reservation>(res.data);
   },
 };

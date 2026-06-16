@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import React, { useState, useEffect } from "react";
 import axiosInstance from "../../lib/services/axiosInstance";
+import { useTenant } from "@/lib/contexts/TenantContext";
 
 interface NavItem {
   id: string;
@@ -32,6 +33,7 @@ export default function DashboardSidebar({
   userEmail = "admin@xfoodi.com",
 }: DashboardSidebarProps) {
   const pathname = usePathname();
+  const { tenant } = useTenant();
   const [collapsed, setCollapsed] = useState(false);
 
   const [activeOrdersCount, setActiveOrdersCount] = useState(0);
@@ -392,25 +394,41 @@ export default function DashboardSidebar({
       {/* Logo / Brand */}
       <div className="dashboard-sidebar-brand" style={{ padding: collapsed ? "1rem 0.75rem" : "1rem 1.25rem" }}>
         <Link href="/" className="flex items-center gap-2.5" style={{ textDecoration: "none" }}>
-          <div
-            style={{
-              width: "2rem",
-              height: "2rem",
-              background: "var(--primary)",
-              borderRadius: "0.5rem",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexShrink: 0,
-            }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z" />
-            </svg>
-          </div>
+          {tenant?.logoUrl ? (
+            <img
+              src={tenant.logoUrl}
+              alt={tenant.name}
+              style={{
+                width: "2rem",
+                height: "2rem",
+                borderRadius: "0.5rem",
+                objectFit: "cover",
+                flexShrink: 0,
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                width: "2rem",
+                height: "2rem",
+                background: "var(--primary)",
+                borderRadius: "0.5rem",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z" />
+              </svg>
+            </div>
+          )}
           {!collapsed && (
             <div>
-              <p className="text-sm font-bold" style={{ color: "var(--text)", lineHeight: 1.2 }}>XFoodi</p>
+              <p className="text-sm font-bold" style={{ color: "var(--text)", lineHeight: 1.2 }}>
+                {tenant?.name || "XFoodi"}
+              </p>
               <p className="text-[10px] font-medium" style={{ color: "var(--primary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
                 {role === "admin" ? "Admin" : "Restaurant"}
               </p>

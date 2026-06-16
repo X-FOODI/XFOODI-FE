@@ -123,6 +123,14 @@ export default function ReservationsPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // Auto refresh every 15 seconds to sync late arrivals and cancellations
+  useEffect(() => {
+    const timer = setInterval(() => {
+      fetchData();
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [fetchData]);
+
   const handleDateChange = (from: string, to: string) => {
     if (from && to && new Date(from) > new Date(to)) {
       setDateError("Ngày bắt đầu phải trước ngày kết thúc");
@@ -194,6 +202,31 @@ export default function ReservationsPage() {
         </Link>
       </div>
 
+      {/* Top Banner Alert for Pending Actions */}
+      {items.some(r => r.metadata?.noShowAutoPending || r.metadata?.isCancellationManualReviewPending) && (
+        <div style={{
+          background: "rgba(245, 158, 11, 0.08)",
+          border: "1.5px solid rgba(245, 158, 11, 0.3)",
+          borderRadius: 16,
+          padding: "12px 18px",
+          marginBottom: 20,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 20 }}>🔔</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>
+              Có đặt bàn trễ hẹn hoặc yêu cầu hủy sát giờ cần xử lý. Vui lòng kiểm tra chi tiết.
+            </span>
+          </div>
+          <span style={{ fontSize: 11, fontWeight: 700, color: "#d97706", background: "rgba(245, 158, 11, 0.15)", padding: "4px 10px", borderRadius: 12 }}>
+            Cần xử lý gấp
+          </span>
+        </div>
+      )}
+
       {/* Filters */}
       <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
         <Input.Search placeholder="Tìm mã xác nhận, tên, SĐT..." value={search} onChange={(e) => setSearch(e.target.value)}
@@ -242,6 +275,23 @@ export default function ReservationsPage() {
                   <tr key={r.id} style={{ borderBottom: "1px solid var(--border)", background: i % 2 === 0 ? "transparent" : "var(--surface-faint, transparent)" }}>
                     <td style={{ padding: "12px 16px" }}>
                       <span style={{ fontFamily: "monospace", fontSize: 14, fontWeight: 700, color: brandColor }}>{r.confirmationCode}</span>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
+                        {r.metadata?.mustLeaveBy && (
+                          <span style={{ display: "inline-block", background: "rgba(239, 68, 68, 0.08)", border: "1px solid rgba(239, 68, 68, 0.3)", borderRadius: 6, padding: "2px 6px", fontSize: 10, fontWeight: 700, color: "#ef4444" }}>
+                            ⚠️ Hạn trả: {new Date(r.metadata.mustLeaveBy).toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        )}
+                        {r.metadata?.isCancellationManualReviewPending && (
+                          <span style={{ display: "inline-block", background: "rgba(245, 158, 11, 0.08)", border: "1px solid rgba(245, 158, 11, 0.3)", borderRadius: 6, padding: "2px 6px", fontSize: 10, fontWeight: 700, color: "#d97706" }}>
+                            ⏰ Chờ duyệt huỷ
+                          </span>
+                        )}
+                        {r.metadata?.noShowAutoPending && (
+                          <span style={{ display: "inline-block", background: "rgba(239, 68, 68, 0.08)", border: "1px solid rgba(239, 68, 68, 0.3)", borderRadius: 6, padding: "2px 6px", fontSize: 10, fontWeight: 700, color: "#ef4444" }}>
+                            🚨 Trễ &gt; 30p
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td style={{ padding: "12px 16px" }}>
                       <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "var(--text)" }}>{r.customer?.user?.fullName ?? "—"}</p>

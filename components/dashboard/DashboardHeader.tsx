@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import authService from "../../lib/services/authService";
 import axiosInstance from "../../lib/services/axiosInstance";
+import { useTenant } from "@/lib/contexts/TenantContext";
 
 interface DashboardHeaderProps {
   role: "admin" | "restaurant";
@@ -22,6 +23,7 @@ export default function DashboardHeader({
   userEmail,
 }: DashboardHeaderProps) {
   const router = useRouter();
+  const { tenant } = useTenant();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -228,24 +230,38 @@ export default function DashboardHeader({
             textDecoration: "none",
           }}
         >
-          {/* XFoodi logo icon */}
-          <div
-            style={{
-              width: "32px",
-              height: "32px",
-              background: "var(--primary, #ff5722)",
-              borderRadius: "8px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexShrink: 0,
-              boxShadow: "0 2px 8px rgba(255,87,34,0.35)",
-            }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
-              <path d="M18.06 22.99h1.66c.84 0 1.53-.64 1.63-1.46L23 5.05h-5V1h-1.97v4.05h-4.97l.3 2.34c1.71.47 3.31 1.32 4.27 2.26 1.44 1.42 2.43 2.89 2.43 5.29v8.05zM1 21.99V21h15.03v.99c0 .55-.45 1-1.01 1H2.01c-.56 0-1.01-.45-1.01-1zm15.03-7c0-2.81-1.17-4.15-2.17-5.15-1.47-1.46-3.45-2.03-5.52-2.17L8 6.2H1v4.09h-.97l.74 11.67h15.03L15.03 14.99z" />
-            </svg>
-          </div>
+          {/* Restaurant logo or fallback */}
+          {tenant?.logoUrl ? (
+            <img
+              src={tenant.logoUrl}
+              alt={tenant.name}
+              style={{
+                width: "32px",
+                height: "32px",
+                borderRadius: "8px",
+                objectFit: "cover",
+                flexShrink: 0,
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                width: "32px",
+                height: "32px",
+                background: "var(--primary, #ff5722)",
+                borderRadius: "8px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+                boxShadow: "0 2px 8px rgba(255,87,34,0.35)",
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+                <path d="M18.06 22.99h1.66c.84 0 1.53-.64 1.63-1.46L23 5.05h-5V1h-1.97v4.05h-4.97l.3 2.34c1.71.47 3.31 1.32 4.27 2.26 1.44 1.42 2.43 2.89 2.43 5.29v8.05zM1 21.99V21h15.03v.99c0 .55-.45 1-1.01 1H2.01c-.56 0-1.01-.45-1.01-1zm15.03-7c0-2.81-1.17-4.15-2.17-5.15-1.47-1.46-3.45-2.03-5.52-2.17L8 6.2H1v4.09h-.97l.74 11.67h15.03L15.03 14.99z" />
+              </svg>
+            </div>
+          )}
           <span
             style={{
               fontSize: "18px",
@@ -254,7 +270,7 @@ export default function DashboardHeader({
               letterSpacing: "-0.3px",
             }}
           >
-            XFoodi
+            {tenant?.name || "XFoodi"}
           </span>
         </Link>
 
