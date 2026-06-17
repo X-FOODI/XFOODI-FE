@@ -158,7 +158,8 @@ export default function TablesManagementPage() {
   useEffect(() => {
     if (!user?.restaurantId) return;
 
-    const newSocket = io(BACKEND_URL.replace("/api", ""), {
+    const socketUrl = BACKEND_URL.replace(/\/api\/?$/, "");
+    const newSocket = io(socketUrl, {
       transports: ["polling"],
       withCredentials: true,
       reconnection: true,
