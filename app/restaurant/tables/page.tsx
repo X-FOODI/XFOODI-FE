@@ -315,6 +315,15 @@ export default function TablesManagementPage() {
 
   // Table click Router/Session/Details trigger
   const handleTableClick = (table: Table) => {
+    const isDeco = table.number.startsWith("DECO_");
+    if (isDeco) {
+      if (viewMode === "edit") {
+        setSelectedTable(table);
+        setDrawerOpen(true);
+      }
+      return;
+    }
+
     if (viewMode === "edit") {
       setSelectedTable(table);
       setDrawerOpen(true);
@@ -1005,7 +1014,7 @@ export default function TablesManagementPage() {
 
       {/* ─── REALTIME TABLE SESSION OPERATIONS MODAL ─── */}
       <Modal
-        title={sessionActionTable ? `Quản lý Bàn: ${sessionActionTable.number}` : "Quản lý Bàn"}
+        title={sessionActionTable ? t("dashboard.tables.operational_modal.title", { number: sessionActionTable.number, defaultValue: `Quản lý Bàn: ${sessionActionTable.number}` }) : t("dashboard.tables.operational_modal.default_title", { defaultValue: "Quản lý Bàn" })}
         open={isSessionModalOpen}
         onCancel={() => setIsSessionModalOpen(false)}
         footer={null}
@@ -1017,23 +1026,25 @@ export default function TablesManagementPage() {
             {/* Current status info */}
             <div className="p-4 rounded-xl border flex items-center justify-between bg-gray-50 dark:bg-slate-900 border-gray-100 dark:border-gray-800">
               <div>
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Trạng thái hiện tại</p>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{t("dashboard.tables.operational_modal.current_status", { defaultValue: "Trạng thái hiện tại" })}</p>
                 <h4 className={`font-extrabold text-lg mt-0.5 ${sessionActionTable.status === "occupied" ? "text-red-500" : "text-emerald-500"}`}>
-                  {sessionActionTable.status === "occupied" ? "Đang có khách" : "Trống (Sẵn sàng)"}
+                  {sessionActionTable.status === "occupied" 
+                    ? t("dashboard.tables.operational_modal.status_occupied", { defaultValue: "Đang có khách" }) 
+                    : t("dashboard.tables.operational_modal.status_available", { defaultValue: "Trống (Sẵn sàng)" })}
                 </h4>
               </div>
               <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#FF5A2C]/10 text-[#FF5A2C]">
-                {sessionActionTable.capacity} ghế
+                {t("dashboard.tables.operational_modal.seats", { count: sessionActionTable.capacity, defaultValue: `${sessionActionTable.capacity} ghế` })}
               </span>
             </div>
 
             {/* Session details */}
             {sessionActionTable.status === "occupied" && sessionActionTable.currentOrder && (
               <div className="space-y-2">
-                <h5 className="font-bold text-xs text-gray-400 uppercase tracking-wider">Thông tin phiên ăn</h5>
+                <h5 className="font-bold text-xs text-gray-400 uppercase tracking-wider">{t("dashboard.tables.operational_modal.session_info", { defaultValue: "Thông tin phiên ăn" })}</h5>
                 <div className="bg-gray-50 dark:bg-slate-950 p-3.5 rounded-xl border border-gray-100 dark:border-gray-900 space-y-1.5 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Mã đơn hàng:</span>
+                    <span className="text-gray-500">{t("dashboard.tables.operational_modal.order_code", { defaultValue: "Mã đơn hàng:" })}</span>
                     <span className="font-bold text-[#FF5A2C]">#{sessionActionTable.currentOrder}</span>
                   </div>
                 </div>
@@ -1050,7 +1061,7 @@ export default function TablesManagementPage() {
                   className="w-full flex items-center justify-center gap-2 h-12 font-bold"
                   style={{ background: "#22c55e", borderColor: "#22c55e" }}
                 >
-                  🟢 Mở khóa &amp; Sử dụng bàn ăn
+                  {t("dashboard.tables.operational_modal.btn_unlock", { defaultValue: "🟢 Mở khóa & Sử dụng bàn ăn" })}
                 </Button>
               ) : (
                 <>
@@ -1060,14 +1071,14 @@ export default function TablesManagementPage() {
                       onClick={handleOpenTransfer}
                       className="flex items-center justify-center gap-1.5 h-11 font-bold"
                     >
-                      🔄 Chuyển bàn
+                      {t("dashboard.tables.operational_modal.btn_transfer", { defaultValue: "🔄 Chuyển bàn" })}
                     </Button>
                     <Button
                       size="large"
                       onClick={handleOpenMerge}
                       className="flex items-center justify-center gap-1.5 h-11 font-bold"
                     >
-                      🔗 Gộp bàn
+                      {t("dashboard.tables.operational_modal.btn_merge", { defaultValue: "🔗 Gộp bàn" })}
                     </Button>
                   </div>
                   <Button
@@ -1077,7 +1088,7 @@ export default function TablesManagementPage() {
                     onClick={closeSession}
                     className="w-full flex items-center justify-center gap-2 h-12 font-bold mt-1"
                   >
-                    🔴 Thanh toán &amp; Đóng bàn
+                    {t("dashboard.tables.operational_modal.btn_checkout", { defaultValue: "🔴 Thanh toán & Đóng bàn" })}
                   </Button>
                 </>
               )}
@@ -1091,7 +1102,7 @@ export default function TablesManagementPage() {
                     rel="noopener noreferrer"
                     className="text-xs text-blue-500 hover:underline font-bold"
                   >
-                    📥 Tải xuống hình ảnh QR Code của bàn này
+                    {t("dashboard.tables.operational_modal.download_qr", { defaultValue: "📥 Tải xuống hình ảnh QR Code của bàn này" })}
                   </a>
                   <a
                     href={sessionActionTable.qrCodeUrl}
@@ -1099,10 +1110,22 @@ export default function TablesManagementPage() {
                     rel="noopener noreferrer"
                     className="text-xs text-[#FF5A2C] hover:underline font-bold"
                   >
-                    🔗 Đi tới trang gọi món (Menu) của bàn
+                    {t("dashboard.tables.operational_modal.go_to_menu", { defaultValue: "🔗 Đi tới trang gọi món (Menu) của bàn" })}
                   </a>
                 </div>
               )}
+
+              {/* Edit table configuration link */}
+              <button
+                onClick={() => {
+                  setIsSessionModalOpen(false);
+                  setSelectedTable(sessionActionTable);
+                  setDrawerOpen(true);
+                }}
+                className="text-xs text-blue-500 hover:text-blue-700 hover:underline font-bold mt-3 self-center bg-transparent border-none cursor-pointer flex items-center gap-1"
+              >
+                {t("dashboard.tables.details.edit_table_config", { defaultValue: "⚙️ Chỉnh sửa cấu hình bàn ăn" })}
+              </button>
             </div>
 
           </div>
@@ -1111,26 +1134,30 @@ export default function TablesManagementPage() {
 
       {/* ─── TRANSFER SESSION MODAL ─── */}
       <Modal
-        title="Chuyển phiên sang bàn khác"
+        title={t("dashboard.tables.transfer_modal.title", { defaultValue: "Chuyển phiên sang bàn khác" })}
         open={isTransferModalOpen}
         onOk={executeTransfer}
         onCancel={() => setIsTransferModalOpen(false)}
-        okText="Xác nhận chuyển"
-        cancelText="Hủy bỏ"
+        okText={t("dashboard.tables.transfer_modal.confirm", { defaultValue: "Xác nhận chuyển" })}
+        cancelText={t("dashboard.tables.transfer_modal.cancel", { defaultValue: "Hủy bỏ" })}
       >
         <div className="space-y-4 pt-3">
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Chọn một bàn ăn đang trống để chuyển toàn bộ phiên sử dụng và đơn hàng (nếu có) từ bàn{" "}
-            <strong>{sessionActionTable?.number}</strong> sang.
-          </p>
+          <p className="text-sm text-gray-500 dark:text-gray-400" dangerouslySetInnerHTML={{
+            __html: t("dashboard.tables.transfer_modal.description", {
+              number: sessionActionTable?.number || "",
+              defaultValue: `Chọn một bàn ăn đang trống để chuyển toàn bộ phiên sử dụng và đơn hàng (nếu có) từ bàn <strong>${sessionActionTable?.number || ""}</strong> sang.`
+            })
+          }} />
           <div>
-            <label className="text-xs font-bold text-gray-500 block mb-1">Chọn bàn trống đích *</label>
+            <label className="text-xs font-bold text-gray-500 block mb-1">
+              {t("dashboard.tables.transfer_modal.target_label", { defaultValue: "Chọn bàn trống đích *" })}
+            </label>
             <select
               value={transferTargetTableId}
               onChange={(e) => setTransferTargetTableId(e.target.value)}
               className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-slate-900 rounded-xl text-sm outline-none focus:border-[#FF5A2C] text-gray-800 dark:text-gray-200"
             >
-              <option value="">Chọn bàn trống</option>
+              <option value="">{t("dashboard.tables.transfer_modal.select_placeholder", { defaultValue: "Chọn bàn trống" })}</option>
               {tables
                 .filter((t) => t.status === "available" && t.id !== sessionActionTable?.id && !t.number.startsWith("DECO_"))
                 .map((t) => (
@@ -1145,26 +1172,30 @@ export default function TablesManagementPage() {
 
       {/* ─── MERGE SESSION MODAL ─── */}
       <Modal
-        title="Gộp bàn ăn"
+        title={t("dashboard.tables.merge_modal.title", { defaultValue: "Gộp bàn ăn" })}
         open={isMergeModalOpen}
         onOk={executeMerge}
         onCancel={() => setIsMergeModalOpen(false)}
-        okText="Xác nhận gộp"
-        cancelText="Hủy bỏ"
+        okText={t("dashboard.tables.merge_modal.confirm", { defaultValue: "Xác nhận gộp" })}
+        cancelText={t("dashboard.tables.merge_modal.cancel", { defaultValue: "Hủy bỏ" })}
       >
         <div className="space-y-4 pt-3">
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Chọn một bàn ăn đang hoạt động (đang có khách) để gộp phiên của bàn{" "}
-            <strong>{sessionActionTable?.number}</strong> vào đó. Cả hai bàn sẽ cùng liên kết tới một đơn hàng chung.
-          </p>
+          <p className="text-sm text-gray-500 dark:text-gray-400" dangerouslySetInnerHTML={{
+            __html: t("dashboard.tables.merge_modal.description", {
+              number: sessionActionTable?.number || "",
+              defaultValue: `Chọn một bàn ăn đang hoạt động (đang có khách) để gộp phiên của bàn <strong>${sessionActionTable?.number || ""}</strong> vào đó. Cả hai bàn sẽ cùng liên kết tới một đơn hàng chung.`
+            })
+          }} />
           <div>
-            <label className="text-xs font-bold text-gray-500 block mb-1">Chọn bàn gộp đích *</label>
+            <label className="text-xs font-bold text-gray-500 block mb-1">
+              {t("dashboard.tables.merge_modal.target_label", { defaultValue: "Chọn bàn gộp đích *" })}
+            </label>
             <select
               value={mergeTargetTableId}
               onChange={(e) => setMergeTargetTableId(e.target.value)}
               className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-slate-900 rounded-xl text-sm outline-none focus:border-[#FF5A2C] text-gray-800 dark:text-gray-200"
             >
-              <option value="">Chọn bàn bận</option>
+              <option value="">{t("dashboard.tables.merge_modal.select_placeholder", { defaultValue: "Chọn bàn bận" })}</option>
               {tables
                 .filter((t) => t.status === "occupied" && t.id !== sessionActionTable?.id && !t.number.startsWith("DECO_"))
                 .map((t) => (
