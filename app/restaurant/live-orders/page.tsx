@@ -214,9 +214,12 @@ export default function LiveOrdersPage() {
         // Play notification sound
         playNotificationSound();
 
-        // Add to state if not already present
+        // Add or update order in state
         setOrders(prev => {
-          if (prev.some(o => o.id === order.id)) return prev;
+          const exists = prev.some(o => o.id === order.id);
+          if (exists) {
+            return prev.map(o => o.id === order.id ? order : o);
+          }
           return [order, ...prev];
         });
       });
