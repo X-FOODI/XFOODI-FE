@@ -160,7 +160,8 @@ export default function CustomerCheckoutPage() {
     if (!paymentId || !polling) return;
 
     // 1. Socket connection for instant webhook detection
-    const socket = io(process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000", {
+    const socketUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/?$/, "") || "http://localhost:5000";
+    const socket = io(socketUrl, {
       transports: ["websocket"],
     });
 
@@ -205,7 +206,8 @@ export default function CustomerCheckoutPage() {
       setCallingStaff(true);
       
       // Emit a socket event to let the owner/staff dashboard know this table needs cash checkout assistance
-      const socket = io(process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000", {
+      const socketUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/?$/, "") || "http://localhost:5000";
+      const socket = io(socketUrl, {
         transports: ["websocket"],
       });
       
