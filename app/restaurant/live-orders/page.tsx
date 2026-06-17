@@ -74,34 +74,77 @@ export default function LiveOrdersPage() {
   const [pendingPayments, setPendingPayments] = useState<Record<string, boolean>>({});
   const [feedbackOrder, setFeedbackOrder] = useState<{ id: string; reference: string } | null>(null);
 
-  // Audio for notification
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Audio context for notification chime (Web Audio API)
+  const audioCtxRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
-    // Create an audio element programmatically with an MP3 chime sound
-    audioRef.current = new Audio("https://www.soundjay.com/buttons/sounds/button-10.mp3");
-    
-    // Unlock audio context on first user click/interaction to satisfy browser autoplay policy
-    const unlockAudio = () => {
-      if (audioRef.current) {
-        audioRef.current.play()
-          .then(() => {
-            audioRef.current?.pause();
-            if (audioRef.current) audioRef.current.currentTime = 0;
-            document.removeEventListener("click", unlockAudio);
-            document.removeEventListener("keydown", unlockAudio);
-          })
-          .catch(err => console.log("Silent audio unlock failed:", err));
+    const initAudioContext = () => {
+      try {
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioContextClass && !audioCtxRef.current) {
+          audioCtxRef.current = new AudioContextClass();
+        }
+        if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
+          audioCtxRef.current.resume();
+        }
+        // Remove listeners once successfully unlocked/initialized
+        document.removeEventListener("click", initAudioContext);
+        document.removeEventListener("keydown", initAudioContext);
+      } catch (err) {
+        console.log("Silent audio unlock failed:", err);
       }
     };
-    document.addEventListener("click", unlockAudio);
-    document.addEventListener("keydown", unlockAudio);
-    
+
+    document.addEventListener("click", initAudioContext);
+    document.addEventListener("keydown", initAudioContext);
     return () => {
-      document.removeEventListener("click", unlockAudio);
-      document.removeEventListener("keydown", unlockAudio);
+      document.removeEventListener("click", initAudioContext);
+      document.removeEventListener("keydown", initAudioContext);
     };
   }, []);
+
+  const playNotificationSound = () => {
+    try {
+      let ctx = audioCtxRef.current;
+      if (!ctx) {
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioContextClass) {
+          ctx = new AudioContextClass();
+          audioCtxRef.current = ctx;
+        }
+      }
+      if (!ctx) return;
+      if (ctx.state === "suspended") {
+        ctx.resume();
+      }
+
+      const playTone = (freq: number, startTime: number, duration: number) => {
+        if (!ctx) return;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, startTime);
+        
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(0.15, startTime + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+        
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+      };
+
+      const now = ctx.currentTime;
+      playTone(523.25, now, 0.4);        // C5
+      playTone(659.25, now + 0.08, 0.4); // E5
+      playTone(783.99, now + 0.16, 0.5); // G5
+    } catch (e) {
+      console.log("Lỗi phát âm thanh:", e);
+    }
+  };
 
   // Sync selectedOrder with latest orders data to show live updates of items status
   useEffect(() => {
@@ -169,22 +212,21 @@ export default function LiveOrdersPage() {
         console.log("Nhận đơn hàng mới!", order);
         
         // Play notification sound
-        if (audioRef.current) {
-          audioRef.current.play().catch(e => console.log("Lỗi phát âm thanh:", e));
-        }
+        playNotificationSound();
 
-        // Add to state if not already present
+        // Add or update order in state
         setOrders(prev => {
-          if (prev.some(o => o.id === order.id)) return prev;
+          const exists = prev.some(o => o.id === order.id);
+          if (exists) {
+            return prev.map(o => o.id === order.id ? order : o);
+          }
           return [order, ...prev];
         });
       });
 
       newSocket.on("CALL_STAFF", (callData: any) => {
         console.log("Nhận yêu cầu gọi nhân viên:", callData);
-        if (audioRef.current) {
-          audioRef.current.play().catch(e => console.log("Lỗi phát âm thanh:", e));
-        }
+        playNotificationSound();
         
         // If cash checkout request, register in state to glow the card on KDS board
         if (callData.type === "CASH_CHECKOUT" && callData.orderId) {
