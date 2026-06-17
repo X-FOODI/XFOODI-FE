@@ -10,9 +10,15 @@ import { useTenant } from "@/lib/contexts/TenantContext";
 import axiosInstance from "@/lib/services/axiosInstance";
 import paymentService, { PaymentPurpose } from "@/lib/services/paymentService";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+// Strip trailing /api to get socket base URL
+const SOCKET_URL = (() => {
+  const url = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+  // Remove any trailing /api path segment
+  return url.replace(/\/api$/, "").replace(/\/api\/$/, "");
+})();
 console.log("[DEBUG] NEXT_PUBLIC_API_URL =", process.env.NEXT_PUBLIC_API_URL);
-console.log("[DEBUG] Socket will connect to:", BACKEND_URL.replace("/api", ""));
+console.log("[DEBUG] SOCKET_URL =", SOCKET_URL);
 
 interface OrderItem {
   id: string;
@@ -135,7 +141,7 @@ export default function LiveOrdersPage() {
 
     if (user.restaurantId) {
       // Connect to Socket.io — polling only for Render/Cloudflare proxy compatibility
-      const newSocket = io(BACKEND_URL.replace("/api", ""), {
+      const newSocket = io(SOCKET_URL, {
         transports: ["polling"],
         withCredentials: true,
         reconnection: true,
