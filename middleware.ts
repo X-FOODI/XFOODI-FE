@@ -80,7 +80,9 @@ export function middleware(req: NextRequest) {
   const adminAccessToken = req.cookies.get('adminAccessToken')?.value;
   const hasAdminAuthToken = !!adminAccessToken;
 
-  const ADMIN_GATE_CODE = process.env.NEXT_PUBLIC_ADMIN_GATE_CODE || '';
+  // Server-only secret: middleware runs server-side, so it must NOT use the
+  // NEXT_PUBLIC_ prefix (which would ship the admin gate code in the client bundle).
+  const ADMIN_GATE_CODE = process.env.ADMIN_GATE_CODE || '';
 
   // Super Admin domain (admin.xfoodi.com or admin.localhost)
   if (isAdminDomain) {

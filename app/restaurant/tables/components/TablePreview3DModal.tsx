@@ -10,6 +10,7 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import * as THREE from "three";
 import { useTranslation } from "react-i18next";
+import { Map as MapIcon, CalendarCheck } from "lucide-react";
 import type { Reservation } from "@/lib/services/reservationService";
 import type { TableData } from "@/app/restaurant/tables/components/DraggableTable";
 
@@ -496,7 +497,7 @@ export default function TablePreview3DModal({
                 onClick={onBackToMap}
                 className="table-360-action-secondary"
               >
-                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>map</span>
+                <MapIcon className="w-[18px] h-[18px] shrink-0" />
                 {t('landing.booking.panorama.back_to_map')}
               </button>
             )}
@@ -506,7 +507,7 @@ export default function TablePreview3DModal({
                 onClick={onBookNow}
                 className="table-360-action-primary"
               >
-                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>event_available</span>
+                <CalendarCheck className="w-[18px] h-[18px] shrink-0" />
                 {t('landing.booking.panorama.book_now')}
               </button>
             )}

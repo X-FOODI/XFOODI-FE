@@ -79,7 +79,21 @@ adminAxiosInstance.interceptors.response.use(
     (response) => response,
     (error) => {
         if (error.response) {
-            // Mute Expected 404s to avoid console clutter. 
+            // On 401 the admin token is expired/invalid. The admin client has no
+            // refresh token of its own, so clear the stale token and bounce to the
+            // admin login instead of failing silently on every subsequent call.
+            if (error.response.status === 401 && typeof window !== 'undefined') {
+                localStorage.removeItem('adminAccessToken');
+                sessionStorage.removeItem('adminAccessToken');
+                const path = window.location.pathname;
+                if (path.startsWith('/admin')) {
+                    const redirect = encodeURIComponent(`${path}${window.location.search || ''}`);
+                    window.location.href = `/login?redirect=${redirect}`;
+                }
+                return Promise.reject(error);
+            }
+
+            // Mute Expected 404s to avoid console clutter.
             const isExpected404 =
                 error.response.status === 404 &&
                 (error.config?.url?.includes("/payment-settings"));

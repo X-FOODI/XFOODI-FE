@@ -16,10 +16,19 @@ import {
   MOCK_RESTAURANT_SUMMARY,
   MOCK_TOP_DISHES,
 } from "@/lib/mock/dashboardMockData";
+import {
+  dashboardService,
+  RestaurantDashboardSummary,
+  TrendPoint,
+  OrderTrendPoint,
+  TopDish,
+  FeedbacksResponse
+} from "@/lib/services/dashboardService";
 import { formatVND } from "@/lib/utils/currency";
 import { useAuth } from "@/lib/contexts/AuthContext";
 import axiosInstance from "@/lib/services/axiosInstance";
 import { useTenant } from "@/lib/contexts/TenantContext";
+import { DollarSign, ClipboardList, Calendar, Users } from "lucide-react";
 
 type FilterOption = "day" | "week" | "month" | "year";
 
@@ -57,6 +66,33 @@ export default function RestaurantDashboardPage() {
   // Dữ liệu thật: thông tin nhà hàng
   const [restaurantInfo, setRestaurantInfo] = useState<RestaurantInfo | null>(null);
 
+  // States for API statistics
+  const [summaryData, setSummaryData] = useState<RestaurantDashboardSummary | null>(null);
+  const [trends, setTrends] = useState<{ revenueTrend: TrendPoint[]; orderTrend: OrderTrendPoint[] } | null>(null);
+  const [topDishes, setTopDishes] = useState<TopDish[]>([]);
+  const [feedbackData, setFeedbackData] = useState<FeedbacksResponse | null>(null);
+  const [loadingStats, setLoadingStats] = useState(true);
+
+  useEffect(() => {
+    if (!isAuthReady || tenantLoading || !user) return;
+    setLoadingStats(true);
+    Promise.all([
+      dashboardService.getRestaurantSummary(filter),
+      dashboardService.getRestaurantTrends(filter),
+      dashboardService.getRestaurantTopDishes(),
+      dashboardService.getRestaurantLatestFeedbacks()
+    ]).then(([sData, tData, dData, fData]) => {
+      setSummaryData(sData);
+      setTrends(tData);
+      setTopDishes(dData);
+      setFeedbackData(fData);
+    }).catch(err => {
+      console.error("Failed to load restaurant dashboard stats:", err);
+    }).finally(() => {
+      setLoadingStats(false);
+    });
+  }, [filter, isAuthReady, tenantLoading, user]);
+
   // Scale mock data (hooks phải luôn ở trên early return)
   const filterKey = filter as FilterOption; // explicit typed alias — fix implicit-any index
   const scale = filterKey === "day" ? 0.14 : filterKey === "week" ? 1 : filterKey === "month" ? 4.3 : 52;
@@ -68,8 +104,15 @@ export default function RestaurantDashboardPage() {
     newCustomers: { ...summary.newCustomers, total: Math.round(summary.newCustomers.total * scale) },
   }), [filter]);
 
-  const totalRevenue = MOCK_RESTAURANT_REVENUE_TREND.reduce((sum, p) => sum + p.value, 0);
-  const totalOrders = MOCK_RESTAURANT_ORDER_TREND.reduce((sum, p) => sum + p.total, 0);
+  // Combine real data and mock data as fallback
+  const finalSummary = summaryData || scaledSummary;
+  const finalRevenueTrend = trends?.revenueTrend || MOCK_RESTAURANT_REVENUE_TREND;
+  const finalOrderTrend = trends?.orderTrend || MOCK_RESTAURANT_ORDER_TREND;
+  const finalTopDishes = topDishes.length > 0 ? topDishes : MOCK_TOP_DISHES;
+  const finalFeedbacks = feedbackData || MOCK_RESTAURANT_FEEDBACKS;
+
+  const totalRevenue = finalRevenueTrend.reduce((sum, p) => sum + p.value, 0);
+  const totalOrders = finalOrderTrend.reduce((sum, p) => sum + p.total, 0);
 
   // ── Auth guard: role-based only ────────────────────────────────────────────
   // Owner/Staff are allowed on any subdomain (admin.localhost or demo.localhost).
@@ -411,17 +454,14 @@ export default function RestaurantDashboardPage() {
               <div className="dashboard-animate-in dashboard-animate-in-delay-1 h-full">
                 <KPICard
                   title={`Doanh thu ${FILTER_LABELS[filter as FilterOption].toLowerCase()}`}
-                  value={formatVND(scaledSummary.revenue.total)}
-                  subtitle={`${summary.fromDate?.slice(0, 10)} - ${summary.toDate?.slice(0, 10)}`}
-                  trend={{ value: summary.revenue.changePercent, isPositive: summary.revenue.changePercent >= 0 }}
+                  value={formatVND(finalSummary.revenue.total)}
+                  subtitle={`${finalSummary.fromDate?.slice(0, 10)} - ${finalSummary.toDate?.slice(0, 10)}`}
+                  trend={{ value: finalSummary.revenue.changePercent, isPositive: finalSummary.revenue.changePercent >= 0 }}
                   iconBg="rgba(34, 197, 94, 0.1)"
                   iconColor="#22c55e"
                   accentClass="dashboard-kpi-card-green"
                   icon={
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+                    <DollarSign size={20} />
                   }
                 />
               </div>
@@ -429,16 +469,13 @@ export default function RestaurantDashboardPage() {
               <div className="dashboard-animate-in dashboard-animate-in-delay-2 h-full">
                 <KPICard
                   title={`Đơn hàng ${FILTER_LABELS[filterKey].toLowerCase()}`}
-                  value={scaledSummary.orders.total}
-                  subtitle={`${scaledSummary.orders.completed} hoàn thành · ${summary.orders.liveProcessing} đang xử lý`}
+                  value={finalSummary.orders.total}
+                  subtitle={`${finalSummary.orders.completed} hoàn thành · ${finalSummary.orders.liveProcessing} đang xử lý`}
                   iconBg="var(--primary-soft)"
                   iconColor="var(--primary)"
                   accentClass="dashboard-kpi-card-primary"
                   icon={
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                    </svg>
+                    <ClipboardList size={20} />
                   }
                 />
               </div>
@@ -446,16 +483,13 @@ export default function RestaurantDashboardPage() {
               <div className="dashboard-animate-in dashboard-animate-in-delay-3 h-full">
                 <KPICard
                   title={`Đặt bàn ${FILTER_LABELS[filterKey].toLowerCase()}`}
-                  value={scaledSummary.reservations.total}
-                  subtitle={`${summary.reservations.pending} chờ xác nhận`}
+                  value={finalSummary.reservations.total}
+                  subtitle={`${finalSummary.reservations.pending} chờ xác nhận`}
                   iconBg="rgba(59, 130, 246, 0.1)"
                   iconColor="#3b82f6"
                   accentClass="dashboard-kpi-card-blue"
                   icon={
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
+                    <Calendar size={20} />
                   }
                 />
               </div>
@@ -463,17 +497,14 @@ export default function RestaurantDashboardPage() {
               <div className="dashboard-animate-in dashboard-animate-in-delay-4 h-full">
                 <KPICard
                   title={`Khách mới ${FILTER_LABELS[filterKey].toLowerCase()}`}
-                  value={scaledSummary.newCustomers.total}
-                  subtitle={`${summary.fromDate?.slice(0, 10)} - ${summary.toDate?.slice(0, 10)}`}
-                  trend={{ value: summary.newCustomers.changePercent, isPositive: summary.newCustomers.changePercent >= 0 }}
+                  value={finalSummary.newCustomers.total}
+                  subtitle={`${finalSummary.fromDate?.slice(0, 10)} - ${finalSummary.toDate?.slice(0, 10)}`}
+                  trend={{ value: finalSummary.newCustomers.changePercent, isPositive: finalSummary.newCustomers.changePercent >= 0 }}
                   iconBg="rgba(168, 85, 247, 0.1)"
                   iconColor="#a855f7"
                   accentClass="dashboard-kpi-card-purple"
                   icon={
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                        d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                    </svg>
+                    <Users size={20} />
                   }
                 />
               </div>
@@ -482,13 +513,13 @@ export default function RestaurantDashboardPage() {
             {/* Charts */}
             <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <RevenueChart
-                data={MOCK_RESTAURANT_REVENUE_TREND}
+                data={finalRevenueTrend}
                 totalRevenue={totalRevenue}
                 subtitle="7 ngày gần nhất"
                 title="Doanh thu"
               />
               <OrdersBarChart
-                data={MOCK_RESTAURANT_ORDER_TREND}
+                data={finalOrderTrend}
                 totalOrders={totalOrders}
                 subtitle="7 ngày gần nhất"
                 title="Đơn hàng"
@@ -498,12 +529,12 @@ export default function RestaurantDashboardPage() {
             {/* Bottom cards */}
             <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <LatestFeedbacksCard
-                items={MOCK_RESTAURANT_FEEDBACKS.items}
-                averageRating={MOCK_RESTAURANT_FEEDBACKS.averageRating}
-                totalCount={MOCK_RESTAURANT_FEEDBACKS.totalCount}
+                items={finalFeedbacks.items}
+                averageRating={finalFeedbacks.averageRating}
+                totalCount={finalFeedbacks.totalCount}
                 viewAllHref="/restaurant/feedbacks"
               />
-              <BestSellingDishesCard dishes={MOCK_TOP_DISHES} />
+              <BestSellingDishesCard dishes={finalTopDishes} />
             </section>
           </div>
         </main>

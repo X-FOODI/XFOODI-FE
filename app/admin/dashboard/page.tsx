@@ -12,7 +12,15 @@ import {
   MOCK_ADMIN_SUMMARY,
   MOCK_TOP_RESTAURANTS,
 } from "@/lib/mock/dashboardMockData";
+import {
+  dashboardService,
+  AdminDashboardSummary,
+  TrendPoint,
+  OrderTrendPoint,
+  TopRestaurant
+} from "@/lib/services/dashboardService";
 import { formatVND } from "@/lib/utils/currency";
+import { DollarSign, ClipboardList, Utensils, Users } from "lucide-react";
 import restaurantApplicationService, {
   RestaurantApplication,
 } from "@/lib/services/restaurantApplicationService";
@@ -57,6 +65,29 @@ export default function AdminDashboardPage() {
       .finally(() => setAppsLoading(false));
   }, []);
 
+  // States for API statistics
+  const [summaryData, setSummaryData] = useState<AdminDashboardSummary | null>(null);
+  const [trends, setTrends] = useState<{ revenueTrend: TrendPoint[]; orderTrend: OrderTrendPoint[] } | null>(null);
+  const [topRestaurants, setTopRestaurants] = useState<TopRestaurant[]>([]);
+  const [loadingStats, setLoadingStats] = useState(true);
+
+  useEffect(() => {
+    setLoadingStats(true);
+    Promise.all([
+      dashboardService.getAdminSummary(filter),
+      dashboardService.getAdminTrends(filter),
+      dashboardService.getAdminTopRestaurants()
+    ]).then(([sData, tData, rData]) => {
+      setSummaryData(sData);
+      setTrends(tData);
+      setTopRestaurants(rData);
+    }).catch(err => {
+      console.error("Failed to load admin dashboard stats:", err);
+    }).finally(() => {
+      setLoadingStats(false);
+    });
+  }, [filter]);
+
   const scale = filter === "day" ? 0.14 : filter === "week" ? 1 : filter === "month" ? 4.3 : 52;
   const scaledSummary = useMemo(() => ({
     ...summary,
@@ -65,8 +96,14 @@ export default function AdminDashboardPage() {
     totalUsers: { ...summary.totalUsers, total: Math.round(summary.totalUsers.total * scale) },
   }), [filter]);
 
-  const totalRevenue = MOCK_ADMIN_REVENUE_TREND.reduce((s, p) => s + p.value, 0);
-  const totalOrders = MOCK_ADMIN_ORDER_TREND.reduce((s, p) => s + p.total, 0);
+  // Combine real data and mock data as fallback
+  const finalSummary = summaryData || scaledSummary;
+  const finalRevenueTrend = trends?.revenueTrend || MOCK_ADMIN_REVENUE_TREND;
+  const finalOrderTrend = trends?.orderTrend || MOCK_ADMIN_ORDER_TREND;
+  const finalTopRestaurants = topRestaurants.length > 0 ? topRestaurants : MOCK_TOP_RESTAURANTS;
+
+  const totalRevenue = finalRevenueTrend.reduce((s, p) => s + p.value, 0);
+  const totalOrders = finalOrderTrend.reduce((s, p) => s + p.total, 0);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -106,17 +143,14 @@ export default function AdminDashboardPage() {
               <div className="dashboard-animate-in dashboard-animate-in-delay-1 h-full">
                 <KPICard
                   title="Tổng doanh thu"
-                  value={formatVND(scaledSummary.totalRevenue.total)}
+                  value={formatVND(finalSummary.totalRevenue.total)}
                   subtitle="Toàn nền tảng"
-                  trend={{ value: summary.totalRevenue.changePercent, isPositive: summary.totalRevenue.changePercent >= 0 }}
+                  trend={{ value: finalSummary.totalRevenue.changePercent, isPositive: finalSummary.totalRevenue.changePercent >= 0 }}
                   iconBg="rgba(34, 197, 94, 0.1)"
                   iconColor="#22c55e"
                   accentClass="dashboard-kpi-card-green"
                   icon={
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+                    <DollarSign size={20} />
                   }
                 />
               </div>
@@ -124,17 +158,14 @@ export default function AdminDashboardPage() {
               <div className="dashboard-animate-in dashboard-animate-in-delay-2 h-full">
                 <KPICard
                   title="Tổng đơn hàng"
-                  value={scaledSummary.totalOrders.total.toLocaleString("vi-VN")}
+                  value={finalSummary.totalOrders.total.toLocaleString("vi-VN")}
                   subtitle="Toàn nền tảng"
-                  trend={{ value: summary.totalOrders.changePercent, isPositive: true }}
+                  trend={{ value: finalSummary.totalOrders.changePercent, isPositive: finalSummary.totalOrders.changePercent >= 0 }}
                   iconBg="var(--primary-soft)"
                   iconColor="var(--primary)"
                   accentClass="dashboard-kpi-card-primary"
                   icon={
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                    </svg>
+                    <ClipboardList size={20} />
                   }
                 />
               </div>
@@ -142,17 +173,14 @@ export default function AdminDashboardPage() {
               <div className="dashboard-animate-in dashboard-animate-in-delay-3 h-full">
                 <KPICard
                   title="Nhà hàng"
-                  value={summary.totalRestaurants.total}
-                  subtitle={`${summary.totalRestaurants.active} đang hoạt động`}
-                  trend={{ value: summary.totalRestaurants.changePercent, isPositive: true }}
+                  value={finalSummary.totalRestaurants.total}
+                  subtitle={`${finalSummary.totalRestaurants.active} đang hoạt động`}
+                  trend={{ value: finalSummary.totalRestaurants.changePercent, isPositive: finalSummary.totalRestaurants.changePercent >= 0 }}
                   iconBg="rgba(59, 130, 246, 0.1)"
                   iconColor="#3b82f6"
                   accentClass="dashboard-kpi-card-blue"
                   icon={
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                        d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                    </svg>
+                    <Utensils size={20} />
                   }
                 />
               </div>
@@ -160,17 +188,14 @@ export default function AdminDashboardPage() {
               <div className="dashboard-animate-in dashboard-animate-in-delay-4 h-full">
                 <KPICard
                   title="Người dùng"
-                  value={scaledSummary.totalUsers.total.toLocaleString("vi-VN")}
-                  subtitle={`+${summary.totalUsers.newThisMonth} tháng này`}
-                  trend={{ value: summary.totalUsers.changePercent, isPositive: true }}
+                  value={finalSummary.totalUsers.total.toLocaleString("vi-VN")}
+                  subtitle={`+${finalSummary.totalUsers.newThisMonth} tháng này`}
+                  trend={{ value: finalSummary.totalUsers.changePercent, isPositive: finalSummary.totalUsers.changePercent >= 0 }}
                   iconBg="rgba(168, 85, 247, 0.1)"
                   iconColor="#a855f7"
                   accentClass="dashboard-kpi-card-purple"
                   icon={
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                        d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                    </svg>
+                    <Users size={20} />
                   }
                 />
               </div>
@@ -179,13 +204,13 @@ export default function AdminDashboardPage() {
             {/* Charts */}
             <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <RevenueChart
-                data={MOCK_ADMIN_REVENUE_TREND}
+                data={finalRevenueTrend}
                 totalRevenue={totalRevenue}
                 subtitle="7 ngày gần nhất · Toàn nền tảng"
                 title="Doanh thu nền tảng"
               />
               <OrdersBarChart
-                data={MOCK_ADMIN_ORDER_TREND}
+                data={finalOrderTrend}
                 totalOrders={totalOrders}
                 subtitle="7 ngày gần nhất · Toàn nền tảng"
                 title="Đơn hàng nền tảng"
@@ -198,11 +223,11 @@ export default function AdminDashboardPage() {
               <div className="dashboard-data-card">
                 <div className="dashboard-data-card-header">
                   <h3 className="dashboard-data-card-title">Nhà hàng doanh thu cao nhất</h3>
-                  <span className="dashboard-data-card-badge">Top {MOCK_TOP_RESTAURANTS.length}</span>
+                  <span className="dashboard-data-card-badge">Top {finalTopRestaurants.length}</span>
                 </div>
 
                 <div className="space-y-2">
-                  {MOCK_TOP_RESTAURANTS.map((r, index) => {
+                  {finalTopRestaurants.map((r, index) => {
                     const st = STATUS_MAP[r.status];
                     const rank = index + 1;
                     const rankClass = rank === 1

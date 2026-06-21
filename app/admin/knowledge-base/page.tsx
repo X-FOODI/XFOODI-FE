@@ -55,6 +55,7 @@ interface DocumentItem {
   status: "STORED" | "PENDING" | "PROCESSING" | "INDEXED" | "FAILED";
   createdAt: string;
   bucketId?: string | null;
+  errorLog?: string | null;
 }
 
 interface TreeNode {
@@ -337,6 +338,13 @@ export default function SuperAdminKnowledgeBasePage() {
   /* ── Sync & Mount ── */
   const [syncing, setSyncing] = useState(false);
   const [mounting, setMounting] = useState(false);
+  const [retryingDocId, setRetryingDocId] = useState<string | null>(null);
+  const [errorLogDoc, setErrorLogDoc] = useState<DocumentItem | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   /* ── Refs ── */
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -591,6 +599,22 @@ export default function SuperAdminKnowledgeBasePage() {
     } catch (err: any) { message.error("Xóa tài liệu thất bại."); }
   };
 
+  const handleRetryDoc = async (doc: DocumentItem) => {
+    setRetryingDocId(doc.id);
+    try {
+      const response = await axiosInstance.post(`/ai/kb/documents/${doc.id}/process`, { restaurantId: selectedRestaurantId });
+      if (response.data.success) {
+        message.success(response.data.message || `Đang xử lý lại tài liệu "${doc.filename}"...`);
+        setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, status: "PROCESSING" } : d));
+        setSelectedDoc(prev => prev?.id === doc.id ? { ...prev, status: "PROCESSING" } : prev);
+      }
+    } catch (err: any) {
+      message.error(err.response?.data?.message || "Xử lý lại thất bại.");
+    } finally {
+      setRetryingDocId(null);
+    }
+  };
+
   const toggleFolder = (path: string) => {
     setExpandedPaths((prev) => ({ ...prev, [path]: !prev[path] }));
   };
@@ -787,10 +811,33 @@ export default function SuperAdminKnowledgeBasePage() {
             </div>
             <span className="px-1.5 py-0.5 rounded border font-mono font-bold text-[9px] shrink-0" style={{ color: "var(--text)", borderColor: "var(--border)", background: "var(--bg-base)" }}>{doc.fileType}</span>
             <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-medium shrink-0 ${isCloud ? "bg-blue-500/10 text-blue-600 dark:text-blue-400" : "bg-gray-500/10 text-gray-600 dark:text-gray-400"}`}>{isCloud ? "Cloud" : "Local"}</span>
-            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full font-semibold text-[9px] shrink-0 ${st.pulse ? "animate-pulse" : ""}`} style={{ background: st.bg, color: st.color }}>
+            <span
+              onClick={(e) => {
+                if (doc.status === "FAILED") {
+                  e.stopPropagation();
+                  setErrorLogDoc(doc);
+                }
+              }}
+              title={doc.status === "FAILED" ? "Click để xem chi tiết lỗi" : undefined}
+              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full font-semibold text-[9px] shrink-0 ${st.pulse ? "animate-pulse" : ""} ${doc.status === "FAILED" ? "cursor-pointer hover:opacity-85" : ""}`}
+              style={{ background: st.bg, color: st.color }}
+            >
               {st.pulse && <span className="w-1 h-1 rounded-full bg-amber-500 animate-ping" />}
               {st.label}
             </span>
+            {doc.status === "FAILED" && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRetryDoc(doc);
+                }}
+                disabled={retryingDocId === doc.id}
+                className="p-1 rounded hover:bg-amber-500/10 text-amber-600 dark:text-amber-400 transition-all shrink-0 disabled:opacity-50"
+                title="Thử lại"
+              >
+                <SyncOutlined spin={retryingDocId === doc.id} style={{ fontSize: '10px' }} />
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
@@ -1205,6 +1252,20 @@ export default function SuperAdminKnowledgeBasePage() {
                           </button>
                         )}
 
+                        <button
+                          onClick={() => {
+                            fetchDocuments(selectedRestaurantId, true);
+                            fetchBuckets(selectedRestaurantId);
+                          }}
+                          disabled={loadingDocs}
+                          className="px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all hover:bg-[var(--surface)] flex items-center gap-1.5 disabled:opacity-50"
+                          style={{ color: "var(--text)", borderColor: "var(--border)" }}
+                          title="Làm mới danh sách tài liệu"
+                        >
+                          <SyncOutlined spin={loadingDocs} />
+                          Làm mới
+                        </button>
+
                         <div className="flex-1" />
 
                         {selectedBucketId !== "all" && sidebarSection === "buckets" && (
@@ -1365,10 +1426,35 @@ export default function SuperAdminKnowledgeBasePage() {
                                         </span>
                                       </td>
                                       <td className="px-4 py-2.5">
-                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${st.pulse ? "animate-pulse" : ""}`} style={{ background: st.bg, color: st.color }}>
-                                          {st.pulse && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />}
-                                          {st.label}
-                                        </span>
+                                        <div className="flex items-center gap-1.5">
+                                          <span
+                                            onClick={(e) => {
+                                              if (doc.status === "FAILED") {
+                                                e.stopPropagation();
+                                                setErrorLogDoc(doc);
+                                              }
+                                            }}
+                                            title={doc.status === "FAILED" ? "Click để xem chi tiết lỗi" : undefined}
+                                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${st.pulse ? "animate-pulse" : ""} ${doc.status === "FAILED" ? "cursor-pointer hover:opacity-85" : ""}`}
+                                            style={{ background: st.bg, color: st.color }}
+                                          >
+                                            {st.pulse && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />}
+                                            {st.label}
+                                          </span>
+                                          {doc.status === "FAILED" && (
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleRetryDoc(doc);
+                                              }}
+                                              disabled={retryingDocId === doc.id}
+                                              className="p-1 rounded hover:bg-amber-500/10 text-amber-600 dark:text-amber-400 transition-all flex items-center justify-center disabled:opacity-50"
+                                              title="Thử lại"
+                                            >
+                                              <SyncOutlined spin={retryingDocId === doc.id} style={{ fontSize: '11px' }} />
+                                            </button>
+                                          )}
+                                        </div>
                                       </td>
                                       <td className="px-4 py-2.5 text-right" onClick={e => e.stopPropagation()}>
                                         <button onClick={() => { if (confirm(`Xóa "${doc.filename}"?`)) handleDeleteDoc(doc.id); }} className="p-1.5 rounded-lg hover:bg-red-500/10 text-red-500 transition-all opacity-0 group-hover:opacity-100" title="Xóa">
@@ -1732,7 +1818,16 @@ export default function SuperAdminKnowledgeBasePage() {
                 {(() => {
                   const st = getStatusInfo(selectedDoc.status);
                   return (
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${st.pulse ? "animate-pulse" : ""}`} style={{ background: st.bg, color: st.color }}>
+                    <span
+                      onClick={() => {
+                        if (selectedDoc.status === "FAILED") {
+                          setErrorLogDoc(selectedDoc);
+                        }
+                      }}
+                      title={selectedDoc.status === "FAILED" ? "Click để xem chi tiết lỗi" : undefined}
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${st.pulse ? "animate-pulse" : ""} ${selectedDoc.status === "FAILED" ? "cursor-pointer hover:opacity-85" : ""}`}
+                      style={{ background: st.bg, color: st.color }}
+                    >
                       {st.pulse && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />}
                       {st.label}
                     </span>
@@ -1748,6 +1843,16 @@ export default function SuperAdminKnowledgeBasePage() {
                   >
                     Tải về ↓
                   </a>
+                )}
+                {selectedDoc.status === "FAILED" && (
+                  <button
+                    onClick={() => handleRetryDoc(selectedDoc)}
+                    disabled={retryingDocId === selectedDoc.id}
+                    className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 ml-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <SyncOutlined spin={retryingDocId === selectedDoc.id} />
+                    Thử lại
+                  </button>
                 )}
               </div>
 
@@ -2013,6 +2118,52 @@ export default function SuperAdminKnowledgeBasePage() {
           </>
         )}
       </AnimatePresence>
+
+      {/* ─── MODAL: ERROR LOG VIEW ─── */}
+      {mounted && typeof document !== "undefined" && createPortal(
+        <AnimatePresence>
+          {errorLogDoc && (
+            <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 0.6 }} exit={{ opacity: 0 }} onClick={() => setErrorLogDoc(null)} className="absolute inset-0 bg-black/60" />
+              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-2xl h-[60vh] z-[1] p-6 rounded-2xl border shadow-2xl flex flex-col" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+                <div className="flex justify-between items-center pb-2 border-b flex-shrink-0" style={{ borderColor: "var(--border)" }}>
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center flex-shrink-0">
+                      <CloseCircleOutlined className="text-base" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-red-600 dark:text-red-400">Chi tiết lỗi xử lý tài liệu</h3>
+                      <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{errorLogDoc.filename}</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setErrorLogDoc(null)} style={{ color: "var(--text-muted)" }} className="flex-shrink-0"><CloseCircleOutlined className="text-lg" /></button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto mt-4 p-4 rounded-xl font-mono text-[11px] leading-relaxed select-text" style={{ background: "var(--bg-base)", color: "var(--text)" }}>
+                  {errorLogDoc.errorLog ? (
+                    <pre className="whitespace-pre-wrap break-all text-red-500/95 dark:text-red-400/95">{errorLogDoc.errorLog}</pre>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full gap-2 text-[var(--text-muted)] font-sans">
+                      <InfoCircleOutlined className="text-2xl" />
+                      <span>Không tìm thấy chi tiết log lỗi cho tài liệu này.</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-end pt-4 flex-shrink-0">
+                  <button
+                    onClick={() => setErrorLogDoc(null)}
+                    className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-[var(--primary)] hover:opacity-90 transition-all"
+                  >
+                    Đóng
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }
@@ -3238,6 +3389,7 @@ function KbTestPanel({ bucketId, restaurantId }: KbTestPanelProps) {
         </AnimatePresence>,
         document.body
       )}
+
     </div>
   );
 }

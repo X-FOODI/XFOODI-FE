@@ -6,6 +6,8 @@ import { useEffect, useRef, useState } from "react";
 import authService from "../../lib/services/authService";
 import axiosInstance from "../../lib/services/axiosInstance";
 import { useTenant } from "@/lib/contexts/TenantContext";
+import { Home, User, Settings, Moon, Sun, Bell, ChevronDown, LogOut, Utensils } from "lucide-react";
+import { useThemeMode } from "@/app/theme/AntdProvider";
 
 interface DashboardHeaderProps {
   role: "admin" | "restaurant";
@@ -25,7 +27,7 @@ export default function DashboardHeader({
   const router = useRouter();
   const { tenant } = useTenant();
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const { mode: theme, toggleTheme } = useThemeMode();
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const [activeOrdersCount, setActiveOrdersCount] = useState(0);
@@ -143,29 +145,6 @@ export default function DashboardHeader({
     return () => clearInterval(interval);
   }, [role]);
 
-  useEffect(() => {
-    // Initial load
-    const isDark = document.documentElement.classList.contains("dark");
-    setTheme(isDark ? "dark" : "light");
-  }, []);
-
-  const toggleTheme = () => {
-    const newTheme = theme === "light" ? "dark" : "light";
-    setTheme(newTheme);
-    localStorage.setItem("xfoodi-theme-mode", newTheme);
-    if (newTheme === "dark") {
-      document.documentElement.classList.add("dark");
-      document.documentElement.setAttribute("data-theme", "dark");
-      document.body.classList.add("dark");
-      document.body.setAttribute("data-theme", "dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-      document.documentElement.setAttribute("data-theme", "light");
-      document.body.classList.remove("dark");
-      document.body.setAttribute("data-theme", "light");
-    }
-  };
-
   const handleLogout = async () => {
     setDropdownOpen(false);
     try {
@@ -182,35 +161,19 @@ export default function DashboardHeader({
       key: "home",
       label: "Trang chủ User",
       href: "/",
-      icon: (
-        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-            d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-        </svg>
-      ),
+      icon: <Home size={18} />, 
     },
     {
       key: "profile",
       label: "Hồ sơ cá nhân",
       href: "/profile",
-      icon: (
-        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-        </svg>
-      ),
+      icon: <User size={18} />, 
     },
     {
       key: "settings",
       label: "Cài đặt tài khoản",
       href: "/profile",
-      icon: (
-        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-      ),
+      icon: <Settings size={18} />, 
     },
   ];
 
@@ -270,9 +233,7 @@ export default function DashboardHeader({
                 boxShadow: "0 2px 8px rgba(255,87,34,0.35)",
               }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
-                <path d="M18.06 22.99h1.66c.84 0 1.53-.64 1.63-1.46L23 5.05h-5V1h-1.97v4.05h-4.97l.3 2.34c1.71.47 3.31 1.32 4.27 2.26 1.44 1.42 2.43 2.89 2.43 5.29v8.05zM1 21.99V21h15.03v.99c0 .55-.45 1-1.01 1H2.01c-.56 0-1.01-.45-1.01-1zm15.03-7c0-2.81-1.17-4.15-2.17-5.15-1.47-1.46-3.45-2.03-5.52-2.17L8 6.2H1v4.09h-.97l.74 11.67h15.03L15.03 14.99z" />
-              </svg>
+              <Utensils size={16} color="white" />
             </div>
           )}
           <span
@@ -311,18 +272,20 @@ export default function DashboardHeader({
           {chipLabel}
         </span>
 
-        {/* Page title */}
-        <h1
-          style={{
-            margin: 0,
-            fontSize: "14px",
-            fontWeight: 600,
-            color: "var(--text, #111111)",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {pageTitle}
-        </h1>
+        {/* Page title — only show if a custom title is passed (otherwise tenant name is already shown in logo) */}
+        {title && (
+          <h1
+            style={{
+              margin: 0,
+              fontSize: "14px",
+              fontWeight: 600,
+              color: "var(--text, #111111)",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {title}
+          </h1>
+        )}
       </div>
 
       {/* ── Right: Bell + User button ── */}
@@ -356,13 +319,9 @@ export default function DashboardHeader({
           }}
         >
           {theme === "light" ? (
-            <svg width="17" height="17" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-            </svg>
+            <Moon size={17} />
           ) : (
-            <svg width="17" height="17" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-            </svg>
+            <Sun size={17} />
           )}
         </button>
 
@@ -394,10 +353,7 @@ export default function DashboardHeader({
               e.currentTarget.style.borderColor = "var(--border)";
             }}
           >
-            <svg width="17" height="17" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-            </svg>
+            <Bell size={17} />
             {(activeOrdersCount > 0 || pendingReservationsCount > 0) && (
               <span
                 style={{
@@ -611,21 +567,15 @@ export default function DashboardHeader({
             </div>
 
             {/* Chevron */}
-            <svg
-              width="13"
-              height="13"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+            <ChevronDown
+              size={13}
               style={{
                 color: "var(--text-muted)",
                 flexShrink: 0,
                 transform: dropdownOpen ? "rotate(180deg)" : "rotate(0deg)",
                 transition: "transform 0.2s ease",
               }}
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
+            />
           </button>
 
           {/* ── Dropdown panel (like booca Menu) ── */}
@@ -744,10 +694,7 @@ export default function DashboardHeader({
                     (e.currentTarget.style.background = "transparent")
                   }
                 >
-                  <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                      d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                  </svg>
+                  <LogOut size={18} />
                   <span>Đăng xuất</span>
                 </button>
               </div>

@@ -342,6 +342,16 @@ export const tableService = {
         await axiosInstance.delete(`/tables/${id}`);
     },
 
+    /** DELETE /api/tables — Bulk delete multiple tables at once */
+    bulkDeleteTables: async (ids: string[]): Promise<{ deleted: string[]; skipped: string[]; failed: string[] }> => {
+        const response = await axiosInstance.delete<{
+            success: boolean;
+            message: string;
+            data: { deleted: string[]; skipped: string[]; failed: string[] };
+        }>('/tables', { data: { ids } });
+        return response.data.data;
+    },
+
     /** PUT /api/tables/{id}/status — Requires Auth */
     updateStatus: async (id: string, status: TableStatus): Promise<TableItem> => {
         const response = await axiosInstance.put<TableItem>(

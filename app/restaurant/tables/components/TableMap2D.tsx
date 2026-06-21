@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState, useRef, useCallback, useEffect } from "react";
+import { Tooltip } from "antd";
 import { DraggableTable, TableData } from "./DraggableTable";
 import { useTranslation } from "react-i18next";
+import { UploadCloud, ArrowRight } from "lucide-react";
 
 export interface Floor {
   id: string;
@@ -36,6 +38,8 @@ interface TableMap2DProps {
   selectedTableIds?: string[];
   hideControls?: boolean;
   focusOnSelected?: boolean;
+  onComponentDrop?: (item: any, position: { x: number; y: number }) => void;
+  flashTableId?: string | null;
 }
 
 const WOOD_FLOOR_PATTERN = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iODAiIHZpZXdCb3g9IjAgMCA4MCA4MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cGF0dGVybiBpZD0iaGVycmluZ2JvbmUiIHdpZHRoPSI4MCIgaGVpZ2h0PSI4MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgcGF0dGVyblRyYW5zZm9ybT0icm90YXRlKDQ1KSI+CiAgICA8cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMjAiIGhlaWdodD0iODAiIGZpbGw9IiNiODlkODIiIHN0cm9rZT0iIzhjNzM1YSIgc3Ryb2tlLXdpZHRoPSIwLjUiLz4KICAgIDxyZWN0IHg9IjIwIiB5PSI0MCIgd2lkdGg9IjIwIiBoZWlnaHQ9IjgwIiBmaWxsPSIjYTQ4YTcwIiBzdHJva2U9IiM4YzczNWEiIHN0cm9rZS13aWR0aD0iMC41Ii8+CiAgICA8cmVjdCB4PSI0MCIgeT0iMCIgd2lkdGg9IjIwIiBoZWlnaHQ9IjgwIiBmaWxsPSIjYzhhZDkzIiBzdHJva2U9IiM4YzczNWEiIHN0cm9rZS13aWR0aD0iMC41Ii8+CiAgICA8cmVjdCB4PSI2MCIgeT0iNDAiIHdpZHRoPSIyMCIgaGVpZ2h0PSI4MCIgZmlsbD0iI2IwOTU3YiIgc3Ryb2tlPSIjOGM3MzVhIiBzdHJva2Utd2lkdGg9IjAuNSIvPgogIDwvcGF0dGVybj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2hlcnJpbmdib25lKSIvPgo8L3N2Zz4=";
@@ -56,6 +60,8 @@ export const TableMap2D: React.FC<TableMap2DProps> = ({
   selectedTableIds = [],
   hideControls = false,
   focusOnSelected = false,
+  onComponentDrop,
+  flashTableId = null,
 }) => {
   const MIN_ZOOM_SCALE = 0.8;
   const MAX_ZOOM_SCALE = 2.8;
@@ -92,6 +98,52 @@ export const TableMap2D: React.FC<TableMap2DProps> = ({
   const touchLastSampleRef = useRef<{ x: number; y: number; time: number } | null>(null);
   const touchMovedRef = useRef(false);
   const [isGestureZooming, setIsGestureZooming] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    if (readOnly) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    if (readOnly) return;
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (readOnly) return;
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    if (readOnly) return;
+    e.preventDefault();
+    setIsDragOver(false);
+
+    if (!onComponentDrop || !floorRef.current) return;
+
+    try {
+      const dataStr = e.dataTransfer.getData("application/json");
+      if (!dataStr) return;
+      const item = JSON.parse(dataStr);
+
+      const rect = floorRef.current.getBoundingClientRect();
+      const currentScale = fitScaleRef.current * zoomScaleRef.current;
+      const clickX = (e.clientX - rect.left) / currentScale;
+      const clickY = (e.clientY - rect.top) / currentScale;
+
+      // Snap to 40px grid (to align with tables & canvas sizing)
+      const snapX = Math.max(0, Math.round(clickX / 40) * 40);
+      const snapY = Math.max(0, Math.round(clickY / 40) * 40);
+
+      onComponentDrop(item, { x: snapX, y: snapY });
+    } catch (err) {
+      console.error("Drop parsing failed", err);
+    }
+  };
 
   const activeFloor = layout.floors.find((f) => f.id === layout.activeFloorId);
   const selectedSet = React.useMemo(() => new Set(selectedTableIds), [selectedTableIds]);
@@ -252,8 +304,8 @@ export const TableMap2D: React.FC<TableMap2DProps> = ({
       if (availW <= 0 || availH <= 0) return;
       const scaleX = availW / activeFloor.width;
       const scaleY = availH / activeFloor.height;
-      // Fit within container; cap at 1 so we never upscale.
-      let finalScale = Math.min(scaleX, scaleY, 1);
+      // Fit within container; allow upscaling but limit to 4.0.
+      let finalScale = Math.min(scaleX, scaleY, 4.0);
 
       if (focusOnSelected && selectedSet.size > 0) {
         const selectedTables = activeFloor.tables.filter(t => selectedSet.has(t.id));
@@ -772,6 +824,54 @@ export const TableMap2D: React.FC<TableMap2DProps> = ({
     }
   };
 
+  const handleFloorResizeStart = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (readOnly || !activeFloor) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startWidth = activeFloor.width;
+    const startHeight = activeFloor.height;
+
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      const dx = moveEvent.clientX - startX;
+      const dy = moveEvent.clientY - startY;
+
+      const currentScale = fitScaleRef.current * zoomScaleRef.current;
+      const newWidth = Math.max(400, Math.min(5000, startWidth + dx / currentScale));
+      const newHeight = Math.max(400, Math.min(5000, startHeight + dy / currentScale));
+
+      // Grid snap (40px)
+      const snapWidth = Math.round(newWidth / 40) * 40;
+      const snapHeight = Math.round(newHeight / 40) * 40;
+
+      const updatedFloors = layout.floors.map(f => {
+        if (f.id === activeFloor.id) {
+          return {
+            ...f,
+            width: snapWidth,
+            height: snapHeight
+          };
+        }
+        return f;
+      });
+
+      onLayoutChange({
+        ...layout,
+        floors: updatedFloors
+      });
+    };
+
+    const handlePointerUp = () => {
+      document.removeEventListener("pointermove", handlePointerMove);
+      document.removeEventListener("pointerup", handlePointerUp);
+    };
+
+    document.addEventListener("pointermove", handlePointerMove);
+    document.addEventListener("pointerup", handlePointerUp);
+  };
+
   return (
     <div className="flex flex-col gap-4 h-full">
       {/* Floor Switcher & Toolbar */}
@@ -843,7 +943,7 @@ export const TableMap2D: React.FC<TableMap2DProps> = ({
                   onClick={() => fileInputRef.current?.click()}
                   className="flex items-center gap-1 px-1 text-sm text-[var(--primary)] hover:underline"
                 >
-                  <span className="material-symbols-outlined text-base">cloud_upload</span>
+                  <UploadCloud className="w-4 h-4 shrink-0" />
                   {t("dashboard.tables.map.upload_floorplan")}
                 </button>
               </>
@@ -865,7 +965,11 @@ export const TableMap2D: React.FC<TableMap2DProps> = ({
       {/* Canvas Container */}
       <div
         ref={containerRef}
-        className="relative block flex-1 overflow-auto overscroll-contain rounded-xl border border-[var(--border)] bg-[var(--bg-base)] p-2 sm:p-4"
+        className={`relative block flex-1 overflow-auto overscroll-contain rounded-xl border p-2 sm:p-4 transition-colors ${
+          isDragOver 
+            ? "border-[var(--primary)] bg-orange-50/10 dark:bg-orange-950/10 border-dashed border-2" 
+            : "border-[var(--border)] bg-[var(--bg-base)]"
+        }`}
         style={{
           touchAction: canDragPan ? (isGestureZooming ? "none" : "pan-x pan-y") : "pan-x pan-y",
           cursor: canDragPan ? (isPanning ? "grabbing" : "grab") : "default",
@@ -883,6 +987,10 @@ export const TableMap2D: React.FC<TableMap2DProps> = ({
         onPointerUp={handlePointerEnd}
         onPointerCancel={handlePointerEnd}
         onPointerLeave={handlePointerEnd}
+        onDragOver={handleDragOver}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
       >
         {/* Scaled wrapper — preserves canvas coordinate system */}
         <div
@@ -896,7 +1004,7 @@ export const TableMap2D: React.FC<TableMap2DProps> = ({
           {/* The Floor Canvas — always renders at native resolution via transform */}
           <div
             ref={floorRef}
-            className="relative shadow-lg"
+            className="relative"
             style={{
               width: activeFloor.width,
               height: activeFloor.height,
@@ -905,17 +1013,41 @@ export const TableMap2D: React.FC<TableMap2DProps> = ({
               willChange: isGestureZooming ? "transform" : "auto",
               backfaceVisibility: "hidden",
               WebkitBackfaceVisibility: "hidden",
-              backgroundColor: "#b89d82",
-              backgroundImage: activeFloor.backgroundImage 
-                ? `url(${activeFloor.backgroundImage})` 
+              backgroundColor: activeFloor.backgroundImage ? "transparent" : "#c4a882",
+              backgroundImage: activeFloor.backgroundImage
+                ? `url(${activeFloor.backgroundImage})`
                 : `url("${WOOD_FLOOR_PATTERN}")`,
-              backgroundSize: activeFloor.backgroundImage ? "contain" : "auto",
+              backgroundSize: activeFloor.backgroundImage ? "100% 100%" : "auto",
               backgroundRepeat: activeFloor.backgroundImage ? "no-repeat" : "repeat",
-              backgroundPosition: "center",
-              border: activeFloor.backgroundImage ? "none" : "1px solid var(--border)",
+              backgroundPosition: "top left",
               borderRadius: 8,
+              boxShadow: "0 10px 24px rgba(0,0,0,0.18)",
             }}
           >
+            {/* Resize handle for the floor canvas */}
+            {!readOnly && (
+              <div
+                style={{
+                  position: "absolute",
+                  right: 0,
+                  bottom: 0,
+                  width: 24,
+                  height: 24,
+                  cursor: "se-resize",
+                  zIndex: 100,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "var(--primary)",
+                  color: "white",
+                  borderRadius: "8px 0 8px 0",
+                  boxShadow: "-2px -2px 6px rgba(0,0,0,0.15)",
+                }}
+                onPointerDown={handleFloorResizeStart}
+              >
+                <ArrowRight className="w-3.5 h-3.5 font-bold" style={{ transform: "rotate(45deg)" }} />
+              </div>
+            )}
             {/* Floor Name Watermark */}
             <div
               style={{
@@ -925,14 +1057,14 @@ export const TableMap2D: React.FC<TableMap2DProps> = ({
                 transform: "translate(-50%, -50%)",
                 fontSize: "3rem",
                 fontWeight: 900,
-                color: "rgba(255, 255, 255, 0.22)",
+                color: "rgba(255, 255, 255, 0.18)",
                 fontFamily: "var(--font-sans), sans-serif",
                 pointerEvents: "none",
                 userSelect: "none",
                 zIndex: 0,
                 textTransform: "uppercase",
                 letterSpacing: "0.18em",
-                textShadow: "0 2px 4px rgba(0,0,0,0.08)",
+                textShadow: "0 2px 4px rgba(0,0,0,0.12)",
                 textAlign: "center",
                 width: "100%",
                 padding: "0 20px",
@@ -941,17 +1073,28 @@ export const TableMap2D: React.FC<TableMap2DProps> = ({
             >
               {activeFloor.name}
             </div>
-            {/* Grid Overlay */}
+            {/* Floor Tile Grid (grout lines look) */}
             {showGrid && !isGestureZooming && (
               <div
                 className="absolute inset-0 pointer-events-none"
                 style={{
-                  backgroundSize: "20px 20px",
+                  backgroundSize: "40px 40px",
                   backgroundImage: `
-                            linear-gradient(to right, rgba(0,0,0,0.05) 1px, transparent 1px),
-                            linear-gradient(to bottom, rgba(0,0,0,0.05) 1px, transparent 1px)
-                        `,
+                    linear-gradient(to right, rgba(90,55,25,0.14) 1px, transparent 1px),
+                    linear-gradient(to bottom, rgba(90,55,25,0.14) 1px, transparent 1px)
+                  `,
                   zIndex: 0
+                }}
+              />
+            )}
+            {/* Room Vignette — subtle radial darkening at edges for depth */}
+            {!activeFloor.backgroundImage && (
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  background: "radial-gradient(ellipse at center, transparent 52%, rgba(0,0,0,0.18) 100%)",
+                  zIndex: 0,
+                  borderRadius: 8,
                 }}
               />
             )}
@@ -968,20 +1111,46 @@ export const TableMap2D: React.FC<TableMap2DProps> = ({
                 renderContent={renderTableContent}
                 scale={scale}
                 reduceEffects={isGestureZooming}
+                isFlashing={flashTableId === table.id}
               />
             ))}
+
+            {/* Perimeter wall overlay — rendered above tables so it always frames the room.
+                pointer-events: none ensures it never blocks table drag/click. */}
+            {!activeFloor.backgroundImage && (
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  zIndex: 50,
+                  borderRadius: 8,
+                  border: "14px solid rgba(42, 18, 4, 0.86)",
+                  boxShadow: "inset 0 0 16px rgba(0,0,0,0.35)",
+                }}
+              />
+            )}
           </div>
         </div>
       </div>
 
       {/* Floor Info Footer */}
       {!hideControls && (
-        <div className="flex items-center justify-between text-xs text-[var(--text-muted)] px-1">
-          <div>
-            {t("dashboard.tables.map.floor_dimensions")}: {activeFloor.width}px × {activeFloor.height}px
+        <div className="flex items-center justify-between text-xs text-[var(--text-muted)] px-1 flex-wrap gap-1">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-[var(--text)]">
+              {Math.round(activeFloor.width / 50)}m × {Math.round(activeFloor.height / 50)}m
+            </span>
+            <span className="opacity-50">({Math.round((activeFloor.width / 50) * (activeFloor.height / 50))}m²)</span>
           </div>
-          <div className="flex items-center gap-3">
-            <span>{activeFloor.tables.length} {t("dashboard.tables.map.tables_on_floor")}</span>
+          <div className="flex items-center gap-2">
+            <span>
+              {activeFloor.tables.filter(t => !t.name.startsWith("DECO_")).length} bàn ăn
+            </span>
+            <span className="opacity-40">·</span>
+            <Tooltip title="Ước tính 2.5m² mỗi bàn 4 chỗ (bao gồm lối đi)">
+              <span className="cursor-help underline decoration-dashed">
+                Gợi ý tối đa ~{Math.floor((activeFloor.width / 50) * (activeFloor.height / 50) / 2.5)} bàn
+              </span>
+            </Tooltip>
           </div>
         </div>
       )}

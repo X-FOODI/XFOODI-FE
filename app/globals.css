@@ -3235,6 +3235,30 @@ html.reservation-overlay-open header {
   }
 }
 
+/* Flash glow animation for newly added tables/items (3 pulses) */
+@keyframes tableFlashGlow {
+  0% {
+    opacity: 0;
+    box-shadow: 0 0 0 0 rgba(255, 210, 50, 0);
+    border-color: rgba(255, 210, 50, 0);
+  }
+  30% {
+    opacity: 1;
+    box-shadow: 0 0 0 6px rgba(255, 210, 50, 0.7), 0 0 28px 12px rgba(255, 200, 50, 0.5);
+    border-color: rgba(255, 210, 50, 1);
+  }
+  60% {
+    opacity: 0.4;
+    box-shadow: 0 0 0 2px rgba(255, 210, 50, 0.2);
+    border-color: rgba(255, 210, 50, 0.4);
+  }
+  100% {
+    opacity: 0;
+    box-shadow: 0 0 0 0 rgba(255, 210, 50, 0);
+    border-color: rgba(255, 210, 50, 0);
+  }
+}
+
 /* Tabs */
 .floor-activity-tabs-wrap {
   display: flex;

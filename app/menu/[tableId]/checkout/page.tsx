@@ -205,28 +205,39 @@ export default function CustomerCheckoutPage() {
     try {
       setCallingStaff(true);
       
-      // Emit a socket event to let the owner/staff dashboard know this table needs cash checkout assistance
+      // Emit a socket event to let the owner/staff dashboard know this table needs cash checkout assistance.
+      // The socket only lives long enough to deliver the message, then closes
+      // immediately — so it can never leak if the component unmounts.
       const socketUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/?$/, "") || "http://localhost:5000";
       const socket = io(socketUrl, {
         transports: ["websocket"],
       });
-      
-      socket.emit("CALL_STAFF", {
-        tableId: table.id,
-        tableCode: table.code,
-        floorName: table.floor.name,
-        restaurantId: table.restaurant.id,
-        type: "CASH_CHECKOUT",
-        orderId: activeOrder.id,
-        orderReference: activeOrder.reference,
-        message: `Bàn ${table.code} yêu cầu thanh toán tiền mặt (Đơn: ${activeOrder.reference})`,
-      });
 
-      // Quick timeout simulate
+      const closeSocket = () => {
+        if (socket.connected) socket.disconnect();
+        else socket.close();
+      };
+
+      socket.on("connect", () => {
+        socket.emit("CALL_STAFF", {
+          tableId: table.id,
+          tableCode: table.code,
+          floorName: table.floor.name,
+          restaurantId: table.restaurant.id,
+          type: "CASH_CHECKOUT",
+          orderId: activeOrder.id,
+          orderReference: activeOrder.reference,
+          message: `Bàn ${table.code} yêu cầu thanh toán tiền mặt (Đơn: ${activeOrder.reference})`,
+        });
+        closeSocket();
+      });
+      // Safety net: ensure the socket is torn down even if it never connects.
+      setTimeout(closeSocket, 5000);
+
+      // Quick UI feedback (independent of the socket lifecycle)
       setTimeout(() => {
         setCallingStaff(false);
         setStaffCalled(true);
-        socket.disconnect();
       }, 1000);
 
     } catch (err) {

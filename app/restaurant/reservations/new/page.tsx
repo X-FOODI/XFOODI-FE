@@ -1,3 +1,4 @@
+
 "use client";
 
 import reservationService, { AvailableTable } from "@/lib/services/reservationService";
@@ -13,7 +14,7 @@ import { Button, DatePicker, TimePicker } from "antd";
 import dayjs from "dayjs";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { 
   Calendar, 
   Users, 
@@ -30,6 +31,7 @@ import {
   Landmark,
   Search
 } from "lucide-react";
+import { TableMap2D, Layout, Floor } from "@/app/restaurant/tables/components/TableMap2D";
 
 // ── Vietnamese banks (reused from wallet page) ─────────────────────────────────
 const VIETNAMESE_BANKS = [
@@ -258,9 +260,6 @@ export default function NewReservationPage() {
   const { mode } = useThemeMode();
   const router = useRouter();
 
-  const brandColor = tenant?.primaryColor || "#FF5A2C";
-  const restaurantId = tenant?.id || user?.restaurantId || "";
-
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
 
@@ -290,6 +289,26 @@ export default function NewReservationPage() {
   const [bankDropdownOpen, setBankDropdownOpen] = useState(false);
   const [bankSearch, setBankSearch] = useState("");
 
+  // Visual layout state
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  const [canvasWidth, setCanvasWidth] = useState(600);
+
+  useEffect(() => {
+    if (user) {
+      setName((prev) => prev || user.fullName || user.name || "");
+      setPhone((prev) => prev || user.phoneNumber || "");
+      setEmail((prev) => prev || user.email || "");
+    }
+  }, [user]);
+
+  // Step 3 — result
+  const [createdId, setCreatedId] = useState("");
+  const [createdCode, setCreatedCode] = useState("");
+  const [createdReservation, setCreatedReservation] = useState<any>(null);
+  const [transferInfo, setTransferInfo] = useState<TransferInfo | null>(null);
+  const [depositPaid, setDepositPaid] = useState(false);
+
   // Step 2 — pre-order dishes state
   const [wantPreOrder, setWantPreOrder] = useState(false);
   const [menu, setMenu] = useState<any[]>([]);
@@ -298,7 +317,92 @@ export default function NewReservationPage() {
   const [activeCategory, setActiveCategory] = useState<string>("");
   const [menuLoading, setMenuLoading] = useState(false);
 
+  const brandColor = tenant?.primaryColor || "#FF5A2C";
+  const restaurantId = tenant?.id || user?.restaurantId || "";
+
+  // Group tables by floor
+  const floorsMap: Record<string, { id: string; name: string; tables: AvailableTable[] }> = {};
+  allTables.forEach((t) => {
+    if (!floorsMap[t.floorId]) {
+      floorsMap[t.floorId] = {
+        id: t.floorId,
+        name: t.floor?.name || "Tầng chưa đặt tên",
+        tables: [],
+      };
+    }
+    floorsMap[t.floorId].tables.push(t);
+  });
+  const floorsList = Object.values(floorsMap);
+
+  // Set default floor on load
   useEffect(() => {
+    if (floorsList.length > 0 && !currentFloorId) {
+      setCurrentFloorId(floorsList[0].id);
+    }
+  }, [allTables, floorsList, currentFloorId]);
+
+  // Init active floor when available tables load
+  useEffect(() => {
+    if (allTables.length > 0) {
+      setCurrentFloorId(prev => prev || allTables[0].floorId);
+    }
+  }, [allTables]);
+
+  // Build 2D layout for the reservation table picker (auto-positions, no floor layout API needed)
+  const reservationLayout = useMemo((): Layout => {
+    if (!allTables.length) return { id: "empty", name: "", floors: [], activeFloorId: "" };
+
+    const floorMap = new Map<string, { id: string; name: string; tables: AvailableTable[] }>();
+    for (const t of allTables) {
+      if (!floorMap.has(t.floorId)) floorMap.set(t.floorId, { id: t.floorId, name: t.floor.name, tables: [] });
+      floorMap.get(t.floorId)!.tables.push(t);
+    }
+
+    const COLS = 5, TW = 72, TH = 64, GX = 44, GY = 52, MARGIN = 36;
+    const selectedSet = new Set(selectedTableIds);
+
+    const floors: Floor[] = Array.from(floorMap.values()).map(({ id, name, tables }) => ({
+      id,
+      name,
+      width: Math.max(640, COLS * (TW + GX) + MARGIN * 2 - GX),
+      height: Math.ceil(tables.length / COLS) * (TH + GY) + MARGIN * 2,
+      tables: tables.map((t, i) => ({
+        id: t.id,
+        tenantId: "",
+        name: t.code,
+        seats: t.seatingCapacity,
+        status: (selectedSet.has(t.id) ? "SELECTED" : "AVAILABLE") as "SELECTED" | "AVAILABLE",
+        area: name,
+        position: { x: (i % COLS) * (TW + GX) + MARGIN, y: Math.floor(i / COLS) * (TH + GY) + MARGIN },
+        shape: (t.seatingCapacity >= 8 ? "Rectangle" : t.seatingCapacity >= 5 ? "Oval" : "Square") as "Rectangle" | "Oval" | "Square",
+        width: TW,
+        height: TH,
+        rotation: 0,
+      })),
+    }));
+
+    const resolvedFloorId = (currentFloorId && floors.some(f => f.id === currentFloorId))
+      ? currentFloorId : floors[0]?.id || "";
+
+    return { id: "reservation", name: "Chọn bàn", floors, activeFloorId: resolvedFloorId };
+  }, [allTables, selectedTableIds, currentFloorId]);
+
+  const handleReservationLayoutChange = (updated: Layout) => {
+    if (updated.activeFloorId !== currentFloorId) setCurrentFloorId(updated.activeFloorId);
+  };
+
+  const handleTableToggle = (tableId: string) => {
+    setSelectedTableIds(prev =>
+      prev.includes(tableId) ? prev.filter(id => id !== tableId) : [...prev, tableId]
+    );
+  };
+
+  const totalSelectedCapacity = useMemo(
+    () => selectedTableIds.reduce((sum, id) => sum + (allTables.find(t => t.id === id)?.seatingCapacity ?? 0), 0),
+    [selectedTableIds, allTables]
+  );
+
+    useEffect(() => {
     if (wantPreOrder && menu.length === 0 && restaurantId) {
       setMenuLoading(true);
       Promise.all([
@@ -334,77 +438,6 @@ export default function NewReservationPage() {
     }
   }, [wantPreOrder, menu.length, restaurantId, showToast]);
 
-  // Group tables by floor
-  const floorsMap = React.useMemo(() => {
-    const map: Record<string, { id: string; name: string; tables: AvailableTable[] }> = {};
-    allTables.forEach((t) => {
-      if (!map[t.floorId]) {
-        map[t.floorId] = {
-          id: t.floorId,
-          name: t.floor?.name || "Tầng chưa đặt tên",
-          tables: [],
-        };
-      }
-      map[t.floorId].tables.push(t);
-    });
-    return map;
-  }, [allTables]);
-
-  const floorsList = Object.values(floorsMap);
-
-  // Visual layout state
-  const observerRef = useRef<ResizeObserver | null>(null);
-  const canvasNodeRef = useRef<HTMLDivElement | null>(null);
-  const [scale, setScale] = useState(1);
-  const [canvasWidth, setCanvasWidth] = useState(600);
-
-  const canvasRef = useCallback((node: HTMLDivElement | null) => {
-    canvasNodeRef.current = node;
-    if (observerRef.current) {
-      observerRef.current.disconnect();
-      observerRef.current = null;
-    }
-
-    if (node) {
-      const handleResize = () => {
-        const width = node.clientWidth;
-        setCanvasWidth(width);
-        const activeFloor = floorsMap[currentFloorId];
-        const activeFloorWidth = Number(activeFloor?.tables?.[0]?.floor?.width) || 1200;
-        setScale(width / activeFloorWidth);
-      };
-
-      handleResize();
-      const observer = new ResizeObserver(handleResize);
-      observer.observe(node);
-      observerRef.current = observer;
-    }
-  }, [currentFloorId, floorsMap]);
-
-  useEffect(() => {
-    if (user) {
-      setName((prev) => prev || user.fullName || user.name || "");
-      setPhone((prev) => prev || user.phoneNumber || "");
-      setEmail((prev) => prev || user.email || "");
-    }
-  }, [user]);
-
-  // Step 3 — result
-  const [createdId, setCreatedId] = useState("");
-  const [createdCode, setCreatedCode] = useState("");
-  const [createdReservation, setCreatedReservation] = useState<any>(null);
-  const [transferInfo, setTransferInfo] = useState<TransferInfo | null>(null);
-  const [depositPaid, setDepositPaid] = useState(false);
-
-  // Set default floor on load
-  useEffect(() => {
-    if (floorsList.length > 0 && !currentFloorId) {
-      setCurrentFloorId(floorsList[0].id);
-    }
-  }, [allTables, floorsList, currentFloorId]);
-
-
-
   // Estimate deposit amount (25k per seat capacity of selected tables, or per guest if auto-arranged)
   const estimatedDeposit = (assignmentMode === "manual" && selectedTableIds.length > 0)
     ? selectedTableIds.reduce((sum, id) => {
@@ -412,11 +445,6 @@ export default function NewReservationPage() {
         return sum + (tbl ? tbl.seatingCapacity * 25000 : 0);
       }, 0)
     : guests * 25000;
-
-  const selectedCapacity = selectedTableIds.reduce((sum, id) => {
-    const tbl = allTables.find((t) => t.id === id);
-    return sum + (tbl ? tbl.seatingCapacity : 0);
-  }, 0);
 
   // ── Step 0 → 1: check available tables ──────────────────────────────────────
   const handleCheckTables = async () => {
@@ -439,13 +467,17 @@ export default function NewReservationPage() {
     setLoading(true);
     try {
       const isoTime = new Date(`${date}T${time}:00`).toISOString();
+      const dishesPayload = wantPreOrder
+        ? Object.entries(selectedDishes)
+            .filter(([_, item]) => item.quantity > 0)
+            .map(([dishId, item]) => ({
+              dishId,
+              quantity: item.quantity,
+              note: item.note || undefined,
+            }))
+        : undefined;
       const tables = await reservationService.checkTables({ restaurantId, time: isoTime, numberOfGuests: guests });
       setAllTables(tables);
-      
-      // Pre-select suggested tables by default
-      const suggestedIds = tables.filter(t => t.isSuggested).map(t => t.id);
-      setSelectedTableIds(suggestedIds);
-      
       setStep(1);
     } catch (err: any) {
       showToast("error", "Lỗi", err?.response?.data?.message || err.message || "Không thể kiểm tra bàn trống");
@@ -471,14 +503,6 @@ export default function NewReservationPage() {
     setLoading(true);
     try {
       const isoTime = new Date(`${date}T${time}:00`).toISOString();
-      // Build bank refund payload if deposit exists
-      const bankRefund = estimatedDeposit > 0 && bankBin ? {
-        bankBin,
-        bankCode,
-        bankName: VIETNAMESE_BANKS.find(b => b.bin === bankBin)?.name ?? "",
-        accountNumber: bankAccountNumber.trim(),
-        accountName: bankAccountName.trim().toUpperCase(),
-      } : undefined;
       const dishesPayload = wantPreOrder
         ? Object.entries(selectedDishes)
             .filter(([_, item]) => item.quantity > 0)
@@ -488,6 +512,14 @@ export default function NewReservationPage() {
               note: item.note || undefined,
             }))
         : undefined;
+      // Build bank refund payload if deposit exists
+      const bankRefund = estimatedDeposit > 0 && bankBin ? {
+        bankBin,
+        bankCode,
+        bankName: VIETNAMESE_BANKS.find(b => b.bin === bankBin)?.name ?? "",
+        accountNumber: bankAccountNumber.trim(),
+        accountName: bankAccountName.trim().toUpperCase(),
+      } : undefined;
       const res = await reservationService.create({
         restaurantId,
         numberOfGuests: guests,
@@ -537,12 +569,16 @@ export default function NewReservationPage() {
 
   const currentFloorTables = floorsMap[currentFloorId]?.tables || [];
 
+  // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text)] transition-colors duration-300">
       {/* Homepage Header */}
       <Header />
 
-      <div className="max-w-2xl mx-auto px-4 pb-24 pt-32">
+      <div 
+        className="mx-auto px-4 pb-24 pt-32 transition-all duration-300"
+        style={{ maxWidth: step === 1 && assignmentMode === "manual" && allTables.length > 0 ? "1100px" : "640px" }}
+      >
         {/* Breadcrumbs */}
         <div className="mb-6 flex items-center gap-2 text-xs">
           <Link href="/" className="text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors">
@@ -584,7 +620,10 @@ export default function NewReservationPage() {
           </div>
         )}
 
-        <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 md:p-8 shadow-sm">
+        <div 
+          className="bg-[var(--card)] border border-[var(--border)] rounded-2xl transition-all duration-300 shadow-sm"
+          style={{ padding: step === 1 && assignmentMode === "manual" && allTables.length > 0 ? "20px 20px 24px" : "24px" }}
+        >
 
           {/* Step 0: Time & Guests */}
           {step === 0 && (
@@ -702,11 +741,7 @@ export default function NewReservationPage() {
                     </button>
 
                     <button
-                      onClick={() => {
-                        setAssignmentMode("manual");
-                        const suggestedIds = allTables.filter(t => t.isSuggested).map(t => t.id);
-                        setSelectedTableIds(suggestedIds);
-                      }}
+                      onClick={() => setAssignmentMode("manual")}
                       className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
                         assignmentMode === "manual"
                           ? "bg-[var(--primary)]/5 border-[var(--primary)] text-[var(--primary)]"
@@ -715,275 +750,137 @@ export default function NewReservationPage() {
                       style={assignmentMode === "manual" ? { borderColor: brandColor, color: brandColor, backgroundColor: `${brandColor}08` } : {}}
                     >
                       <div className="flex items-center gap-2 font-bold text-sm mb-1">
-                        <span>🗺️</span>
-                        <span>Tự chọn bàn trên sơ đồ</span>
+                        <span>🪑</span>
+                        <span>Tự chọn bàn trực tuyến</span>
                       </div>
-                      <p className="text-[11px] opacity-85 m-0 leading-normal">Xem sơ đồ mặt bằng thực tế và chọn vị trí bàn yêu thích (gần cửa sổ, sân khấu...).</p>
+                      <p className="text-[11px] opacity-85 m-0 leading-normal">Xem sơ đồ bàn trực quan 2D và chủ động chọn bàn phù hợp với bạn.</p>
                     </button>
                   </div>
 
-                  {assignmentMode === "auto" ? (
-                    <div className="p-8 bg-[var(--surface)] border border-[var(--border)] rounded-2xl text-center space-y-4 shadow-sm">
-                      <div className="text-4xl animate-bounce">🍽️</div>
-                      <h3 className="font-bold text-[var(--text)] text-base m-0">Tự động sắp xếp bàn</h3>
-                      <p className="text-xs text-[var(--text-muted)] max-w-sm mx-auto leading-relaxed">
-                        Hệ thống sẽ tự động ghép và tối ưu vị trí ngồi tốt nhất cho nhóm của bạn dựa trên số lượng khách ({guests} người) khi bạn đến nhận bàn.
+                  {assignmentMode === "auto" && (
+                    <div className="p-6 bg-[var(--surface)] border border-dashed border-[var(--border)] rounded-2xl text-center space-y-3">
+                      <p className="font-bold text-[var(--text)] text-sm">Xác nhận tự động xếp bàn</p>
+                      <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+                        Bạn đã chọn chế độ để nhà hàng tự động sắp xếp bàn trống tối ưu nhất cho đoàn khách {guests} người.
                       </p>
+                      <div className="flex gap-3 mt-6">
+                        <Button 
+                          onClick={() => setStep(0)} 
+                          className="flex-1 rounded-xl h-11 border-[var(--border)] text-[var(--text)] bg-transparent font-semibold"
+                        >
+                          ← Quay lại
+                        </Button>
+                        <Button 
+                          type="primary" 
+                          onClick={() => setStep(2)} 
+                          className="flex-[2] rounded-xl h-11 font-bold border-none"
+                          style={{ background: brandColor, color: "#fff" }}
+                        >
+                          Tiếp tục đặt bàn →
+                        </Button>
+                      </div>
                     </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {/* Gợi ý ghép bàn / chọn bàn tối ưu */}
-                      {allTables.some(t => t.isSuggested) && (
-                        <div 
-                          className="p-4 rounded-xl border flex items-start gap-3 shadow-sm animate-fadeIn"
-                          style={{
-                            background: "rgba(16, 185, 129, 0.05)",
-                            borderColor: "rgba(16, 185, 129, 0.2)"
-                          }}
-                        >
-                          <span className="text-xl">💡</span>
-                          <div>
-                            <p className="m-0 text-xs font-bold text-[var(--text)]">Gợi ý xếp bàn tối ưu</p>
-                            <p className="m-0 mt-1 text-[11px] text-[var(--text-muted)] leading-relaxed">
-                              {allTables[0]?.isCombinedSuggestion ? (
-                                <>
-                                  Để đủ sức chứa cho đoàn <strong>{guests} khách</strong>, hệ thống đề xuất ghép các bàn: {" "}
-                                  <strong className="text-[var(--text)] animate-pulse">
-                                    {allTables.filter(t => t.isSuggested).map(t => t.code).join(", ")}
-                                  </strong>{" "}
-                                  (tổng sức chứa {allTables.filter(t => t.isSuggested).reduce((sum, t) => sum + t.seatingCapacity, 0)} chỗ).
-                                </>
-                              ) : (
-                                <>
-                                  Hệ thống đề xuất bàn <strong className="text-[var(--text)] animate-pulse">{allTables.find(t => t.isSuggested)?.code}</strong> ({allTables.find(t => t.isSuggested)?.seatingCapacity} chỗ) trống và phù hợp nhất cho đoàn <strong>{guests} khách</strong>.
-                                </>
-                              )}
-                            </p>
-                          </div>
-                        </div>
-                      )}
+                  )}
 
-                      {/* Floor selection tabs */}
-                      {floorsList.length > 1 && (
-                        <div className="flex gap-2 border-b border-[var(--border)] pb-2 overflow-x-auto">
-                          {floorsList.map((f) => (
-                            <button
-                              key={f.id}
-                              onClick={() => setCurrentFloorId(f.id)}
-                              className={`px-4 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap cursor-pointer ${
-                                currentFloorId === f.id
-                                  ? "text-white shadow-sm"
-                                  : "text-[var(--text-muted)] bg-[var(--surface)] hover:text-[var(--text)]"
-                              }`}
-                              style={currentFloorId === f.id ? { backgroundColor: brandColor } : {}}
-                            >
-                              {f.name}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Sơ đồ bàn Visual Layout */}
-                      <div className="relative border border-[var(--border)] rounded-2xl overflow-hidden shadow-inner">
-                        {/* Header bar of canvas */}
-                        <div className="bg-[var(--surface)] border-b border-[var(--border)] px-4 py-2.5 flex items-center justify-between text-[11px] text-[var(--text-muted)]">
-                          <div className="flex items-center gap-1">
-                            <MapPin className="w-3.5 h-3.5" />
-                            <span>Sơ đồ: <strong>{floorsMap[currentFloorId]?.name}</strong></span>
-                          </div>
-                          <div className="font-mono text-[10px]">
-                            Tỷ lệ: {Math.round(scale * 100)}% | CWState: {canvasWidth} | clientWidth: {canvasNodeRef.current?.clientWidth ?? "null"} | floorWidth: {Number(floorsMap[currentFloorId]?.tables?.[0]?.floor?.width) || 1200} | floorId: {currentFloorId}
-                          </div>
+                  {assignmentMode === "manual" && (
+                    <div className="flex flex-col md:flex-row gap-6 items-start">
+                      {/* Left: Floor map */}
+                      <div className="flex-1 min-w-0 w-full">
+                        <div className="flex items-baseline gap-3 mb-4 flex-wrap">
+                          <h3 className="text-lg font-bold text-[var(--text)] m-0">Sơ đồ nhà hàng</h3>
+                          <span className="text-xs text-[var(--text-muted)]">
+                            {allTables.length} bàn trống · {guests} khách
+                          </span>
                         </div>
 
-                        {/* Canvas Grid container */}
-                        <div 
-                          ref={canvasRef}
-                          className="relative w-full overflow-hidden select-none"
-                          style={{
-                            height: (Number(floorsMap[currentFloorId]?.tables?.[0]?.floor?.height) || 800) * scale,
-                            backgroundImage: floorsMap[currentFloorId]?.tables?.[0]?.floor?.imageUrl
-                              ? `url(${floorsMap[currentFloorId]?.tables?.[0]?.floor?.imageUrl})`
-                              : (mode === "dark" 
-                                  ? "radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px)"
-                                  : "radial-gradient(rgba(0,0,0,0.06) 1px, transparent 1px)"),
-                            backgroundSize: floorsMap[currentFloorId]?.tables?.[0]?.floor?.imageUrl ? "contain" : `${20 * scale}px ${20 * scale}px`,
-                            backgroundRepeat: floorsMap[currentFloorId]?.tables?.[0]?.floor?.imageUrl ? "no-repeat" : "repeat",
-                            backgroundPosition: "center",
-                            backgroundColor: mode === "dark" ? "#0f172a" : "#f8fafc",
-                          }}
-                        >
-                          {currentFloorTables.map((t) => {
-                            const selected = selectedTableIds.includes(t.id);
-                            const isAvailable = t.isAvailable;
-                            const hasSoftConflict = !!t.conflictTime;
-                            const isRound = t.shape?.toLowerCase() === "circle" || t.shape?.toLowerCase() === "round";
-                            
-                            const left = (t.positionX ?? 0) * scale;
-                            const top = (t.positionY ?? 0) * scale;
-                            const width = (t.width ?? 80) * scale;
-                            const height = (t.height ?? 80) * scale;
-                            const rotate = t.rotation ?? 0;
-
-                            return (
-                              <button
-                                key={t.id}
-                                disabled={!isAvailable}
-                                onClick={() => {
-                                  if (selected) {
-                                    setSelectedTableIds((prev) => prev.filter((id) => id !== t.id));
-                                  } else {
-                                    if (t.conflictTime) {
-                                      setPendingConflictTable(t);
-                                    } else {
-                                      setSelectedTableIds((prev) => [...prev, t.id]);
-                                    }
-                                  }
-                                }}
-                                className={`absolute flex flex-col items-center justify-center p-1 font-sans select-none transition-all duration-300 ${
-                                  !isAvailable 
-                                    ? "opacity-35 cursor-not-allowed" 
-                                    : selected 
-                                    ? "shadow-lg animate-pulse"
-                                    : "hover:scale-105 hover:shadow-md cursor-pointer"
-                                }`}
-                                style={{
-                                  left,
-                                  top,
-                                  width,
-                                  height,
-                                  transform: `rotate(${rotate}deg)`,
-                                  borderRadius: isRound ? "50%" : "12px",
-                                  border: !isAvailable 
-                                    ? "1.5px dashed #64748b" 
-                                    : selected
-                                    ? `2.5px solid ${brandColor}` 
-                                    : hasSoftConflict
-                                    ? "1.5px dashed #f59e0b"
-                                    : `2px solid ${brandColor}50`,
-                                  background: !isAvailable
-                                    ? (mode === "dark" ? "#1e293b" : "#e2e8f0")
-                                    : selected
-                                    ? `${brandColor}`
-                                    : hasSoftConflict
-                                    ? (mode === "dark" ? "rgba(245, 158, 11, 0.1)" : "rgba(245, 158, 11, 0.05)")
-                                    : (mode === "dark" ? "rgba(30, 41, 59, 0.6)" : "rgba(255, 255, 255, 0.95)"),
-                                  color: selected 
-                                    ? "#ffffff" 
-                                    : !isAvailable
-                                    ? "var(--text-muted)"
-                                    : hasSoftConflict
-                                    ? "#f59e0b"
-                                    : "var(--text)"
-                                }}
-                              >
-                                <span 
-                                  className="font-black tracking-tight leading-none"
-                                  style={{ fontSize: Math.max(10, 14 * scale) }}
-                                >
-                                  {t.code}
-                                </span>
-                                <span 
-                                  className="font-medium opacity-80 mt-1 leading-none whitespace-nowrap"
-                                  style={{ fontSize: Math.max(8, 10 * scale) }}
-                                >
-                                  👤 {t.seatingCapacity}
-                                </span>
-                                {selected && (
-                                  <div 
-                                    className="absolute -top-1.5 -right-1.5 bg-emerald-500 text-white rounded-full flex items-center justify-center p-0.5 shadow border border-white"
-                                    style={{ width: 16 * scale, height: 16 * scale }}
-                                  >
-                                    <Check className="w-full h-full stroke-[3]" />
-                                  </div>
-                                )}
-                              </button>
-                            );
-                          })}
+                        {/* Legend */}
+                        <div className="flex gap-4 mb-4 flex-wrap text-xs">
+                          <span className="flex items-center gap-1.5 text-[var(--text-muted)]">
+                            <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500/20 border-2 border-emerald-500 inline-block" />
+                            Trống — Click để chọn
+                          </span>
+                          <span className="flex items-center gap-1.5 text-[var(--text-muted)]">
+                            <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: `${brandColor}20`, border: `2px solid ${brandColor}` }} />
+                            Đã chọn
+                          </span>
                         </div>
 
-                        {/* Legend bar */}
-                        <div className="bg-[var(--surface)] border-t border-[var(--border)] px-4 py-3 flex flex-wrap gap-x-6 gap-y-2 justify-center text-xs">
-                          <div className="flex items-center gap-1.5">
-                            <div className="w-3.5 h-3.5 rounded border border-dashed border-[#64748b] bg-zinc-300 dark:bg-zinc-700 opacity-40" />
-                            <span className="text-[var(--text-muted)]">Bàn đã đặt / Không đủ chỗ</span>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <div 
-                              className="w-3.5 h-3.5 rounded border border-dashed border-amber-500 bg-amber-500/10" 
-                            />
-                            <span className="text-[var(--text-muted)]">Bàn có thể trùng giờ (Soft conflict)</span>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <div 
-                              className="w-3.5 h-3.5 rounded border" 
-                              style={{ borderColor: `${brandColor}90`, backgroundColor: "var(--surface)" }}
-                            />
-                            <span className="text-[var(--text-muted)]">Bàn trống có thể chọn</span>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <div 
-                              className="w-3.5 h-3.5 rounded" 
-                              style={{ backgroundColor: brandColor }}
-                            />
-                            <span className="text-[var(--text-muted)]">Bàn bạn đang chọn</span>
-                          </div>
+                        <div className="h-[420px] rounded-2xl overflow-hidden border border-[var(--border)] bg-[var(--surface)]">
+                          <TableMap2D
+                            layout={reservationLayout}
+                            onLayoutChange={handleReservationLayoutChange}
+                            onTableClick={(table) => handleTableToggle(table.id)}
+                            onTablePositionChange={() => {}}
+                            readOnly={true}
+                            selectedTableIds={selectedTableIds}
+                          />
                         </div>
                       </div>
 
-                      {/* Selection Summary list */}
-                      {selectedTableIds.length > 0 && (
-                        <div className="space-y-2">
-                          <div 
-                            className={`p-3.5 rounded-xl border flex items-center gap-3 transition-colors duration-300 ${
-                              selectedCapacity >= guests 
-                                ? "bg-emerald-500/5 border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
-                                : "bg-amber-500/5 border-amber-500/20 text-amber-600 dark:text-amber-400"
-                            }`}
-                          >
-                            <div className={`p-1.5 rounded-lg ${selectedCapacity >= guests ? "bg-emerald-500/10 text-emerald-500" : "bg-amber-500/10 text-amber-500"}`}>
-                              <Info className="w-4 h-4" />
-                            </div>
-                            <p className="text-xs m-0 leading-relaxed flex-1">
-                              {selectedCapacity >= guests ? (
-                                <>
-                                  Đã chọn: <strong>{
-                                    selectedTableIds.map(id => allTables.find(t => t.id === id)?.code).filter(Boolean).join(", ")
-                                  }</strong> (Tổng sức chứa: <strong>{selectedCapacity}/{guests}</strong> chỗ - Hợp lệ).
-                                </>
-                              ) : (
-                                <>
-                                  Đã chọn: <strong>{
-                                    selectedTableIds.map(id => allTables.find(t => t.id === id)?.code).filter(Boolean).join(", ")
-                                  }</strong> (Tổng sức chứa: <strong className="underline">{selectedCapacity}/{guests}</strong> chỗ). Vui lòng chọn thêm bàn để đủ chỗ cho {guests} người.
-                                </>
-                              )}
-                            </p>
+                      {/* Right: Selection panel */}
+                      <div className="w-full md:w-[240px] shrink-0 bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sticky top-24">
+                        <p className="m-0 mb-3 font-bold text-sm text-[var(--text)] flex items-center justify-between">
+                          <span>Bàn đã chọn</span>
+                          {selectedTableIds.length > 0 && (
+                            <span className="px-2 py-0.5 rounded-full text-white text-xs font-bold" style={{ background: brandColor }}>
+                              {selectedTableIds.length}
+                            </span>
+                          )}
+                        </p>
+
+                        {selectedTableIds.length === 0 ? (
+                          <p className="text-xs text-[var(--text-muted)] text-center py-4">
+                            Click vào bàn trên sơ đồ để chọn
+                          </p>
+                        ) : (
+                          <div className="flex flex-col gap-2 mb-4 max-h-[160px] overflow-y-auto pr-1">
+                            {selectedTableIds.map(id => {
+                              const t = allTables.find(t => t.id === id);
+                              if (!t) return null;
+                              return (
+                                <div key={id} className="flex items-center justify-between p-2 bg-[var(--card)] rounded-xl border border-[var(--border)] text-xs">
+                                  <span className="font-bold text-[var(--text)]">Bàn {t.code}</span>
+                                  <span className="text-[var(--text-muted)]">{t.seatingCapacity} chỗ</span>
+                                  <button onClick={() => handleTableToggle(id)} className="bg-transparent border-none cursor-pointer text-[var(--text-muted)] hover:text-red-500 text-sm p-0.5 leading-none">×</button>
+                                </div>
+                              );
+                            })}
                           </div>
+                        )}
+
+                        {selectedTableIds.length > 0 && (
+                          <div className="pt-3 border-t border-dashed border-[var(--border)] text-xs text-[var(--text-muted)] flex flex-col gap-1.5 mb-4">
+                            <div className="flex justify-between">
+                              <span>Tổng sức chứa</span>
+                              <strong className="text-[var(--text)]">{totalSelectedCapacity} chỗ</strong>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Số khách</span>
+                              <strong style={{ color: totalSelectedCapacity >= guests ? "#10b981" : "#f59e0b" }}>{guests} người</strong>
+                            </div>
+                            {totalSelectedCapacity < guests && (
+                              <p className="m-0 mt-1 text-amber-500 text-[10px] leading-tight">⚠️ Chưa đủ chỗ cho {guests} khách</p>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="flex flex-col gap-2">
+                          <Button onClick={() => setStep(0)} className="w-full rounded-xl h-10 border-[var(--border)] text-[var(--text)] bg-transparent font-semibold">← Quay lại</Button>
+                          <Button
+                            type="primary"
+                            onClick={() => setStep(2)}
+                            disabled={selectedTableIds.length === 0}
+                            className="w-full rounded-xl h-10 font-bold border-none"
+                            style={{ background: brandColor, color: "#fff" }}
+                          >
+                            Tiếp tục đặt bàn →
+                          </Button>
                         </div>
-                      )}
+                      </div>
                     </div>
                   )}
                 </div>
               )}
-
-              <div className="flex gap-3 pt-4 border-t border-[var(--border)]">
-                <Button 
-                  onClick={() => setStep(0)} 
-                  className="flex-1 rounded-xl h-11 border-[var(--border)] text-[var(--text)] bg-transparent font-semibold"
-                >
-                  ← Quay lại
-                </Button>
-                <Button 
-                  type="primary" 
-                  onClick={() => setStep(2)} 
-                  disabled={assignmentMode === "manual" && (selectedTableIds.length === 0 || selectedCapacity < guests)}
-                  className="flex-[2] rounded-xl h-11 font-bold border-none"
-                  style={{ background: brandColor, color: "#fff" }}
-                >
-                  {assignmentMode === "auto" ? "Tiếp tục đặt bàn →" : (selectedTableIds.length > 0 ? (selectedCapacity >= guests ? `Tiếp tục (${selectedTableIds.length} bàn) →` : `Thiếu sức chứa (${selectedCapacity}/{guests})`) : "Chọn bàn để tiếp tục")}
-                </Button>
-              </div>
             </div>
           )}
 
