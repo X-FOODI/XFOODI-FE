@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { DatePicker, TimePicker } from "antd";
+import dayjs from "dayjs";
 import { useTenant } from "@/lib/contexts/TenantContext";
 import { useAuth } from "@/lib/contexts/AuthContext";
 import { useCart } from "@/lib/contexts/CartContext";
@@ -314,6 +316,10 @@ function BookingFormCard({ data, accentColor }: { data: any; accentColor: string
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.date || !form.time) {
+      setError("Vui lòng chọn đầy đủ ngày và giờ đặt bàn.");
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -325,7 +331,7 @@ function BookingFormCard({ data, accentColor }: { data: any; accentColor: string
       const payload: any = {
         restaurantId,
         numberOfGuests: Number(form.guests),
-        time: new Date(`${form.date}T${form.time}`).toISOString(),
+        time: new Date(`${form.date}T${form.time}:00`).toISOString(),
         specialRequests: form.note || undefined,
       };
 
@@ -380,24 +386,55 @@ function BookingFormCard({ data, accentColor }: { data: any; accentColor: string
         </div>
       )}
 
-      {[
-        { label: "Ngày", key: "date", type: "date", required: true },
-        { label: "Giờ", key: "time", type: "time", required: true },
-        { label: "Số người", key: "guests", type: "number", required: true },
-      ].map(field => (
-        <div key={field.key} style={{ marginBottom: 10 }}>
-          <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: 3 }}>{field.label}</label>
-          <input
-            type={field.type}
-            required={field.required}
-            min={field.key === "guests" ? 1 : undefined}
-            max={field.key === "guests" ? 20 : undefined}
-            value={(form as any)[field.key]}
-            onChange={e => setForm(prev => ({ ...prev, [field.key]: e.target.value }))}
-            style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: "1.5px solid var(--border)", background: "var(--card)", color: "var(--text)", fontSize: 12, boxSizing: "border-box", outline: "none" }}
-          />
+      {/* Date selector (Ant Design) */}
+      <div style={{ marginBottom: 10 }}>
+        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: 3 }}>Ngày</label>
+        <DatePicker 
+          value={form.date ? dayjs(form.date) : null}
+          onChange={(val) => setForm(prev => ({ ...prev, date: val ? val.format("YYYY-MM-DD") : "" }))}
+          disabledDate={(current) => current && current < dayjs().startOf("day")}
+          style={{ width: "100%", height: 38, borderRadius: 8 }}
+          placeholder="Chọn ngày đặt bàn"
+          format="DD/MM/YYYY"
+          allowClear={false}
+        />
+      </div>
+
+      {/* Time selector (Ant Design) */}
+      <div style={{ marginBottom: 10 }}>
+        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: 3 }}>Giờ</label>
+        <TimePicker 
+          value={form.time ? dayjs(form.time, "HH:mm") : null}
+          onChange={(val) => setForm(prev => ({ ...prev, time: val ? val.format("HH:mm") : "" }))}
+          format="HH:mm"
+          minuteStep={15}
+          style={{ width: "100%", height: 38, borderRadius: 8 }}
+          placeholder="Chọn giờ đến"
+          allowClear={false}
+        />
+      </div>
+
+      {/* Guests Selector (Plus/Minus Counter) */}
+      <div style={{ marginBottom: 10 }}>
+        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: 3 }}>Số người</label>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <button 
+            type="button"
+            onClick={() => setForm(prev => ({ ...prev, guests: String(Math.max(1, Number(prev.guests) - 1)) }))}
+            className="w-9 h-9 rounded-full border border-[var(--border)] bg-[var(--surface)] cursor-pointer text-xl text-[var(--text)] flex items-center justify-center hover:bg-[var(--border)] transition-colors active:scale-95"
+          >
+            −
+          </button>
+          <span style={{ fontSize: 16, fontWeight: 800, color: "var(--text)", minWidth: 24, textAlign: "center" }}>{form.guests}</span>
+          <button 
+            type="button"
+            onClick={() => setForm(prev => ({ ...prev, guests: String(Math.min(100, Number(prev.guests) + 1)) }))}
+            className="w-9 h-9 rounded-full border border-[var(--border)] bg-[var(--surface)] cursor-pointer text-xl text-[var(--text)] flex items-center justify-center hover:bg-[var(--border)] transition-colors active:scale-95"
+          >
+            +
+          </button>
         </div>
-      ))}
+      </div>
 
       <div style={{ marginBottom: 10 }}>
         <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: 3 }}>Yêu cầu đặc biệt</label>
@@ -937,18 +974,27 @@ export function ChatAssistant() {
   /* ─────────────── Session & history persistence ─────────────── */
   useEffect(() => {
     if (typeof window === "undefined" || !tenant?.id) return;
-    let sid = localStorage.getItem(`xfoodi-chat-session-${tenant.id}`);
+    const userKey = user?.id ? `-${user.id}` : "-guest";
+    const sessionKey = `xfoodi-chat-session-${tenant.id}${userKey}`;
+    let sid = localStorage.getItem(sessionKey);
     if (!sid) {
       sid = generateSessionId();
-      localStorage.setItem(`xfoodi-chat-session-${tenant.id}`, sid);
+      localStorage.setItem(sessionKey, sid);
     }
     setSessionIdRestaurant(sid);
 
-    const saved = localStorage.getItem(`xfoodi-chat-history-restaurant-${tenant.id}-${sid}`);
+    const historyKey = `xfoodi-chat-history-restaurant-${tenant.id}-${sid}`;
+    const saved = localStorage.getItem(historyKey);
     if (saved) {
-      try { setHistoryRestaurant(JSON.parse(saved)); } catch { /* ignore */ }
+      try {
+        setHistoryRestaurant(JSON.parse(saved));
+      } catch {
+        setHistoryRestaurant([]);
+      }
+    } else {
+      setHistoryRestaurant([]);
     }
-  }, [tenant?.id]);
+  }, [tenant?.id, user?.id]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
