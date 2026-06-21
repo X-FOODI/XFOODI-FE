@@ -451,13 +451,21 @@ export default function NewReservationPage() {
     }
   }, [wantPreOrder, menu.length, restaurantId, showToast]);
 
-  // Estimate deposit amount (25k per seat capacity of selected tables, or per guest if auto-arranged)
-  const estimatedDeposit = (assignmentMode === "manual" && selectedTableIds.length > 0)
-    ? selectedTableIds.reduce((sum, id) => {
-        const tbl = allTables.find((t) => t.id === id);
-        return sum + (tbl ? tbl.seatingCapacity * 25000 : 0);
-      }, 0)
-    : guests * 25000;
+  // Estimate deposit amount based on restaurant settings (reservationConfig)
+  const reservationConfig = tenant?.metadata?.reservationConfig || {};
+  const depositEnabled = reservationConfig.deposit_enabled === true;
+  const depositAmountSetting = reservationConfig.deposit_amount;
+
+  const estimatedDeposit = !depositEnabled
+    ? 0
+    : (depositAmountSetting !== undefined && depositAmountSetting !== null && Number(depositAmountSetting) > 0)
+      ? Number(depositAmountSetting)
+      : (assignmentMode === "manual" && selectedTableIds.length > 0)
+        ? selectedTableIds.reduce((sum, id) => {
+            const tbl = allTables.find((t) => t.id === id);
+            return sum + (tbl ? tbl.seatingCapacity * 25000 : 0);
+          }, 0)
+        : guests * 25000;
 
   // ── Step 0 → 1: check available tables ──────────────────────────────────────
   const handleCheckTables = async () => {
@@ -561,7 +569,7 @@ export default function NewReservationPage() {
           setTransferInfo(info);
         } catch { /* optional */ }
       } else {
-        showToast("success", "Đặt bàn thành công", `Mã xác nhận: ${res.confirmationCode}`);
+        showToast("success", "Tiếp nhận thành công", "Yêu cầu đặt bàn đã được gửi và đang chờ xác nhận");
       }
       setStep(3);
     } catch (err: any) {
@@ -1336,10 +1344,17 @@ export default function NewReservationPage() {
                       </div>
                     </>
                   )}
-                  <div className="flex justify-between border-t border-dashed border-[var(--border)] pt-2 mt-1">
-                    <span className="text-[var(--text-muted)] font-medium">💰 Yêu cầu cọc (bắt buộc)</span>
-                    <span className="font-black text-sm text-[var(--primary)]">{estimatedDeposit.toLocaleString("vi-VN")}đ</span>
-                  </div>
+                  {estimatedDeposit > 0 ? (
+                    <div className="flex justify-between border-t border-dashed border-[var(--border)] pt-2 mt-1">
+                      <span className="text-[var(--text-muted)] font-medium">💰 Yêu cầu cọc (bắt buộc)</span>
+                      <span className="font-black text-sm text-[var(--primary)]">{estimatedDeposit.toLocaleString("vi-VN")}đ</span>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between border-t border-dashed border-[var(--border)] pt-2 mt-1">
+                      <span className="text-[var(--text-muted)] font-medium">💰 Yêu cầu cọc</span>
+                      <span className="font-bold text-sm text-green-500">Miễn phí (Không yêu cầu)</span>
+                    </div>
+                  )}
                 </div>
               </div>
 

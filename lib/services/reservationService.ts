@@ -58,6 +58,19 @@ export interface Reservation {
   statusValue: ReservationStatus;
   customer: ReservationCustomer;
   tables: Array<{ id: string; tableId: string; table: ReservationTable }>;
+  orders?: Array<{
+    id: string;
+    reference: string;
+    totalAmount: string | number;
+    orderDetails: Array<{
+      id: string;
+      quantity: number;
+      unitPrice: string | number;
+      note?: string;
+      dish: { id: string; name: string; price: string | number; imageUrl?: string };
+      statusValue: { id: string; code: string; name: string; colorCode: string };
+    }>;
+  }>;
   payments?: Array<{
     id: string;
     amount: number;
@@ -206,8 +219,8 @@ const reservationService = {
     return unwrap<AvailableTable[]>(res.data);
   },
 
-  async updateStatus(id: string, status: string): Promise<Reservation> {
-    const res = await axiosInstance.patch(API_ROUTES.RESERVATIONS.UPDATE_STATUS(id), { status });
+  async updateStatus(id: string, status: string, reason?: string): Promise<Reservation> {
+    const res = await axiosInstance.patch(API_ROUTES.RESERVATIONS.UPDATE_STATUS(id), { status, ...(reason ? { reason } : {}) });
     return unwrap<Reservation>(res.data);
   },
 

@@ -68,6 +68,7 @@ export interface TenantConfig {
   modifiedBy: string;
   tenantSettings: any[];
   configuration?: TenantConfiguration;
+  metadata?: any;
 }
 
 // Helper function to convert API response to frontend ITenant format
@@ -420,6 +421,7 @@ export const tenantService = {
           CreatedBy: "createdBy",
           ModifiedBy: "modifiedBy",
           TenantSettings: "tenantSettings",
+          Metadata: "metadata",
         };
 
         for (const [pascalKey, camelKey] of Object.entries(pascalToCamelMap)) {

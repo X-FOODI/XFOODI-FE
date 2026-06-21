@@ -81,6 +81,9 @@ export default function ReservationDetailPage() {
   const [completeLoading, setCompleteLoading] = useState(false);
   const [showCancelConfirmModal, setShowCancelConfirmModal] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectLoading, setRejectLoading] = useState(false);
 
   const brandColor = tenant?.primaryColor || "#FF380B";
 
@@ -94,11 +97,31 @@ export default function ReservationDetailPage() {
     try {
       const updated = await reservationService.updateStatus(res.id, action);
       setRes((r) => r ? { ...r, statusValue: updated.statusValue } : r);
-      showToast("success", "Đã cập nhật", action === "CONFIRMED" ? "Đặt bàn đã được xác nhận" : "Đặt bàn đã bị huỷ");
+      if (action === "CONFIRMED") {
+        showToast("success", "Đã xác nhận", "Đặt bàn đã được chấp nhận. Email kèm mã xác nhận đã gửi tới khách. ✉️");
+      } else {
+        showToast("success", "Đã cập nhật", "Đặt bàn đã bị huỷ");
+      }
     } catch (err: any) {
       showToast("error", "Lỗi", err?.response?.data?.message || err.message);
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleRejectWithReason = async () => {
+    if (!res || !rejectReason.trim()) return;
+    setRejectLoading(true);
+    try {
+      const updated = await reservationService.updateStatus(res.id, "CANCELLED", rejectReason.trim());
+      setRes((r) => r ? { ...r, statusValue: updated.statusValue } : r);
+      showToast("success", "Từ chối đặt bàn", "Email thông báo từ chối và lý do đã được gửi tới khách. ✉️");
+      setShowRejectModal(false);
+      setRejectReason("");
+    } catch (err: any) {
+      showToast("error", "Lỗi", err?.response?.data?.message || err.message);
+    } finally {
+      setRejectLoading(false);
     }
   };
 
@@ -407,10 +430,10 @@ export default function ReservationDetailPage() {
             <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
               <Button type="primary" loading={actionLoading} onClick={() => handleAction("CONFIRMED")}
                 style={{ background: "#10b981", borderColor: "#10b981", borderRadius: 10, fontWeight: 700 }}>
-                ✓ Xác nhận đặt bàn
+                ✓ Chấp nhận đặt bàn
               </Button>
-              <Button danger loading={actionLoading} onClick={() => { setCancelReason(""); setShowCancelConfirmModal(true); }} style={{ borderRadius: 10 }}>
-                ✕ Huỷ đặt bàn
+              <Button danger loading={actionLoading} onClick={() => { setRejectReason(""); setShowRejectModal(true); }} style={{ borderRadius: 10 }}>
+                ✕ Từ chối đặt bàn
               </Button>
             </div>
           )}
@@ -556,6 +579,33 @@ export default function ReservationDetailPage() {
                 </span>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Pre-ordered dishes */}
+        {res.orders && res.orders.length > 0 && res.orders[0].orderDetails && res.orders[0].orderDetails.length > 0 && (
+          <div style={{ background: "var(--card)", borderRadius: 16, border: "1px solid var(--border)", padding: 20, marginTop: 16 }}>
+            <h3 style={{ fontSize: 13, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 14px" }}>Món ăn đặt trước</h3>
+            {res.orders[0].orderDetails.map((detail) => (
+              <div key={detail.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 10, background: "var(--surface)", marginBottom: 8 }}>
+                {detail.dish?.imageUrl ? (
+                  <img src={detail.dish.imageUrl} alt={detail.dish.name} style={{ width: 48, height: 48, borderRadius: 8, objectFit: "cover" }} />
+                ) : (
+                  <div style={{ width: 48, height: 48, borderRadius: 8, background: "var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>🍽️</div>
+                )}
+                <div style={{ flex: 1 }}>
+                  <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "var(--text)" }}>{detail.dish?.name}</p>
+                  {detail.note && <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--text-muted)", background: "var(--bg-base)", padding: "2px 6px", borderRadius: 4, display: "inline-block" }}>Ghi chú: {detail.note}</p>}
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{detail.quantity} x {Number(detail.unitPrice).toLocaleString("vi-VN")}đ</p>
+                </div>
+              </div>
+            ))}
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 12, paddingTop: 12, borderTop: "1px dashed var(--border)" }}>
+              <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>Tổng hóa đơn tạm tính:</span>
+              <span style={{ fontSize: 15, fontWeight: 700, color: brandColor }}>{Number(res.orders[0].totalAmount).toLocaleString("vi-VN")}đ</span>
+            </div>
           </div>
         )}
 
@@ -731,6 +781,53 @@ export default function ReservationDetailPage() {
                 style={{ borderRadius: 10, height: 40 }}
               >
                 Quay lại
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Reject modal — for PENDING → CANCELLED with reason */}
+      {showRejectModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "var(--card)", borderRadius: 20, padding: 28, width: 440, boxShadow: "var(--shadow-md)" }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--text)", marginBottom: 6 }}>Từ chối yêu cầu đặt bàn</h3>
+            <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 16, lineHeight: "1.5" }}>
+              Khách hàng <strong>{res?.customer?.user?.fullName ?? ""}</strong> sẽ nhận được email thông báo từ chối kèm theo lý do bạn nhập.
+            </p>
+            <div style={{ marginBottom: 18 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", display: "block", marginBottom: 6 }}>
+                Lý do từ chối <span style={{ color: "#ef4444" }}>*</span>
+              </label>
+              <textarea
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="Nhập lý do từ chối (sẽ được gửi tới khách qua email)..."
+                rows={4}
+                autoFocus
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: 10,
+                  border: "1.5px solid var(--border)",
+                  background: "var(--surface)",
+                  color: "var(--text)",
+                  fontSize: 13,
+                  outline: "none",
+                  resize: "none",
+                  boxSizing: "border-box"
+                }}
+              />
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <Button onClick={() => { setShowRejectModal(false); setRejectReason(""); }} style={{ flex: 1, borderRadius: 10, height: 40 }}>Huỷ</Button>
+              <Button
+                danger type="primary"
+                loading={rejectLoading}
+                disabled={!rejectReason.trim()}
+                onClick={handleRejectWithReason}
+                style={{ flex: 2, borderRadius: 10, fontWeight: 700, height: 40 }}
+              >
+                ✕ Xác nhận từ chối
               </Button>
             </div>
           </div>

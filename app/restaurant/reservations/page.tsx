@@ -95,6 +95,9 @@ export default function ReservationsPage() {
   const [dateTo, setDateTo] = useState<string>("");
   const [dateError, setDateError] = useState<string>("");
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<Reservation | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectLoading, setRejectLoading] = useState(false);
 
   const restaurantId = tenant?.id || user?.restaurantId || "";
   const brandColor = tenant?.primaryColor || "#FF380B";
@@ -144,6 +147,35 @@ export default function ReservationsPage() {
     setPage(1);
   };
 
+  const handleApprove = async (id: string) => {
+    setActionLoadingId(id);
+    try {
+      await reservationService.updateStatus(id, "CONFIRMED");
+      showToast("success", "Đã duyệt", "Đặt bàn đã được xác nhận. Email thông báo đã gửi tới khách.");
+      fetchData();
+    } catch (err: any) {
+      showToast("error", "Lỗi", err?.response?.data?.message || err.message);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleRejectConfirm = async () => {
+    if (!rejectTarget || !rejectReason.trim()) return;
+    setRejectLoading(true);
+    try {
+      await reservationService.updateStatus(rejectTarget.id, "CANCELLED", rejectReason.trim());
+      showToast("success", "Đã từ chối", "Đặt bàn đã bị từ chối. Email thông báo và lý do đã gửi tới khách.");
+      setRejectTarget(null);
+      setRejectReason("");
+      fetchData();
+    } catch (err: any) {
+      showToast("error", "Lỗi", err?.response?.data?.message || err.message);
+    } finally {
+      setRejectLoading(false);
+    }
+  };
+
   const handleStatusChange = async (id: string, status: string) => {
     try {
       await reservationService.updateStatus(id, status);
@@ -156,10 +188,15 @@ export default function ReservationsPage() {
 
   const handleCheckIn = async () => {
     if (!checkInTarget) return;
-    await reservationService.checkIn(checkInTarget.confirmationCode);
-    showToast("success", "Check-in thành công", `Khách ${checkInTarget.customer?.user?.fullName ?? ""} đã check-in`);
-    setCheckInTarget(null);
-    fetchData();
+    try {
+      await reservationService.checkIn(checkInTarget.confirmationCode);
+      showToast("success", "Check-in thành công", `Khách ${checkInTarget.customer?.user?.fullName ?? ""} đã check-in`);
+      setCheckInTarget(null);
+      fetchData();
+    } catch (err: any) {
+      showToast("error", "Lỗi check-in", err?.response?.data?.message || err.message);
+      // We do not close the modal here so the user can see the error
+    }
   };
 
   const handleComplete = async (id: string) => {
@@ -367,8 +404,10 @@ export default function ReservationsPage() {
                         <Button size="small" onClick={() => router.push(`/restaurant/reservations/${r.id}`)} style={{ borderRadius: 8, fontSize: 12 }}>Chi tiết</Button>
                         {r.statusValue?.code === "PENDING" && (
                           <>
-                            <Button size="small" onClick={() => handleStatusChange(r.id, "CONFIRMED")} style={{ borderRadius: 8, fontSize: 12, color: "#10b981", borderColor: "#10b981" }}>Duyệt</Button>
-                            <Button size="small" danger onClick={() => handleStatusChange(r.id, "CANCELLED")} style={{ borderRadius: 8, fontSize: 12 }}>Huỷ</Button>
+                            <Button size="small" loading={actionLoadingId === r.id} onClick={() => handleApprove(r.id)}
+                              style={{ borderRadius: 8, fontSize: 12, color: "#10b981", borderColor: "#10b981" }}>Duyệt</Button>
+                            <Button size="small" danger onClick={() => { setRejectTarget(r); setRejectReason(""); }}
+                              style={{ borderRadius: 8, fontSize: 12 }}>Từ chối</Button>
                           </>
                         )}
                         {r.statusValue?.code === "CONFIRMED" && !r.checkedInAt && (
@@ -413,6 +452,54 @@ export default function ReservationsPage() {
           onConfirm={handleCheckIn}
           onClose={() => setCheckInTarget(null)}
         />
+      )}
+
+      {/* Reject reservation modal */}
+      {rejectTarget && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "var(--card)", borderRadius: 20, padding: 28, width: 440, boxShadow: "var(--shadow-md)" }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--text)", marginBottom: 6 }}>Từ chối đặt bàn</h3>
+            <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 16 }}>
+              Khách hàng <strong>{rejectTarget.customer?.user?.fullName ?? ""}</strong> sẽ nhận được email thông báo từ chối kèm theo lý do bạn nhập.
+            </p>
+            <div style={{ marginBottom: 18 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", display: "block", marginBottom: 6 }}>
+                Lý do từ chối <span style={{ color: "#ef4444" }}>*</span>
+              </label>
+              <textarea
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="Nhập lý do từ chối (sẽ được gửi tới khách qua email)..."
+                rows={4}
+                autoFocus
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: 10,
+                  border: "1.5px solid var(--border)",
+                  background: "var(--surface)",
+                  color: "var(--text)",
+                  fontSize: 13,
+                  outline: "none",
+                  resize: "none",
+                  boxSizing: "border-box"
+                }}
+              />
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <Button onClick={() => { setRejectTarget(null); setRejectReason(""); }} style={{ flex: 1, borderRadius: 10, height: 40 }}>Huỷ</Button>
+              <Button
+                danger type="primary"
+                loading={rejectLoading}
+                disabled={!rejectReason.trim()}
+                onClick={handleRejectConfirm}
+                style={{ flex: 2, borderRadius: 10, fontWeight: 700, height: 40 }}
+              >
+                ✕ Xác nhận từ chối
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
         </main>
