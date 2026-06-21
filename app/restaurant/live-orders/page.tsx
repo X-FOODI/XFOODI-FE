@@ -44,6 +44,8 @@ interface Order {
   customerEmail?: string | null;
   isPaid?: boolean;
   reservationId?: string | null;
+  reservationTime?: string | null;
+  reservationCode?: string | null;
   depositPaid?: number; // tiền cọc đã thanh toán, trừ vào bill
 }
 
@@ -471,6 +473,24 @@ export default function LiveOrdersPage() {
                         </span>
                       )}
                     </div>
+                    {order.reservationId ? (
+                      <div className="mt-2 flex flex-col gap-1">
+                        <span className="self-start text-[10px] font-black bg-purple-500/15 text-purple-400 border border-purple-500/30 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                          📅 Đặt trước
+                        </span>
+                        {order.reservationTime && (
+                          <span className="text-[11px] font-extrabold text-purple-300">
+                            Nhận bàn lúc: {new Date(order.reservationTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ({new Date(order.reservationTime).toLocaleDateString('vi-VN')})
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="mt-2">
+                        <span className="text-[10px] font-black bg-blue-500/15 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                          🍽️ Trực tiếp
+                        </span>
+                      </div>
+                    )}
                     {order.customerName && (
                       <div className="mt-2 text-xs font-bold text-zinc-400 flex items-center gap-1.5">
                         <span className="text-zinc-500">👤</span>
@@ -725,6 +745,35 @@ export default function LiveOrdersPage() {
                     </div>
                   </div>
                 </div>
+                {selectedOrder.reservationId && (
+                  <div className="bg-purple-950/20 border border-purple-500/30 rounded-2xl p-5 space-y-3 col-span-1 md:col-span-2">
+                    <h4 className="text-xs font-black tracking-widest text-purple-400 uppercase">📅 Thông tin đặt bàn trước</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span className="text-purple-300/70">Mã đặt bàn:</span>
+                          <span className="font-extrabold text-purple-300">{selectedOrder.reservationCode || "—"}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-purple-300/70">Nhận bàn lúc:</span>
+                          <span className="font-extrabold text-purple-200">
+                            {selectedOrder.reservationTime ? new Date(selectedOrder.reservationTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + " " + new Date(selectedOrder.reservationTime).toLocaleDateString('vi-VN') : "—"}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span className="text-purple-300/70">Trạng thái:</span>
+                          <span className="font-extrabold text-purple-400">Đã xác nhận & Cọc trước</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-purple-300/70">Tiền cọc đã trả:</span>
+                          <span className="font-extrabold text-emerald-400">{(selectedOrder.depositPaid ?? 0).toLocaleString('vi-VN')} đ</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Items List */}

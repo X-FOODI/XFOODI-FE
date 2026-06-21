@@ -1,6 +1,7 @@
 "use client";
 
 import reservationService, { AvailableTable } from "@/lib/services/reservationService";
+import axiosInstance from "@/lib/services/axiosInstance";
 import paymentService, { TransferInfo } from "@/lib/services/paymentService";
 import PaymentDeadlineCountdown from "@/components/reservations/PaymentDeadlineCountdown";
 import { useAuth } from "@/lib/contexts/AuthContext";
@@ -257,6 +258,9 @@ export default function NewReservationPage() {
   const { mode } = useThemeMode();
   const router = useRouter();
 
+  const brandColor = tenant?.primaryColor || "#FF5A2C";
+  const restaurantId = tenant?.id || user?.restaurantId || "";
+
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
 
@@ -286,10 +290,96 @@ export default function NewReservationPage() {
   const [bankDropdownOpen, setBankDropdownOpen] = useState(false);
   const [bankSearch, setBankSearch] = useState("");
 
+  // Step 2 — pre-order dishes state
+  const [wantPreOrder, setWantPreOrder] = useState(false);
+  const [menu, setMenu] = useState<any[]>([]);
+  const [selectedDishes, setSelectedDishes] = useState<Record<string, { quantity: number; name: string; price: number; note?: string }>>({});
+  const [menuSearch, setMenuSearch] = useState("");
+  const [activeCategory, setActiveCategory] = useState<string>("");
+  const [menuLoading, setMenuLoading] = useState(false);
+
+  useEffect(() => {
+    if (wantPreOrder && menu.length === 0 && restaurantId) {
+      setMenuLoading(true);
+      Promise.all([
+        axiosInstance.get("/categories", { params: { restaurantId } }),
+        axiosInstance.get("/dishes", { params: { restaurantId } })
+      ])
+        .then(([catRes, dishRes]) => {
+          const categoriesData = catRes.data?.data || [];
+          const dishesData = dishRes.data?.data || [];
+
+          // Format to MenuCategory structure: { categoryId, categoryName, items }
+          const formattedMenu = categoriesData.map((cat: any) => {
+            const items = dishesData.filter((dish: any) => dish.categoryId === cat.id && dish.isActive);
+            return {
+              categoryId: cat.id,
+              categoryName: cat.name,
+              items
+            };
+          }).filter((cat: any) => cat.items.length > 0);
+
+          setMenu(formattedMenu);
+          if (formattedMenu.length > 0) {
+            setActiveCategory(formattedMenu[0].categoryId);
+          }
+        })
+        .catch(err => {
+          console.error("Failed to load menu:", err);
+          showToast("error", "Lỗi tải thực đơn", "Không thể tải danh sách món ăn từ nhà hàng");
+        })
+        .finally(() => {
+          setMenuLoading(false);
+        });
+    }
+  }, [wantPreOrder, menu.length, restaurantId, showToast]);
+
+  // Group tables by floor
+  const floorsMap = React.useMemo(() => {
+    const map: Record<string, { id: string; name: string; tables: AvailableTable[] }> = {};
+    allTables.forEach((t) => {
+      if (!map[t.floorId]) {
+        map[t.floorId] = {
+          id: t.floorId,
+          name: t.floor?.name || "Tầng chưa đặt tên",
+          tables: [],
+        };
+      }
+      map[t.floorId].tables.push(t);
+    });
+    return map;
+  }, [allTables]);
+
+  const floorsList = Object.values(floorsMap);
+
   // Visual layout state
-  const canvasRef = useRef<HTMLDivElement>(null);
+  const observerRef = useRef<ResizeObserver | null>(null);
+  const canvasNodeRef = useRef<HTMLDivElement | null>(null);
   const [scale, setScale] = useState(1);
   const [canvasWidth, setCanvasWidth] = useState(600);
+
+  const canvasRef = useCallback((node: HTMLDivElement | null) => {
+    canvasNodeRef.current = node;
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+      observerRef.current = null;
+    }
+
+    if (node) {
+      const handleResize = () => {
+        const width = node.clientWidth;
+        setCanvasWidth(width);
+        const activeFloor = floorsMap[currentFloorId];
+        const activeFloorWidth = Number(activeFloor?.tables?.[0]?.floor?.width) || 1200;
+        setScale(width / activeFloorWidth);
+      };
+
+      handleResize();
+      const observer = new ResizeObserver(handleResize);
+      observer.observe(node);
+      observerRef.current = observer;
+    }
+  }, [currentFloorId, floorsMap]);
 
   useEffect(() => {
     if (user) {
@@ -306,23 +396,6 @@ export default function NewReservationPage() {
   const [transferInfo, setTransferInfo] = useState<TransferInfo | null>(null);
   const [depositPaid, setDepositPaid] = useState(false);
 
-  const brandColor = tenant?.primaryColor || "#FF5A2C";
-  const restaurantId = tenant?.id || user?.restaurantId || "";
-
-  // Group tables by floor
-  const floorsMap: Record<string, { id: string; name: string; tables: AvailableTable[] }> = {};
-  allTables.forEach((t) => {
-    if (!floorsMap[t.floorId]) {
-      floorsMap[t.floorId] = {
-        id: t.floorId,
-        name: t.floor?.name || "Tầng chưa đặt tên",
-        tables: [],
-      };
-    }
-    floorsMap[t.floorId].tables.push(t);
-  });
-  const floorsList = Object.values(floorsMap);
-
   // Set default floor on load
   useEffect(() => {
     if (floorsList.length > 0 && !currentFloorId) {
@@ -330,24 +403,7 @@ export default function NewReservationPage() {
     }
   }, [allTables, floorsList, currentFloorId]);
 
-  // Calculate layout scale dynamically
-  useEffect(() => {
-    if (step !== 1 || !canvasRef.current) return;
 
-    const handleResize = () => {
-      if (canvasRef.current) {
-        const width = canvasRef.current.clientWidth;
-        setCanvasWidth(width);
-        setScale(width / 600);
-      }
-    };
-
-    handleResize();
-    const observer = new ResizeObserver(handleResize);
-    observer.observe(canvasRef.current);
-
-    return () => observer.disconnect();
-  }, [step, currentFloorId]);
 
   // Estimate deposit amount (25k per seat capacity of selected tables, or per guest if auto-arranged)
   const estimatedDeposit = (assignmentMode === "manual" && selectedTableIds.length > 0)
@@ -356,6 +412,11 @@ export default function NewReservationPage() {
         return sum + (tbl ? tbl.seatingCapacity * 25000 : 0);
       }, 0)
     : guests * 25000;
+
+  const selectedCapacity = selectedTableIds.reduce((sum, id) => {
+    const tbl = allTables.find((t) => t.id === id);
+    return sum + (tbl ? tbl.seatingCapacity : 0);
+  }, 0);
 
   // ── Step 0 → 1: check available tables ──────────────────────────────────────
   const handleCheckTables = async () => {
@@ -380,6 +441,11 @@ export default function NewReservationPage() {
       const isoTime = new Date(`${date}T${time}:00`).toISOString();
       const tables = await reservationService.checkTables({ restaurantId, time: isoTime, numberOfGuests: guests });
       setAllTables(tables);
+      
+      // Pre-select suggested tables by default
+      const suggestedIds = tables.filter(t => t.isSuggested).map(t => t.id);
+      setSelectedTableIds(suggestedIds);
+      
       setStep(1);
     } catch (err: any) {
       showToast("error", "Lỗi", err?.response?.data?.message || err.message || "Không thể kiểm tra bàn trống");
@@ -413,6 +479,15 @@ export default function NewReservationPage() {
         accountNumber: bankAccountNumber.trim(),
         accountName: bankAccountName.trim().toUpperCase(),
       } : undefined;
+      const dishesPayload = wantPreOrder
+        ? Object.entries(selectedDishes)
+            .filter(([_, item]) => item.quantity > 0)
+            .map(([dishId, item]) => ({
+              dishId,
+              quantity: item.quantity,
+              note: item.note || undefined,
+            }))
+        : undefined;
       const res = await reservationService.create({
         restaurantId,
         numberOfGuests: guests,
@@ -423,6 +498,7 @@ export default function NewReservationPage() {
         phoneNumber: phone,
         email: email.trim(),
         bankRefund,
+        dishes: dishesPayload,
       });
       setCreatedId(res.id);
       setCreatedCode(res.confirmationCode || "");
@@ -626,7 +702,11 @@ export default function NewReservationPage() {
                     </button>
 
                     <button
-                      onClick={() => setAssignmentMode("manual")}
+                      onClick={() => {
+                        setAssignmentMode("manual");
+                        const suggestedIds = allTables.filter(t => t.isSuggested).map(t => t.id);
+                        setSelectedTableIds(suggestedIds);
+                      }}
                       className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
                         assignmentMode === "manual"
                           ? "bg-[var(--primary)]/5 border-[var(--primary)] text-[var(--primary)]"
@@ -652,6 +732,37 @@ export default function NewReservationPage() {
                     </div>
                   ) : (
                     <div className="space-y-4">
+                      {/* Gợi ý ghép bàn / chọn bàn tối ưu */}
+                      {allTables.some(t => t.isSuggested) && (
+                        <div 
+                          className="p-4 rounded-xl border flex items-start gap-3 shadow-sm animate-fadeIn"
+                          style={{
+                            background: "rgba(16, 185, 129, 0.05)",
+                            borderColor: "rgba(16, 185, 129, 0.2)"
+                          }}
+                        >
+                          <span className="text-xl">💡</span>
+                          <div>
+                            <p className="m-0 text-xs font-bold text-[var(--text)]">Gợi ý xếp bàn tối ưu</p>
+                            <p className="m-0 mt-1 text-[11px] text-[var(--text-muted)] leading-relaxed">
+                              {allTables[0]?.isCombinedSuggestion ? (
+                                <>
+                                  Để đủ sức chứa cho đoàn <strong>{guests} khách</strong>, hệ thống đề xuất ghép các bàn: {" "}
+                                  <strong className="text-[var(--text)] animate-pulse">
+                                    {allTables.filter(t => t.isSuggested).map(t => t.code).join(", ")}
+                                  </strong>{" "}
+                                  (tổng sức chứa {allTables.filter(t => t.isSuggested).reduce((sum, t) => sum + t.seatingCapacity, 0)} chỗ).
+                                </>
+                              ) : (
+                                <>
+                                  Hệ thống đề xuất bàn <strong className="text-[var(--text)] animate-pulse">{allTables.find(t => t.isSuggested)?.code}</strong> ({allTables.find(t => t.isSuggested)?.seatingCapacity} chỗ) trống và phù hợp nhất cho đoàn <strong>{guests} khách</strong>.
+                                </>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Floor selection tabs */}
                       {floorsList.length > 1 && (
                         <div className="flex gap-2 border-b border-[var(--border)] pb-2 overflow-x-auto">
@@ -680,7 +791,9 @@ export default function NewReservationPage() {
                             <MapPin className="w-3.5 h-3.5" />
                             <span>Sơ đồ: <strong>{floorsMap[currentFloorId]?.name}</strong></span>
                           </div>
-                          <div className="font-mono">Tỷ lệ: {Math.round(scale * 100)}%</div>
+                          <div className="font-mono text-[10px]">
+                            Tỷ lệ: {Math.round(scale * 100)}% | CWState: {canvasWidth} | clientWidth: {canvasNodeRef.current?.clientWidth ?? "null"} | floorWidth: {Number(floorsMap[currentFloorId]?.tables?.[0]?.floor?.width) || 1200} | floorId: {currentFloorId}
+                          </div>
                         </div>
 
                         {/* Canvas Grid container */}
@@ -688,11 +801,15 @@ export default function NewReservationPage() {
                           ref={canvasRef}
                           className="relative w-full overflow-hidden select-none"
                           style={{
-                            height: 400 * scale,
-                            backgroundSize: `${20 * scale}px ${20 * scale}px`,
-                            backgroundImage: mode === "dark" 
-                              ? "radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px)"
-                              : "radial-gradient(rgba(0,0,0,0.06) 1px, transparent 1px)",
+                            height: (Number(floorsMap[currentFloorId]?.tables?.[0]?.floor?.height) || 800) * scale,
+                            backgroundImage: floorsMap[currentFloorId]?.tables?.[0]?.floor?.imageUrl
+                              ? `url(${floorsMap[currentFloorId]?.tables?.[0]?.floor?.imageUrl})`
+                              : (mode === "dark" 
+                                  ? "radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px)"
+                                  : "radial-gradient(rgba(0,0,0,0.06) 1px, transparent 1px)"),
+                            backgroundSize: floorsMap[currentFloorId]?.tables?.[0]?.floor?.imageUrl ? "contain" : `${20 * scale}px ${20 * scale}px`,
+                            backgroundRepeat: floorsMap[currentFloorId]?.tables?.[0]?.floor?.imageUrl ? "no-repeat" : "repeat",
+                            backgroundPosition: "center",
                             backgroundColor: mode === "dark" ? "#0f172a" : "#f8fafc",
                           }}
                         >
@@ -816,15 +933,33 @@ export default function NewReservationPage() {
 
                       {/* Selection Summary list */}
                       {selectedTableIds.length > 0 && (
-                        <div className="p-3.5 rounded-xl bg-emerald-500/5 border border-emerald-500/20 flex items-center gap-3">
-                          <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500">
-                            <Info className="w-4 h-4" />
+                        <div className="space-y-2">
+                          <div 
+                            className={`p-3.5 rounded-xl border flex items-center gap-3 transition-colors duration-300 ${
+                              selectedCapacity >= guests 
+                                ? "bg-emerald-500/5 border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                                : "bg-amber-500/5 border-amber-500/20 text-amber-600 dark:text-amber-400"
+                            }`}
+                          >
+                            <div className={`p-1.5 rounded-lg ${selectedCapacity >= guests ? "bg-emerald-500/10 text-emerald-500" : "bg-amber-500/10 text-amber-500"}`}>
+                              <Info className="w-4 h-4" />
+                            </div>
+                            <p className="text-xs m-0 leading-relaxed flex-1">
+                              {selectedCapacity >= guests ? (
+                                <>
+                                  Đã chọn: <strong>{
+                                    selectedTableIds.map(id => allTables.find(t => t.id === id)?.code).filter(Boolean).join(", ")
+                                  }</strong> (Tổng sức chứa: <strong>{selectedCapacity}/{guests}</strong> chỗ - Hợp lệ).
+                                </>
+                              ) : (
+                                <>
+                                  Đã chọn: <strong>{
+                                    selectedTableIds.map(id => allTables.find(t => t.id === id)?.code).filter(Boolean).join(", ")
+                                  }</strong> (Tổng sức chứa: <strong className="underline">{selectedCapacity}/{guests}</strong> chỗ). Vui lòng chọn thêm bàn để đủ chỗ cho {guests} người.
+                                </>
+                              )}
+                            </p>
                           </div>
-                          <p className="text-xs text-[var(--text)] m-0">
-                            Bạn đã chọn: <strong>{
-                              selectedTableIds.map(id => allTables.find(t => t.id === id)?.code).filter(Boolean).join(", ")
-                            }</strong>
-                          </p>
                         </div>
                       )}
                     </div>
@@ -842,11 +977,11 @@ export default function NewReservationPage() {
                 <Button 
                   type="primary" 
                   onClick={() => setStep(2)} 
-                  disabled={assignmentMode === "manual" && selectedTableIds.length === 0}
+                  disabled={assignmentMode === "manual" && (selectedTableIds.length === 0 || selectedCapacity < guests)}
                   className="flex-[2] rounded-xl h-11 font-bold border-none"
                   style={{ background: brandColor, color: "#fff" }}
                 >
-                  {assignmentMode === "auto" ? "Tiếp tục đặt bàn →" : (selectedTableIds.length > 0 ? `Tiếp tục (${selectedTableIds.length} bàn) →` : "Chọn bàn để tiếp tục")}
+                  {assignmentMode === "auto" ? "Tiếp tục đặt bàn →" : (selectedTableIds.length > 0 ? (selectedCapacity >= guests ? `Tiếp tục (${selectedTableIds.length} bàn) →` : `Thiếu sức chứa (${selectedCapacity}/{guests})`) : "Chọn bàn để tiếp tục")}
                 </Button>
               </div>
             </div>
@@ -1047,6 +1182,199 @@ export default function NewReservationPage() {
                   </div>
                 )}
 
+                {/* Pre-order Option Toggle */}
+                <div className="rounded-2xl border border-[var(--border)] p-4 space-y-3 animate-fade-in animate-duration-300" style={{ background: "var(--surface)" }}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-sm font-bold text-[var(--text)] block">🍽️ Bạn có muốn đặt món trước không?</span>
+                      <span className="text-[10px] text-[var(--text-muted)] mt-0.5 block">Nhà hàng sẽ chuẩn bị trước món ăn khi bạn đến</span>
+                    </div>
+                    {/* Toggle Switch */}
+                    <button
+                      type="button"
+                      onClick={() => setWantPreOrder(w => !w)}
+                      className="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
+                      style={{
+                        background: wantPreOrder ? "var(--primary)" : "rgba(120, 120, 128, 0.3)"
+                      }}
+                    >
+                      <span
+                        className="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                        style={{
+                          transform: wantPreOrder ? "translateX(20px)" : "translateX(0px)"
+                        }}
+                      />
+                    </button>
+                  </div>
+
+                  {wantPreOrder && (
+                    <div className="space-y-4 pt-3 border-t border-[var(--border)]">
+                      {menuLoading ? (
+                        <div className="text-center py-6 text-xs text-[var(--text-muted)] flex flex-col items-center justify-center gap-2">
+                          <span className="animate-spin text-lg">⏳</span>
+                          <span>Đang tải thực đơn...</span>
+                        </div>
+                      ) : (
+                        <>
+                          {/* Search bar */}
+                          <div className="relative">
+                            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                            <input
+                              type="text"
+                              value={menuSearch}
+                              onChange={(e) => setMenuSearch(e.target.value)}
+                              placeholder="Tìm món ăn..."
+                              className="w-full pl-9 pr-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--card)] text-[var(--text)] text-xs focus:outline-none focus:border-[var(--primary)] transition-colors"
+                            />
+                          </div>
+
+                          {/* Category tabs */}
+                          <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar scroll-smooth">
+                            {menu.map((cat) => (
+                              <button
+                                key={cat.categoryId}
+                                type="button"
+                                onClick={() => setActiveCategory(cat.categoryId)}
+                                className="px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors"
+                                style={{
+                                  background: activeCategory === cat.categoryId ? "var(--primary)" : "var(--card)",
+                                  color: activeCategory === cat.categoryId ? "#fff" : "var(--text-muted)",
+                                  border: activeCategory === cat.categoryId ? "none" : "1px solid var(--border)"
+                                }}
+                              >
+                                {cat.categoryName}
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* Dishes list */}
+                          <div className="space-y-3 overflow-y-auto pr-1" style={{ maxHeight: 280 }}>
+                            {menu
+                              .find(cat => cat.categoryId === activeCategory)
+                              ?.items?.filter((item: any) => !menuSearch || item.name?.toLowerCase().includes(menuSearch.toLowerCase()))
+                              .map((dish: any) => {
+                                const qty = selectedDishes[dish.id]?.quantity || 0;
+                                return (
+                                  <div
+                                    key={dish.id}
+                                    className="flex items-center gap-3 p-2.5 rounded-xl border border-[var(--border)] bg-[var(--card)] hover:border-zinc-500 transition-colors"
+                                  >
+                                    {dish.imageUrl ? (
+                                      <img
+                                        src={dish.imageUrl}
+                                        alt={dish.name}
+                                        className="w-12 h-12 rounded-lg object-cover shrink-0"
+                                      />
+                                    ) : (
+                                      <div className="w-12 h-12 rounded-lg bg-[var(--surface)] flex items-center justify-center shrink-0 text-lg">
+                                        🍲
+                                      </div>
+                                    )}
+
+                                    <div className="flex-1 min-w-0">
+                                      <div className="font-bold text-xs text-[var(--text)] truncate">{dish.name}</div>
+                                      <div className="text-[9px] text-[var(--text-muted)] truncate">{dish.description || "Chưa có mô tả"}</div>
+                                      <div className="text-xs font-black text-[var(--primary)] mt-0.5">
+                                        {(dish.price || 0).toLocaleString("vi-VN")}đ
+                                      </div>
+                                    </div>
+
+                                    {/* Quantity controls */}
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      {qty > 0 && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setSelectedDishes(prev => {
+                                              const updated = { ...prev };
+                                              if (updated[dish.id].quantity <= 1) {
+                                                delete updated[dish.id];
+                                              } else {
+                                                updated[dish.id].quantity -= 1;
+                                              }
+                                              return updated;
+                                            });
+                                          }}
+                                          className="w-6 h-6 rounded-lg bg-[var(--surface)] border border-[var(--border)] flex items-center justify-center font-bold text-xs text-[var(--text)]"
+                                        >
+                                          -
+                                        </button>
+                                      )}
+                                      {qty > 0 && (
+                                        <span className="text-xs font-bold text-[var(--text)] min-w-[14px] text-center">
+                                          {qty}
+                                        </span>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setSelectedDishes(prev => ({
+                                            ...prev,
+                                            [dish.id]: {
+                                              quantity: (prev[dish.id]?.quantity || 0) + 1,
+                                              name: dish.name || "",
+                                              price: dish.price || 0,
+                                              note: prev[dish.id]?.note || ""
+                                            }
+                                          }));
+                                        }}
+                                        className="w-6 h-6 rounded-lg bg-[var(--primary)] text-white flex items-center justify-center font-bold text-xs shadow-sm"
+                                      >
+                                        +
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            {(!menu.find(cat => cat.categoryId === activeCategory)?.items ||
+                              menu.find(cat => cat.categoryId === activeCategory)?.items?.filter((item: any) => !menuSearch || item.name?.toLowerCase().includes(menuSearch.toLowerCase())).length === 0) && (
+                              <div className="text-center py-6 text-xs" style={{ color: "var(--text-muted)" }}>
+                                Không có món ăn nào trong danh mục này
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Selected Dishes Summary list */}
+                          {Object.keys(selectedDishes).length > 0 && (
+                            <div className="pt-2 border-t border-dashed border-[var(--border)] space-y-2">
+                              <span className="text-xs font-bold text-[var(--text)] block">Món đã chọn đặt trước:</span>
+                              <div className="space-y-2 max-h-48 overflow-y-auto">
+                                {Object.entries(selectedDishes).map(([dishId, item]) => (
+                                  <div key={dishId} className="flex flex-col gap-1.5 bg-[var(--surface)] p-2 rounded-lg border border-[var(--border)]">
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="font-semibold text-[var(--text)]">
+                                        {item.name} <span className="text-[var(--primary)] font-bold font-mono">x{item.quantity}</span>
+                                      </span>
+                                      <span className="font-bold text-[var(--text)]">
+                                        {(item.price * item.quantity).toLocaleString("vi-VN")}đ
+                                      </span>
+                                    </div>
+                                    <input
+                                      type="text"
+                                      value={item.note || ""}
+                                      onChange={(e) => {
+                                        setSelectedDishes(prev => ({
+                                          ...prev,
+                                          [dishId]: {
+                                            ...prev[dishId],
+                                            note: e.target.value
+                                          }
+                                        }));
+                                      }}
+                                      placeholder="Ghi chú món ăn (ít cay, không hành...)"
+                                      className="w-full bg-[var(--card)] text-[10px] text-[var(--text)] border border-[var(--border)] rounded px-2 py-1 outline-none focus:border-[var(--primary)]"
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 {/* Summary card */}
                 <div className="p-4 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-xs space-y-2.5">
                   <p className="m-0 font-bold text-sm text-[var(--text)] border-b border-[var(--border)] pb-2">Tóm tắt thông tin đặt chỗ</p>
@@ -1065,6 +1393,22 @@ export default function NewReservationPage() {
                         {selectedTableIds.map(id => allTables.find(t => t.id === id)?.code).filter(Boolean).join(", ")}
                       </span>
                     </div>
+                  )}
+                  {wantPreOrder && Object.keys(selectedDishes).length > 0 && (
+                    <>
+                      <div className="flex justify-between border-t border-dashed border-[var(--border)] pt-2 mt-1">
+                        <span className="text-[var(--text-muted)]">🍽️ Số món đặt trước</span>
+                        <span className="font-semibold text-[var(--text)]">
+                          {Object.values(selectedDishes).reduce((s, item) => s + item.quantity, 0)} món
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-[var(--text-muted)]">💵 Tổng tiền món ăn</span>
+                        <span className="font-bold text-[var(--text)] text-[var(--primary)]">
+                          {Object.values(selectedDishes).reduce((s, item) => s + item.quantity * item.price, 0).toLocaleString("vi-VN")}đ
+                        </span>
+                      </div>
+                    </>
                   )}
                   <div className="flex justify-between border-t border-dashed border-[var(--border)] pt-2 mt-1">
                     <span className="text-[var(--text-muted)] font-medium">💰 Yêu cầu cọc (bắt buộc)</span>

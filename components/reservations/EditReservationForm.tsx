@@ -43,6 +43,8 @@ export default function EditReservationForm({ reservation, onSave, brandColor = 
         numberOfGuests: guests,
       });
       setAvailableTables(tables);
+      const suggestedIds = tables.filter(t => t.isSuggested).map(t => t.id);
+      setSelectedTableIds(suggestedIds);
     } catch (err: any) {
       setConflictError(err.message || "Không thể kiểm tra bàn trống");
     } finally {
@@ -97,6 +99,21 @@ export default function EditReservationForm({ reservation, onSave, brandColor = 
       <h4 style={{ margin: "0 0 16px", fontSize: 14, fontWeight: 700, color: "var(--text)" }}>
         ✏️ Chỉnh sửa đặt bàn
       </h4>
+
+      {reservation.metadata?.isAutoAssignment && (
+        <div style={{
+          padding: "10px 12px",
+          borderRadius: 10,
+          fontSize: 12,
+          background: "rgba(59, 130, 246, 0.08)",
+          border: "1px solid rgba(59, 130, 246, 0.2)",
+          color: "#2563eb",
+          marginBottom: 14,
+          lineHeight: "1.4"
+        }}>
+          ℹ️ Khách chọn chế độ <strong>Để nhà hàng tự sắp xếp bàn</strong>. Bạn có thể tự do thay đổi hoặc chọn bất kỳ bàn trống nào phù hợp cho họ.
+        </div>
+      )}
 
       {/* Number of guests */}
       <div style={{ marginBottom: 14 }}>
@@ -167,39 +184,79 @@ export default function EditReservationForm({ reservation, onSave, brandColor = 
         {conflictError && (
           <p style={{ fontSize: 12, color: "#ef4444", margin: "0 0 8px" }}>{conflictError}</p>
         )}
-        {availableTables.length > 0 && (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            {availableTables.map((t) => {
-              const selected = selectedTableIds.includes(t.id);
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() =>
-                    setSelectedTableIds(
-                      selected ? selectedTableIds.filter((id) => id !== t.id) : [...selectedTableIds, t.id]
-                    )
-                  }
-                  style={{
-                    padding: "10px 8px",
-                    borderRadius: 8,
-                    border: `2px solid ${selected ? brandColor : "var(--border)"}`,
-                    background: selected ? `${brandColor}12` : "var(--surface)",
-                    cursor: "pointer",
-                    textAlign: "left",
-                  }}
-                >
-                  <p style={{ margin: 0, fontWeight: 700, color: selected ? brandColor : "var(--text)", fontSize: 13 }}>
-                    Bàn {t.code}
-                  </p>
-                  <p style={{ margin: "2px 0 0", fontSize: 11, color: "var(--text-muted)" }}>
-                    {t.seatingCapacity} chỗ · {t.floor?.name}
-                  </p>
-                </button>
-              );
-            })}
-          </div>
-        )}
+        {availableTables.length > 0 && (() => {
+          const selectedCapacity = selectedTableIds.reduce((sum, id) => {
+            const tbl = availableTables.find((t) => t.id === id);
+            return sum + (tbl ? tbl.seatingCapacity : 0);
+          }, 0);
+          const isCapacityOk = selectedCapacity >= guests;
+
+          return (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {/* Suggestion badge */}
+              {availableTables.some(t => t.isSuggested) && (
+                <div style={{
+                  padding: "8px 12px",
+                  borderRadius: 8,
+                  fontSize: 12,
+                  background: "rgba(16, 185, 129, 0.08)",
+                  border: "1px solid rgba(16, 185, 129, 0.2)",
+                  color: "#059669"
+                }}>
+                  💡 Gợi ý: {availableTables[0]?.isCombinedSuggestion ? "Ghép các bàn: " : "Nên chọn bàn: "}
+                  <strong>{availableTables.filter(t => t.isSuggested).map(t => t.code).join(", ")}</strong>
+                </div>
+              )}
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                {availableTables.map((t) => {
+                  const selected = selectedTableIds.includes(t.id);
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      disabled={!t.isAvailable}
+                      onClick={() =>
+                        setSelectedTableIds(
+                          selected ? selectedTableIds.filter((id) => id !== t.id) : [...selectedTableIds, t.id]
+                        )
+                      }
+                      style={{
+                        padding: "10px 8px",
+                        borderRadius: 8,
+                        border: `2px solid ${selected ? brandColor : "var(--border)"}`,
+                        background: selected ? `${brandColor}12` : "var(--surface)",
+                        cursor: t.isAvailable ? "pointer" : "not-allowed",
+                        textAlign: "left",
+                        opacity: t.isAvailable ? 1 : 0.5,
+                      }}
+                    >
+                      <p style={{ margin: 0, fontWeight: 700, color: selected ? brandColor : "var(--text)", fontSize: 13 }}>
+                        Bàn {t.code} {t.isSuggested && "⭐"}
+                      </p>
+                      <p style={{ margin: "2px 0 0", fontSize: 11, color: "var(--text-muted)" }}>
+                        {t.seatingCapacity} chỗ · {t.floor?.name}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {selectedTableIds.length > 0 && (
+                <div style={{
+                  padding: "8px 12px",
+                  borderRadius: 8,
+                  fontSize: 12,
+                  background: isCapacityOk ? "rgba(16, 185, 129, 0.08)" : "rgba(245, 158, 11, 0.08)",
+                  border: `1px solid ${isCapacityOk ? "rgba(16, 185, 129, 0.2)" : "rgba(245, 158, 11, 0.2)"}`,
+                  color: isCapacityOk ? "#059669" : "#d97706"
+                }}>
+                  Đã chọn: <strong>{selectedTableIds.map(id => availableTables.find(t => t.id === id)?.code).filter(Boolean).join(", ")}</strong> (Sức chứa: {selectedCapacity}/{guests})
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {error && <p style={{ fontSize: 12, color: "#ef4444", margin: "0 0 12px" }}>{error}</p>}
@@ -211,6 +268,10 @@ export default function EditReservationForm({ reservation, onSave, brandColor = 
         <Button
           type="primary"
           loading={loading}
+          disabled={availableTables.length > 0 && selectedTableIds.reduce((sum, id) => {
+            const tbl = availableTables.find((t) => t.id === id);
+            return sum + (tbl ? tbl.seatingCapacity : 0);
+          }, 0) < guests}
           onClick={handleSave}
           style={{ flex: 2, background: brandColor, borderColor: brandColor, fontWeight: 700 }}
         >

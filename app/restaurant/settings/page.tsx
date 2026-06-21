@@ -23,6 +23,20 @@ interface RestaurantMetadata {
     tiktok?: string;
   };
   gallery?: string[];
+  reservationConfig?: {
+    opening_time?: string;
+    closing_time?: string;
+    last_booking_before_close_minutes?: number;
+    min_advance_booking_hours?: number;
+    max_advance_booking_days?: number;
+    closed_dates?: string[];
+    early_checkin_minutes?: number;
+    late_checkin_minutes?: number;
+    deposit_enabled?: boolean;
+    deposit_amount?: number | null;
+    deposit_confirmation_timeout_minutes?: number;
+    free_cancellation_hours?: number;
+  };
 }
 
 interface RestaurantInfo {
@@ -64,7 +78,8 @@ export default function RestaurantSettingsPage() {
   const [restaurantInfo, setRestaurantInfo] = useState<RestaurantInfo | null>(null);
   
   // Tabs
-  const [activeTab, setActiveTab] = useState<"general" | "appearance">("general");
+  const [activeTab, setActiveTab] = useState<"general" | "appearance" | "reservation">("general");
+  const [newClosedDate, setNewClosedDate] = useState("");
 
   // Form State
   const [formData, setFormData] = useState({
@@ -84,6 +99,20 @@ export default function RestaurantSettingsPage() {
       [day.key]: { isOpen: true, open: "08:00", close: "22:00" }
     }), {} as Record<string, { isOpen: boolean, open: string, close: string }>),
     gallery: [] as string[],
+    reservationConfig: {
+      opening_time: "10:00",
+      closing_time: "22:00",
+      last_booking_before_close_minutes: 60,
+      min_advance_booking_hours: 1,
+      max_advance_booking_days: 30,
+      closed_dates: [] as string[],
+      early_checkin_minutes: 15,
+      late_checkin_minutes: 30,
+      deposit_enabled: false,
+      deposit_amount: "" as string | number,
+      deposit_confirmation_timeout_minutes: 120,
+      free_cancellation_hours: 12,
+    },
   });
 
   useEffect(() => {
@@ -99,6 +128,7 @@ export default function RestaurantSettingsPage() {
         const data = res.data.data;
         setRestaurantInfo(data);
         const meta = data.metadata || {};
+        const config = meta.reservationConfig || {};
         
         setFormData({
           name: data.name || "",
@@ -117,6 +147,20 @@ export default function RestaurantSettingsPage() {
             [day.key]: { isOpen: true, open: "08:00", close: "22:00" }
           }), {} as any),
           gallery: meta.gallery || [],
+          reservationConfig: {
+            opening_time: config.opening_time || "10:00",
+            closing_time: config.closing_time || "22:00",
+            last_booking_before_close_minutes: config.last_booking_before_close_minutes ?? 60,
+            min_advance_booking_hours: config.min_advance_booking_hours ?? 1,
+            max_advance_booking_days: config.max_advance_booking_days ?? 30,
+            closed_dates: config.closed_dates || [],
+            early_checkin_minutes: config.early_checkin_minutes ?? 15,
+            late_checkin_minutes: config.late_checkin_minutes ?? 30,
+            deposit_enabled: config.deposit_enabled ?? false,
+            deposit_amount: config.deposit_amount !== null && config.deposit_amount !== undefined ? config.deposit_amount : "",
+            deposit_confirmation_timeout_minutes: config.deposit_confirmation_timeout_minutes ?? 120,
+            free_cancellation_hours: config.free_cancellation_hours ?? 12,
+          }
         });
       })
       .catch((err) => {
@@ -176,10 +220,14 @@ export default function RestaurantSettingsPage() {
             tiktok: formData.tiktok,
           },
           gallery: formData.gallery,
+          reservationConfig: {
+            ...formData.reservationConfig,
+            deposit_amount: formData.reservationConfig.deposit_amount === "" ? null : Number(formData.reservationConfig.deposit_amount),
+          }
         }
       };
 
-      await axiosInstance.put("/api/restaurants/me", payload);
+      await axiosInstance.put("/restaurants/me", payload);
       alert("Lưu cài đặt thành công!");
     } catch (err) {
       console.error(err);
@@ -264,6 +312,16 @@ export default function RestaurantSettingsPage() {
                 }`}
               >
                 Cá nhân hóa Giao diện
+              </button>
+              <button
+                onClick={() => setActiveTab("reservation")}
+                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === "reservation" 
+                    ? "bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-white" 
+                    : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                }`}
+              >
+                Cấu hình Đặt bàn
               </button>
             </div>
 
@@ -499,8 +557,280 @@ export default function RestaurantSettingsPage() {
                         <div key={idx} className="relative aspect-square rounded-lg overflow-hidden group border border-gray-200 dark:border-gray-700">
                           <img src={url} alt={`Gallery ${idx}`} className="w-full h-full object-cover" />
                           <button 
+                            type="button"
                             onClick={() => setFormData({...formData, gallery: formData.gallery.filter((_, i) => i !== idx)})}
                             className="absolute top-2 right-2 w-6 h-6 bg-black/50 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500"
+                          >
+                            &times;
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Content: Reservation Settings */}
+            {activeTab === "reservation" && (
+              <div className="space-y-6">
+                {/* Hours & Booking Window */}
+                <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm space-y-4">
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    Giờ Hoạt Động & Thời Gian Đặt Trước
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Giờ mở cửa đặt bàn</label>
+                      <input 
+                        type="time" 
+                        value={formData.reservationConfig.opening_time} 
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          reservationConfig: { ...formData.reservationConfig, opening_time: e.target.value }
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-transparent text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Giờ đóng cửa đặt bàn</label>
+                      <input 
+                        type="time" 
+                        value={formData.reservationConfig.closing_time} 
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          reservationConfig: { ...formData.reservationConfig, closing_time: e.target.value }
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-transparent text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    <div className="space-y-1.5 md:col-span-2">
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block">
+                        Thời gian đặt bàn muộn nhất trước giờ đóng cửa (phút){" "}
+                        <span className="text-xs text-gray-400 font-normal ml-1.5">(PRD mặc định: 60 phút)</span>
+                      </label>
+                      <input 
+                        type="number" 
+                        min={0}
+                        value={formData.reservationConfig.last_booking_before_close_minutes} 
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          reservationConfig: { ...formData.reservationConfig, last_booking_before_close_minutes: parseInt(e.target.value) || 0 }
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-transparent text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block">
+                        Thời gian đặt trước tối thiểu (tiếng){" "}
+                        <span className="text-xs text-gray-400 font-normal ml-1.5">(PRD mặc định: 1 tiếng)</span>
+                      </label>
+                      <input 
+                        type="number" 
+                        min={0}
+                        value={formData.reservationConfig.min_advance_booking_hours} 
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          reservationConfig: { ...formData.reservationConfig, min_advance_booking_hours: parseInt(e.target.value) || 0 }
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-transparent text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block">
+                        Thời gian đặt trước tối đa (ngày){" "}
+                        <span className="text-xs text-gray-400 font-normal ml-1.5">(PRD mặc định: 30 ngày)</span>
+                      </label>
+                      <input 
+                        type="number" 
+                        min={1}
+                        value={formData.reservationConfig.max_advance_booking_days} 
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          reservationConfig: { ...formData.reservationConfig, max_advance_booking_days: parseInt(e.target.value) || 0 }
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-transparent text-gray-900 dark:text-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Check-in & No-show Thresholds */}
+                <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm space-y-4">
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
+                    Quy Trình Check-in & Tự Động Đánh Dấu No-show
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block">
+                        Cho phép check-in sớm tối đa (phút){" "}
+                        <span className="text-xs text-gray-400 font-normal ml-1.5">(PRD mặc định: 15 phút)</span>
+                      </label>
+                      <input 
+                        type="number" 
+                        min={0}
+                        value={formData.reservationConfig.early_checkin_minutes} 
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          reservationConfig: { ...formData.reservationConfig, early_checkin_minutes: parseInt(e.target.value) || 0 }
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-transparent text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block">
+                        Thời gian trễ tối đa trước khi No-show (phút){" "}
+                        <span className="text-xs text-gray-400 font-normal ml-1.5">(PRD mặc định: 30 phút)</span>
+                      </label>
+                      <input 
+                        type="number" 
+                        min={1}
+                        value={formData.reservationConfig.late_checkin_minutes} 
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          reservationConfig: { ...formData.reservationConfig, late_checkin_minutes: parseInt(e.target.value) || 0 }
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-transparent text-gray-900 dark:text-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Deposit & Cancellation Policies */}
+                <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                        <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        Yêu Cầu Đặt Cọc & Chính Sách Hủy Bàn
+                      </h2>
+                      <p className="text-xs text-gray-500 mt-1">Cấu hình tiền cọc bắt buộc để tránh khách ảo/bùng bàn.</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        className="sr-only peer" 
+                        checked={formData.reservationConfig.deposit_enabled} 
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          reservationConfig: { ...formData.reservationConfig, deposit_enabled: e.target.checked }
+                        })} 
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+                    </label>
+                  </div>
+
+                  {formData.reservationConfig.deposit_enabled && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-gray-100 dark:border-gray-700/50 transition-all duration-300">
+                      <div className="space-y-1.5">
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Số tiền cọc cố định (VND)</label>
+                        <input 
+                          type="number" 
+                          min={0}
+                          placeholder="Mặc định: 25k/chỗ"
+                          value={formData.reservationConfig.deposit_amount} 
+                          onChange={(e) => setFormData({
+                            ...formData,
+                            reservationConfig: { ...formData.reservationConfig, deposit_amount: e.target.value }
+                          })}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-transparent text-gray-900 dark:text-white"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block">
+                          Thời hạn xác nhận cọc (phút){" "}
+                          <span className="text-xs text-gray-400 font-normal ml-1.5">(PRD mặc định: 120 phút)</span>
+                        </label>
+                        <input 
+                          type="number" 
+                          min={1}
+                          value={formData.reservationConfig.deposit_confirmation_timeout_minutes} 
+                          onChange={(e) => setFormData({
+                            ...formData,
+                            reservationConfig: { ...formData.reservationConfig, deposit_confirmation_timeout_minutes: parseInt(e.target.value) || 0 }
+                          })}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-transparent text-gray-900 dark:text-white"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block">
+                          Thời hạn hủy cọc miễn phí (tiếng){" "}
+                          <span className="text-xs text-gray-400 font-normal ml-1.5">(PRD mặc định: 12 tiếng)</span>
+                        </label>
+                        <input 
+                          type="number" 
+                          min={0}
+                          value={formData.reservationConfig.free_cancellation_hours} 
+                          onChange={(e) => setFormData({
+                            ...formData,
+                            reservationConfig: { ...formData.reservationConfig, free_cancellation_hours: parseInt(e.target.value) || 0 }
+                          })}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-transparent text-gray-900 dark:text-white"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Closed Dates Manager */}
+                <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm space-y-4">
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                    Quản Lý Ngày Đóng Cửa / Ngày Nghỉ
+                  </h2>
+                  <p className="text-xs text-gray-500">Khách hàng sẽ không thể đặt bàn vào các ngày này.</p>
+                  
+                  <div className="flex gap-2">
+                    <input 
+                      type="date"
+                      value={newClosedDate}
+                      onChange={(e) => setNewClosedDate(e.target.value)}
+                      className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-transparent text-gray-900 dark:text-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!newClosedDate) return;
+                        if (formData.reservationConfig.closed_dates.includes(newClosedDate)) {
+                          alert("Ngày này đã được thêm.");
+                          return;
+                        }
+                        setFormData({
+                          ...formData,
+                          reservationConfig: {
+                            ...formData.reservationConfig,
+                            closed_dates: [...formData.reservationConfig.closed_dates, newClosedDate].sort()
+                          }
+                        });
+                        setNewClosedDate("");
+                      }}
+                      className="px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-colors"
+                    >
+                      Thêm Ngày Nghỉ
+                    </button>
+                  </div>
+
+                  {formData.reservationConfig.closed_dates.length === 0 ? (
+                    <div className="text-center py-6 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 text-sm text-gray-500">
+                      Chưa cấu hình ngày nghỉ nào. Nhà hàng mở cửa tất cả các ngày trong năm.
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {formData.reservationConfig.closed_dates.map((date) => (
+                        <div key={date} className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-white rounded-full text-sm transition-colors">
+                          <span>{date}</span>
+                          <button
+                            type="button"
+                            onClick={() => setFormData({
+                              ...formData,
+                              reservationConfig: {
+                                ...formData.reservationConfig,
+                                closed_dates: formData.reservationConfig.closed_dates.filter(d => d !== date)
+                              }
+                            })}
+                            className="w-4 h-4 bg-gray-300 dark:bg-gray-600 hover:bg-red-500 hover:text-white text-gray-600 dark:text-gray-300 rounded-full flex items-center justify-center text-xs font-bold transition-colors"
                           >
                             &times;
                           </button>
