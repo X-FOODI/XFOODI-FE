@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { DatePicker, TimePicker } from "antd";
 import dayjs from "dayjs";
 import { useTenant } from "@/lib/contexts/TenantContext";
@@ -331,6 +331,65 @@ function BookingFormCard({ data, accentColor }: { data: any; accentColor: string
   const [pollingPayment, setPollingPayment] = useState(false);
   const [paymentExpired, setPaymentExpired] = useState(false);
 
+  // Dish preorder states
+  const [dishes, setDishes] = useState<any[]>([]);
+  const [loadingDishes, setLoadingDishes] = useState(false);
+  const [selectedDishes, setSelectedDishes] = useState<Record<string, { quantity: number; name: string; price: number; note?: string }>>({});
+  const [showMenuModal, setShowMenuModal] = useState(false);
+  const [selectedDetailDish, setSelectedDetailDish] = useState<any | null>(null);
+  const [menuSearch, setMenuSearch] = useState("");
+  const [categories, setCategories] = useState<any[]>([]);
+  const [activeCategory, setActiveCategory] = useState<string>("");
+
+  // Fetch menu categories and dishes for preorder
+  useEffect(() => {
+    if (tenant?.id) {
+      setLoadingDishes(true);
+      Promise.all([
+        axiosInstance.get("/categories", { params: { restaurantId: tenant.id } }),
+        axiosInstance.get("/dishes", { params: { restaurantId: tenant.id } })
+      ])
+        .then(([catRes, dishRes]) => {
+          const catData = catRes.data?.data || [];
+          const dishData = dishRes.data?.data || [];
+          setCategories(catData);
+          setDishes(dishData.filter((d: any) => d.isActive));
+          if (catData.length > 0) {
+            setActiveCategory(catData[0].id);
+          }
+        })
+        .catch(err => {
+          console.error("Failed to load menu in chatbot:", err);
+        })
+        .finally(() => {
+          setLoadingDishes(false);
+        });
+    }
+  }, [tenant?.id]);
+
+  // Derived suggested dishes
+  const suggestedDishes = useMemo(() => {
+    const featured = dishes.filter((d: any) => d.isFeatured);
+    return featured.length > 0 ? featured.slice(0, 4) : dishes.slice(0, 4);
+  }, [dishes]);
+
+  // Update dish quantity helper
+  const updateDishQuantity = (dish: any, change: number) => {
+    setSelectedDishes(prev => {
+      const current = prev[dish.id] || { quantity: 0, name: dish.name, price: dish.price };
+      const newQty = Math.max(0, current.quantity + change);
+      if (newQty === 0) {
+        const copy = { ...prev };
+        delete copy[dish.id];
+        return copy;
+      }
+      return {
+        ...prev,
+        [dish.id]: { ...current, quantity: newQty }
+      };
+    });
+  };
+
   // Poll payment status if deposit is required
   useEffect(() => {
     if (!pollingPayment || !transferInfo || paymentExpired || depositPaid) return;
@@ -396,12 +455,21 @@ function BookingFormCard({ data, accentColor }: { data: any; accentColor: string
         throw new Error("Không xác định được nhà hàng để đặt bàn.");
       }
 
+      const dishesPayload = Object.entries(selectedDishes)
+        .filter(([_, item]) => item.quantity > 0)
+        .map(([dishId, item]) => ({
+          dishId,
+          quantity: item.quantity,
+          note: item.note || undefined,
+        }));
+
       const payload: any = {
         restaurantId,
         numberOfGuests: Number(form.guests),
         time: new Date(`${form.date}T${form.time}:00`).toISOString(),
         specialRequests: form.note || undefined,
         tableIds: assignmentMode === "manual" ? selectedTableIds : [],
+        dishes: dishesPayload,
       };
 
       if (!user) {
@@ -573,6 +641,32 @@ function BookingFormCard({ data, accentColor }: { data: any; accentColor: string
             <span style={{ color: "var(--text-muted)" }}>Bàn xếp:</span>
             <span style={{ fontWeight: 700, color: accentColor }}>{tableCodes}</span>
           </div>
+
+          {/* Preordered dishes summary on success */}
+          {Object.keys(selectedDishes).length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, borderTop: "1px dashed var(--border)", paddingTop: 6, marginTop: 2 }}>
+              <span style={{ color: "var(--text-muted)", fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>Món ăn đặt trước:</span>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, paddingLeft: 4 }}>
+                {Object.entries(selectedDishes).map(([id, item]) => (
+                  <div key={id} style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5 }}>
+                    <span style={{ color: "var(--text)" }}>
+                      {item.name} <span style={{ color: "var(--text-muted)" }}>x{item.quantity}</span>
+                    </span>
+                    <strong style={{ color: accentColor }}>
+                      {(item.price * item.quantity).toLocaleString("vi-VN")}đ
+                    </strong>
+                  </div>
+                ))}
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, borderTop: "1px dotted var(--border)", paddingTop: 4, marginTop: 2 }}>
+                  <span style={{ fontWeight: 700, color: "var(--text)" }}>Tổng tiền món:</span>
+                  <strong style={{ color: accentColor }}>
+                    {Object.values(selectedDishes).reduce((sum, item) => sum + item.price * item.quantity, 0).toLocaleString("vi-VN")}đ
+                  </strong>
+                </div>
+              </div>
+            </div>
+          )}
+
           {(createdReservation?.specialRequests || form.note) && (
             <div style={{ display: "flex", flexDirection: "column", gap: 2, fontSize: 11.5, borderTop: "1px dashed var(--border)", paddingTop: 6, marginTop: 2 }}>
               <span style={{ color: "var(--text-muted)" }}>Yêu cầu đặc biệt:</span>
@@ -753,6 +847,141 @@ function BookingFormCard({ data, accentColor }: { data: any; accentColor: string
         </div>
       )}
 
+      {/* Dish preorder section */}
+      {tenant?.id && dishes.length > 0 && (
+        <div style={{ marginBottom: 12, borderTop: "1px solid var(--border)", paddingTop: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+            <label style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              Gọi món trước (Không bắt buộc)
+            </label>
+            <button
+              type="button"
+              onClick={() => setShowMenuModal(true)}
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: accentColor,
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                padding: "2px 6px",
+                borderRadius: 4,
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.04)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+            >
+              Xem thực đơn ({dishes.length}) →
+            </button>
+          </div>
+
+          {/* List of selected preordered items summary */}
+          {Object.keys(selectedDishes).length > 0 && (
+            <div style={{
+              background: `color-mix(in srgb, ${accentColor} 6%, var(--surface))`,
+              borderRadius: 8,
+              padding: "8px 10px",
+              marginBottom: 10,
+              fontSize: 11,
+              border: `1px solid color-mix(in srgb, ${accentColor} 15%, var(--border))`
+            }}>
+              <div style={{ fontWeight: 700, color: "var(--text)", marginBottom: 4 }}>Món đã chọn:</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {Object.entries(selectedDishes).map(([id, item]) => (
+                  <div key={id} style={{ display: "flex", justifyContent: "space-between", color: "var(--text)" }}>
+                    <span>{item.name} <span style={{ color: "var(--text-muted)", fontWeight: 500 }}>x{item.quantity}</span></span>
+                    <strong style={{ color: accentColor }}>{(item.price * item.quantity).toLocaleString("vi-VN")}đ</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Popular dish suggestions */}
+          <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 6, fontWeight: 600 }}>Gợi ý món ăn phổ biến:</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {suggestedDishes.map((dish: any) => {
+              const selected = selectedDishes[dish.id];
+              const qty = selected ? selected.quantity : 0;
+              return (
+                <div
+                  key={dish.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "8px",
+                    background: "var(--card)",
+                    borderRadius: 10,
+                    border: "1px solid var(--border)",
+                  }}
+                >
+                  <div 
+                    onClick={() => setSelectedDetailDish(dish)}
+                    style={{ display: "flex", gap: 8, alignItems: "center", flex: 1, cursor: "pointer" }}
+                  >
+                    {dish.imageUrl ? (
+                      <img
+                        src={dish.imageUrl}
+                        alt={dish.name}
+                        style={{ width: 40, height: 40, borderRadius: 8, objectFit: "cover", flexShrink: 0 }}
+                      />
+                    ) : (
+                      <div style={{ width: 40, height: 40, borderRadius: 8, background: "var(--surface)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>
+                        🍲
+                      </div>
+                    )}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text)" }}>{dish.name}</span>
+                      <span style={{ fontSize: 11, color: accentColor, fontWeight: 600 }}>{dish.price.toLocaleString("vi-VN")}đ</span>
+                    </div>
+                  </div>
+
+                  {qty > 0 ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <button
+                        type="button"
+                        onClick={() => updateDishQuantity(dish, -1)}
+                        style={{ width: 22, height: 22, borderRadius: "50%", border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text)", fontWeight: "bold", fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                      >
+                        −
+                      </button>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text)", minWidth: 14, textAlign: "center" }}>{qty}</span>
+                      <button
+                        type="button"
+                        onClick={() => updateDishQuantity(dish, 1)}
+                        style={{ width: 22, height: 22, borderRadius: "50%", border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text)", fontWeight: "bold", fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                      >
+                        +
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => updateDishQuantity(dish, 1)}
+                      style={{
+                        padding: "4px 10px",
+                        borderRadius: 6,
+                        border: "none",
+                        background: accentColor,
+                        color: "white",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Thêm
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <div style={{ marginBottom: 10 }}>
         <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: 3 }}>Yêu cầu đặc biệt</label>
         <textarea
@@ -809,6 +1038,359 @@ function BookingFormCard({ data, accentColor }: { data: any; accentColor: string
           </>
         )}
       </button>
+
+      {/* Full Menu Modal (Centered overlay) */}
+      {showMenuModal && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "rgba(0,0,0,0.6)",
+          zIndex: 100000,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "16px",
+          backdropFilter: "blur(4px)",
+        }}>
+          <div style={{
+            background: "var(--card)",
+            borderRadius: 20,
+            width: "100%",
+            maxWidth: 500,
+            maxHeight: "80vh",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
+            border: "1px solid var(--border)",
+            overflow: "hidden",
+          }}>
+            {/* Header */}
+            <div style={{ padding: "16px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h3 style={{ fontSize: 15, fontWeight: 800, color: "var(--text)", margin: 0 }}>Thực đơn nhà hàng</h3>
+              <button
+                type="button"
+                onClick={() => { setShowMenuModal(false); setMenuSearch(""); }}
+                style={{ width: 28, height: 28, borderRadius: "50%", border: "none", background: "var(--surface)", color: "var(--text)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+              >
+                <X style={{ width: 16, height: 16 }} />
+              </button>
+            </div>
+
+            {/* Search Input */}
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: 8 }}>
+              <input
+                type="text"
+                value={menuSearch}
+                onChange={e => setMenuSearch(e.target.value)}
+                placeholder="Tìm món ăn..."
+                style={{
+                  width: "100%",
+                  padding: "9px 12px",
+                  borderRadius: 10,
+                  border: "1.5px solid var(--border)",
+                  background: "var(--surface)",
+                  color: "var(--text)",
+                  fontSize: 13,
+                  outline: "none",
+                  boxSizing: "border-box"
+                }}
+              />
+              
+              {/* Category tabs (only show if no search term) */}
+              {!menuSearch && categories.length > 0 && (
+                <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, scrollbarWidth: "none" }}>
+                  {categories.map(cat => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setActiveCategory(cat.id)}
+                      style={{
+                        padding: "5px 12px",
+                        borderRadius: 20,
+                        fontSize: 12,
+                        fontWeight: 600,
+                        whiteSpace: "nowrap",
+                        cursor: "pointer",
+                        border: activeCategory === cat.id ? `1.5px solid ${accentColor}` : "1.5px solid var(--border)",
+                        background: activeCategory === cat.id ? `${accentColor}12` : "var(--card)",
+                        color: activeCategory === cat.id ? accentColor : "var(--text-muted)",
+                        transition: "all 0.15s",
+                      }}
+                    >
+                      {cat.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Scrollable Dishes List */}
+            <div style={{ flex: 1, overflowY: "auto", padding: "16px", display: "flex", flexDirection: "column", gap: 12 }}>
+              {dishes
+                .filter((dish: any) => {
+                  const matchesSearch = dish.name.toLowerCase().includes(menuSearch.toLowerCase()) || 
+                    (dish.description && dish.description.toLowerCase().includes(menuSearch.toLowerCase()));
+                  const matchesCategory = menuSearch ? true : dish.categoryId === activeCategory;
+                  return matchesSearch && matchesCategory;
+                })
+                .map((dish: any) => {
+                  const selected = selectedDishes[dish.id];
+                  const qty = selected ? selected.quantity : 0;
+                  return (
+                    <div
+                      key={dish.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                        padding: "10px",
+                        background: "var(--surface)",
+                        borderRadius: 12,
+                        border: "1px solid var(--border)",
+                      }}
+                    >
+                      {dish.imageUrl ? (
+                        <img
+                          src={dish.imageUrl}
+                          alt={dish.name}
+                          onClick={() => setSelectedDetailDish(dish)}
+                          style={{ width: 56, height: 56, borderRadius: 10, objectFit: "cover", cursor: "pointer", flexShrink: 0 }}
+                        />
+                      ) : (
+                        <div
+                          onClick={() => setSelectedDetailDish(dish)}
+                          style={{ width: 56, height: 56, borderRadius: 10, background: "var(--card)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, cursor: "pointer", flexShrink: 0 }}
+                        >
+                          🍲
+                        </div>
+                      )}
+                      
+                      <div style={{ display: "flex", flexDirection: "column", gap: 3, flex: 1 }}>
+                        <span 
+                          onClick={() => setSelectedDetailDish(dish)}
+                          style={{ fontSize: 13, fontWeight: 800, color: "var(--text)", cursor: "pointer" }}
+                        >
+                          {dish.name}
+                        </span>
+                        {dish.description && (
+                          <span style={{ fontSize: 11, color: "var(--text-muted)", lineClamp: 2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.3 }}>
+                            {dish.description}
+                          </span>
+                        )}
+                        <span style={{ fontSize: 12, color: accentColor, fontWeight: 700 }}>
+                          {dish.price.toLocaleString("vi-VN")}đ
+                        </span>
+                      </div>
+
+                      {/* Quantity selector */}
+                      {qty > 0 ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <button
+                            type="button"
+                            onClick={() => updateDishQuantity(dish, -1)}
+                            style={{ width: 26, height: 26, borderRadius: "50%", border: "1px solid var(--border)", background: "var(--card)", color: "var(--text)", fontWeight: "bold", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                          >
+                            −
+                          </button>
+                          <span style={{ fontSize: 13, fontWeight: 800, color: "var(--text)", minWidth: 16, textAlign: "center" }}>{qty}</span>
+                          <button
+                            type="button"
+                            onClick={() => updateDishQuantity(dish, 1)}
+                            style={{ width: 26, height: 26, borderRadius: "50%", border: "1px solid var(--border)", background: "var(--card)", color: "var(--text)", fontWeight: "bold", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                          >
+                            +
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => updateDishQuantity(dish, 1)}
+                          style={{
+                            padding: "6px 12px",
+                            borderRadius: 8,
+                            border: "none",
+                            background: accentColor,
+                            color: "white",
+                            fontSize: 12,
+                            fontWeight: 700,
+                            cursor: "pointer",
+                          }}
+                        >
+                          Thêm
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              {dishes.filter((dish: any) => {
+                const matchesSearch = dish.name.toLowerCase().includes(menuSearch.toLowerCase()) || 
+                  (dish.description && dish.description.toLowerCase().includes(menuSearch.toLowerCase()));
+                const matchesCategory = menuSearch ? true : dish.categoryId === activeCategory;
+                return matchesSearch && matchesCategory;
+              }).length === 0 && (
+                <div style={{ textAlign: "center", padding: "32px 0", color: "var(--text-muted)", fontSize: 13 }}>
+                  Không tìm thấy món ăn phù hợp.
+                </div>
+              )}
+            </div>
+
+            {/* Footer Summary & Confirm button */}
+            <div style={{ padding: "16px", borderTop: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--surface)" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <span style={{ fontSize: 11, color: "var(--text-muted)" }}>Tổng tiền món ăn:</span>
+                <strong style={{ fontSize: 15, color: accentColor }}>
+                  {Object.values(selectedDishes).reduce((sum, item) => sum + item.price * item.quantity, 0).toLocaleString("vi-VN")}đ
+                </strong>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowMenuModal(false)}
+                style={{
+                  padding: "10px 24px",
+                  borderRadius: 12,
+                  border: "none",
+                  background: accentColor,
+                  color: "white",
+                  fontSize: 13,
+                  fontWeight: 800,
+                  cursor: "pointer",
+                }}
+              >
+                Xác nhận
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dish Detail Modal (Centered overlay) */}
+      {selectedDetailDish && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "rgba(0,0,0,0.6)",
+          zIndex: 100001,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "16px",
+          backdropFilter: "blur(4px)",
+        }}>
+          <div style={{
+            background: "var(--card)",
+            borderRadius: 20,
+            width: "100%",
+            maxWidth: 400,
+            boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
+            border: "1px solid var(--border)",
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
+          }}>
+            {/* Header / Image */}
+            <div style={{ position: "relative", width: "100%", height: 200, background: "var(--surface)" }}>
+              {selectedDetailDish.imageUrl ? (
+                <img
+                  src={selectedDetailDish.imageUrl}
+                  alt={selectedDetailDish.name}
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              ) : (
+                <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 64 }}>
+                  🍲
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setSelectedDetailDish(null)}
+                style={{
+                  position: "absolute",
+                  top: 12,
+                  right: 12,
+                  width: 30,
+                  height: 30,
+                  borderRadius: "50%",
+                  border: "none",
+                  background: "rgba(0,0,0,0.5)",
+                  color: "white",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                }}
+              >
+                <X style={{ width: 16, height: 16 }} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+                <h3 style={{ fontSize: 16, fontWeight: 900, color: "var(--text)", margin: 0 }}>{selectedDetailDish.name}</h3>
+                <span style={{ fontSize: 15, fontWeight: 800, color: accentColor }}>
+                  {selectedDetailDish.price.toLocaleString("vi-VN")}đ
+                </span>
+              </div>
+
+              {selectedDetailDish.description && (
+                <p style={{ fontSize: 12, color: "var(--text-muted)", margin: 0, lineHeight: 1.5 }}>
+                  {selectedDetailDish.description}
+                </p>
+              )}
+
+              {/* Quantity Selection in Detail */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8, borderTop: "1px solid var(--border)", paddingTop: 16 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>Số lượng đặt trước:</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <button
+                    type="button"
+                    onClick={() => updateDishQuantity(selectedDetailDish, -1)}
+                    style={{ width: 28, height: 28, borderRadius: "50%", border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text)", fontWeight: "bold", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                  >
+                    −
+                  </button>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: "var(--text)", minWidth: 16, textAlign: "center" }}>
+                    {selectedDishes[selectedDetailDish.id]?.quantity || 0}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => updateDishQuantity(selectedDetailDish, 1)}
+                    style={{ width: 28, height: 28, borderRadius: "50%", border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text)", fontWeight: "bold", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div style={{ padding: "16px 20px", background: "var(--surface)", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                onClick={() => setSelectedDetailDish(null)}
+                style={{
+                  padding: "8px 20px",
+                  borderRadius: 10,
+                  border: "none",
+                  background: accentColor,
+                  color: "white",
+                  fontSize: 12,
+                  fontWeight: 800,
+                  cursor: "pointer",
+                }}
+              >
+                Xác nhận
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </form>
   );
 }
