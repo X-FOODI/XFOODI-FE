@@ -253,16 +253,20 @@ function SePayQR({ info, deadline, onSuccess, onSkip }: {
   );
 }
 
-// ── Main page ──────────────────────────────────────────────────────────────────
 export default function NewReservationPage() {
   const { user } = useAuth();
-  const { tenant } = useTenant();
+  const { tenant, refreshTenant } = useTenant();
   const { showToast } = useToast();
   const { mode } = useThemeMode();
   const router = useRouter();
 
+  useEffect(() => {
+    refreshTenant();
+  }, []);
+
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [configFromApi, setConfigFromApi] = useState<any>(null);
 
   // Step 0 — time & guests
   const [date, setDate] = useState("");
@@ -304,6 +308,18 @@ export default function NewReservationPage() {
       setEmail((prev) => prev || user.email || "");
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!tenant) {
+      axiosInstance.get("/restaurants/me")
+        .then((res) => {
+          if (res.data?.data?.metadata?.reservationConfig) {
+            setConfigFromApi(res.data.data.metadata.reservationConfig);
+          }
+        })
+        .catch(err => console.log("Lỗi tải cấu hình:", err));
+    }
+  }, [tenant]);
 
   // Step 3 — result
   const [createdId, setCreatedId] = useState("");
@@ -452,7 +468,7 @@ export default function NewReservationPage() {
   }, [wantPreOrder, menu.length, restaurantId, showToast]);
 
   // Estimate deposit amount based on restaurant settings (reservationConfig)
-  const reservationConfig = tenant?.metadata?.reservationConfig || {};
+  const reservationConfig = configFromApi || tenant?.metadata?.reservationConfig || {};
   const depositEnabled = reservationConfig.deposit_enabled === true;
   const depositAmountSetting = reservationConfig.deposit_amount;
 
