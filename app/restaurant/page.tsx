@@ -8,7 +8,8 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { Button } from "antd";
+import { Button, Dropdown } from "antd";
+import { LogoutOutlined, ProfileOutlined, DashboardOutlined, ShopOutlined, TeamOutlined, PlusOutlined } from "@ant-design/icons";
 import { useAuth } from "@/lib/contexts/AuthContext";
 import authService from "@/lib/services/authService";
 
@@ -324,6 +325,127 @@ function MapEmbed({ address, lat, lng }: { address: string; lat?: number | null;
 
 function PublishedHeader({ props, brandColor }: { props: any; brandColor: string }) {
   const links = Array.isArray(props.links) ? props.links : [];
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [displayName, setDisplayName] = useState<string>("");
+  const [userEmail, setUserEmail] = useState<string>("");
+  const [userAvatar, setUserAvatar] = useState<string>("");
+  const [userRoles, setUserRoles] = useState<string[]>([]);
+  const [restaurantSlug, setRestaurantSlug] = useState<string | null>(null);
+
+  useEffect(() => {
+    const syncAuth = () => {
+      const token = localStorage.getItem("accessToken") || sessionStorage.getItem("accessToken");
+      const user = authService.getCurrentUser();
+      setIsAuthenticated(!!token);
+      setDisplayName(user?.name || user?.fullName || "");
+      setUserEmail(user?.email || "");
+      setUserAvatar(user?.avatar || "");
+      const roles = user?.roles || (user?.role ? [user.role] : []);
+      setUserRoles(roles);
+      setRestaurantSlug(user?.restaurantSlug || null);
+    };
+    syncAuth();
+    window.addEventListener("focus", syncAuth);
+    return () => {
+      window.removeEventListener("focus", syncAuth);
+    };
+  }, []);
+
+  const initials = displayName
+    ? displayName.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()
+    : "U";
+
+  const handleLogout = async () => {
+    try {
+      await authService.logoutServer();
+    } catch (e) {
+      console.warn("Server logout failed", e);
+    }
+    authService.logout();
+    setIsAuthenticated(false);
+    setDisplayName("");
+    setUserEmail("");
+    window.location.href = "/";
+  };
+
+  const hasRole = (role: string) =>
+    userRoles.some((r) => r.toLowerCase() === role.toLowerCase());
+  const isAdmin = hasRole("Admin") || hasRole("SuperAdmin") || hasRole("System Admin");
+  const isOwner = hasRole("Owner");
+  const isStaff = hasRole("Staff");
+
+  const getSubdomainRedirectUrl = () => {
+    if (typeof window === "undefined" || !restaurantSlug) {
+      return hasRole("Owner") ? "/restaurant/dashboard" : "/staff";
+    }
+    const host = window.location.host;
+    const protocol = window.location.protocol;
+    const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1");
+    const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || "xfoodi.website";
+    
+    const targetTenantSubdomain = isLocalhost
+      ? `${restaurantSlug}.localhost`
+      : `${restaurantSlug}.${BASE_DOMAIN}`;
+      
+    const port = host.includes(":") ? `:${host.split(":")[1]}` : "";
+    const targetPath = hasRole("Owner") ? "/restaurant/dashboard" : "/staff";
+    
+    return `${protocol}//${targetTenantSubdomain}${port}${targetPath}`;
+  };
+
+  const userMenuItems = [
+    {
+      key: "profile",
+      icon: <ProfileOutlined />,
+      label: <Link href="/profile">Trang cá nhân</Link>,
+    },
+    {
+      key: "my-reservations",
+      icon: (
+        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ display: "inline" }} className="mr-1.5">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+      ),
+      label: <Link href="/your-reservation">Lịch sử đặt bàn</Link>,
+    },
+    {
+      key: "my-orders",
+      icon: (
+        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ display: "inline" }} className="mr-1.5">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+        </svg>
+      ),
+      label: <Link href="/my-orders">Lịch sử đơn hàng</Link>,
+    },
+    ...(isAdmin ? [{
+      key: "admin-dashboard",
+      icon: <DashboardOutlined />,
+      label: <Link href="/admin/dashboard">Admin Dashboard</Link>,
+    }] : []),
+    ...(isOwner ? [{
+      key: "restaurant-dashboard",
+      icon: <ShopOutlined />,
+      label: <a href={getSubdomainRedirectUrl()}>Restaurant Dashboard</a>,
+    }] : []),
+    ...(isStaff ? [{
+      key: "staff-dashboard",
+      icon: <TeamOutlined />,
+      label: <a href={getSubdomainRedirectUrl()}>Staff Panel</a>,
+    }] : []),
+    ...(!isAdmin && !isOwner && !isStaff ? [{
+      key: "open-restaurant",
+      icon: <PlusOutlined />,
+      label: <Link href="/register-restaurant">Đăng ký nhà hàng</Link>,
+    }] : []),
+    { type: "divider" as const },
+    {
+      key: "logout",
+      icon: <LogoutOutlined />,
+      label: "Đăng xuất",
+      danger: true,
+      onClick: handleLogout,
+    },
+  ];
 
   return (
     <header 
@@ -428,6 +550,76 @@ function PublishedHeader({ props, brandColor }: { props: any; brandColor: string
             >
               {props.ctaText}
             </a>
+          )}
+
+          {isAuthenticated ? (
+            <Dropdown
+              menu={{ items: userMenuItems }}
+              placement="bottomRight"
+              trigger={['click']}
+              popupRender={(menu) => (
+                <div style={{
+                  background: "var(--card, #ffffff)",
+                  borderRadius: "12px",
+                  boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
+                  border: "1px solid var(--border, #f0f0f0)",
+                  overflow: "hidden",
+                  zIndex: 9999
+                }}>
+                  <div style={{
+                    padding: "12px 16px",
+                    borderBottom: "1px solid var(--border, #f0f0f0)"
+                  }}>
+                    <div style={{ fontWeight: 600, fontSize: "14px", color: "var(--text)", marginBottom: 2 }}>
+                      {displayName || "User"}
+                    </div>
+                    <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                      {userEmail || "user@example.com"}
+                    </div>
+                  </div>
+                  {React.cloneElement(menu as React.ReactElement<any>, {
+                    style: { boxShadow: "none", border: "none", background: "transparent" }
+                  })}
+                </div>
+              )}
+            >
+              <button
+                aria-label="User menu"
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: "50%",
+                  overflow: "hidden",
+                  border: `2px solid ${brandColor}`,
+                  padding: 0,
+                  cursor: "pointer",
+                  background: `color-mix(in srgb, ${brandColor} 15%, var(--card))`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  transition: "border-color 0.2s",
+                }}
+              >
+                {userAvatar ? (
+                  <img
+                    src={userAvatar}
+                    alt={displayName}
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                ) : (
+                  <span style={{ fontSize: 13, fontWeight: 700, color: brandColor, userSelect: "none" }}>
+                    {initials}
+                  </span>
+                )}
+              </button>
+            </Dropdown>
+          ) : (
+            <Link href="/login">
+              <Button type="primary" shape="round" style={{ fontWeight: 600, background: brandColor, borderColor: brandColor }}>
+                Đăng nhập
+              </Button>
+            </Link>
           )}
         </div>
       </div>
