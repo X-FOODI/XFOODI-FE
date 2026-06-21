@@ -116,6 +116,15 @@ export interface AvailableTable {
   shape?: string;
   isSuggested?: boolean;
   isCombinedSuggestion?: boolean;
+  has3DView?: boolean;
+  viewDescription?: string | null;
+  defaultViewUrl?: string | null;
+  cubeBackImageUrl?: string | null;
+  cubeBottomImageUrl?: string | null;
+  cubeFrontImageUrl?: string | null;
+  cubeLeftImageUrl?: string | null;
+  cubeRightImageUrl?: string | null;
+  cubeTopImageUrl?: string | null;
 }
 
 export interface ReservationFilterParams {

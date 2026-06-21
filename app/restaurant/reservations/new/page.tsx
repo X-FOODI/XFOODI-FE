@@ -32,6 +32,7 @@ import {
   Search
 } from "lucide-react";
 import { TableMap2D, Layout, Floor } from "@/app/restaurant/tables/components/TableMap2D";
+import TablePreview3DModal from "@/app/restaurant/tables/components/TablePreview3DModal";
 
 // ── Vietnamese banks (reused from wallet page) ─────────────────────────────────
 const VIETNAMESE_BANKS = [
@@ -274,6 +275,8 @@ export default function NewReservationPage() {
   const [currentFloorId, setCurrentFloorId] = useState<string>("");
   const [assignmentMode, setAssignmentMode] = useState<"auto" | "manual">("auto");
   const [pendingConflictTable, setPendingConflictTable] = useState<AvailableTable | null>(null);
+  const [preview360Open, setPreview360Open] = useState(false);
+  const [preview360Table, setPreview360Table] = useState<AvailableTable | null>(null);
 
   // Step 2 — personal info
   const [name, setName] = useState(user?.fullName || user?.name || "");
@@ -823,7 +826,6 @@ export default function NewReservationPage() {
                             onTablePositionChange={() => {}}
                             readOnly={true}
                             selectedTableIds={selectedTableIds}
-                            focusOnSelected={true}
                           />
                         </div>
                       </div>
@@ -844,15 +846,31 @@ export default function NewReservationPage() {
                             Click vào bàn trên sơ đồ để chọn
                           </p>
                         ) : (
-                          <div className="flex flex-col gap-2 mb-4 max-h-[160px] overflow-y-auto pr-1">
+                          <div className="flex flex-col gap-2 mb-4 max-h-[200px] overflow-y-auto pr-1">
                             {selectedTableIds.map(id => {
                               const t = allTables.find(t => t.id === id);
                               if (!t) return null;
+                              const has360 = !!(t.cubeFrontImageUrl || t.defaultViewUrl);
                               return (
-                                <div key={id} className="flex items-center justify-between p-2 bg-[var(--card)] rounded-xl border border-[var(--border)] text-xs">
-                                  <span className="font-bold text-[var(--text)]">Bàn {t.code}</span>
-                                  <span className="text-[var(--text-muted)]">{t.seatingCapacity} chỗ</span>
-                                  <button onClick={() => handleTableToggle(id)} className="bg-transparent border-none cursor-pointer text-[var(--text-muted)] hover:text-red-500 text-sm p-0.5 leading-none">×</button>
+                                <div key={id} className="flex flex-col gap-1.5 p-2 bg-[var(--card)] rounded-xl border border-[var(--border)] text-xs">
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-bold text-[var(--text)]">Bàn {t.code}</span>
+                                    <span className="text-[var(--text-muted)]">{t.seatingCapacity} chỗ</span>
+                                    <button onClick={() => handleTableToggle(id)} className="bg-transparent border-none cursor-pointer text-[var(--text-muted)] hover:text-red-500 text-sm p-0.5 leading-none">×</button>
+                                  </div>
+                                  {has360 && (
+                                    <button
+                                      onClick={() => {
+                                        setPreview360Table(t);
+                                        setPreview360Open(true);
+                                      }}
+                                      className="flex items-center justify-center gap-1.5 w-full rounded-lg py-1 text-[10px] font-bold border cursor-pointer transition-all"
+                                      style={{ background: `${brandColor}18`, borderColor: brandColor, color: brandColor }}
+                                    >
+                                      <span>360°</span>
+                                      <span>Xem góc nhìn 360°</span>
+                                    </button>
+                                  )}
                                 </div>
                               );
                             })}
@@ -1480,6 +1498,52 @@ export default function NewReservationPage() {
           </div>
         </div>
       )}
+
+      {/* ─── 360° PANORAMA PREVIEW MODAL ─── */}
+      {preview360Table && (() => {
+        const t = preview360Table;
+        const getFullUrl = (rawUrl?: string | null) => {
+          if (!rawUrl) return '';
+          if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://') || rawUrl.startsWith('data:')) return rawUrl;
+          const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+          const cleanBase = apiBase.endsWith('/api') ? apiBase.slice(0, -4) : apiBase;
+          const cleanUrl = rawUrl.startsWith('/') ? rawUrl : `/${rawUrl}`;
+          return `${cleanBase}${cleanUrl}`;
+        };
+        const rawUrl = t.cubeFrontImageUrl || t.defaultViewUrl;
+        const imageUrl = rawUrl ? getFullUrl(rawUrl) : undefined;
+        const hasCubemap = !!(t.cubeFrontImageUrl && t.cubeBackImageUrl && t.cubeLeftImageUrl && t.cubeRightImageUrl && t.cubeTopImageUrl && t.cubeBottomImageUrl);
+        const cubeUrls = hasCubemap ? [
+          getFullUrl(t.cubeRightImageUrl),
+          getFullUrl(t.cubeLeftImageUrl),
+          getFullUrl(t.cubeTopImageUrl),
+          getFullUrl(t.cubeBottomImageUrl),
+          getFullUrl(t.cubeFrontImageUrl),
+          getFullUrl(t.cubeBackImageUrl),
+        ] : undefined;
+        return (
+          <TablePreview3DModal
+            open={preview360Open}
+            table={{
+              id: t.id,
+              tenantId: '',
+              name: t.code,
+              seats: t.seatingCapacity,
+              status: 'AVAILABLE',
+              area: t.floor?.name || '',
+              position: { x: 0, y: 0 },
+              shape: (t.shape || 'Square') as any,
+              width: t.width ? Number(t.width) : 80,
+              height: t.height ? Number(t.height) : 80,
+              rotation: t.rotation ? Number(t.rotation) : 0,
+            }}
+            tableImageUrl={imageUrl}
+            cubeUrls={cubeUrls}
+            onClose={() => setPreview360Open(false)}
+            onBookNow={() => setPreview360Open(false)}
+          />
+        );
+      })()}
     </div>
   );
 }
