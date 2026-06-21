@@ -974,18 +974,27 @@ export function ChatAssistant() {
   /* ─────────────── Session & history persistence ─────────────── */
   useEffect(() => {
     if (typeof window === "undefined" || !tenant?.id) return;
-    let sid = localStorage.getItem(`xfoodi-chat-session-${tenant.id}`);
+    const userKey = user?.id ? `-${user.id}` : "-guest";
+    const sessionKey = `xfoodi-chat-session-${tenant.id}${userKey}`;
+    let sid = localStorage.getItem(sessionKey);
     if (!sid) {
       sid = generateSessionId();
-      localStorage.setItem(`xfoodi-chat-session-${tenant.id}`, sid);
+      localStorage.setItem(sessionKey, sid);
     }
     setSessionIdRestaurant(sid);
 
-    const saved = localStorage.getItem(`xfoodi-chat-history-restaurant-${tenant.id}-${sid}`);
+    const historyKey = `xfoodi-chat-history-restaurant-${tenant.id}-${sid}`;
+    const saved = localStorage.getItem(historyKey);
     if (saved) {
-      try { setHistoryRestaurant(JSON.parse(saved)); } catch { /* ignore */ }
+      try {
+        setHistoryRestaurant(JSON.parse(saved));
+      } catch {
+        setHistoryRestaurant([]);
+      }
+    } else {
+      setHistoryRestaurant([]);
     }
-  }, [tenant?.id]);
+  }, [tenant?.id, user?.id]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
