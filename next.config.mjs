@@ -63,6 +63,10 @@ const nextConfig = {
         destination: `${tenantBase}/hubs/:path*`,
       },
       {
+        source: '/uploads/:path*',
+        destination: `${tenantBase}/uploads/:path*`,
+      },
+      {
         source: '/api/:path*',
         destination: `${tenantBase}/api/:path*`,
       },
