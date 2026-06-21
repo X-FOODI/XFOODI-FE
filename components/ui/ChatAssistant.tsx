@@ -10,6 +10,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useParams } from "next/navigation";
 import axiosInstance from "@/lib/services/axiosInstance";
 import reservationService, { AvailableTable } from "@/lib/services/reservationService";
+import paymentService, { TransferInfo } from "@/lib/services/paymentService";
+import PaymentDeadlineCountdown from "@/components/reservations/PaymentDeadlineCountdown";
 import { io } from "socket.io-client";
 import DOMPurify from "dompurify";
 import {
@@ -322,6 +324,32 @@ function BookingFormCard({ data, accentColor }: { data: any; accentColor: string
   const [assignmentMode, setAssignmentMode] = useState<"auto" | "manual">("auto");
   const [createdReservation, setCreatedReservation] = useState<any>(null);
 
+  // Deposit states
+  const [transferInfo, setTransferInfo] = useState<TransferInfo | null>(null);
+  const [depositPaid, setDepositPaid] = useState(false);
+  const [loadingTransfer, setLoadingTransfer] = useState(false);
+  const [pollingPayment, setPollingPayment] = useState(false);
+  const [paymentExpired, setPaymentExpired] = useState(false);
+
+  // Poll payment status if deposit is required
+  useEffect(() => {
+    if (!pollingPayment || !transferInfo || paymentExpired || depositPaid) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const { status } = await paymentService.pollStatus(transferInfo.paymentId);
+        if (status === 1) { // COMPLETED
+          setDepositPaid(true);
+          setPollingPayment(false);
+        }
+      } catch (err) {
+        // ignore polling errors
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [pollingPayment, transferInfo, paymentExpired, depositPaid]);
+
   // Fetch available tables when date, time, or guest count changes
   useEffect(() => {
     if (form.date && form.time && tenant?.id) {
@@ -384,9 +412,28 @@ function BookingFormCard({ data, accentColor }: { data: any; accentColor: string
 
       const response = await axiosInstance.post("/reservations", payload);
       if (response.data?.success && response.data?.data) {
-        setConfirmationCode(response.data.data.confirmationCode);
-        setCreatedReservation(response.data.data);
+        const resData = response.data.data;
+        setConfirmationCode(resData.confirmationCode);
+        setCreatedReservation(resData);
         setSubmitted(true);
+
+        // Fetch transfer info if deposit > 0
+        if (Number(resData.depositAmount) > 0) {
+          setLoadingTransfer(true);
+          try {
+            const info = await paymentService.getTransferInfo({
+              reservationId: resData.id,
+              amount: Number(resData.depositAmount),
+              restaurantId: resData.restaurantId,
+            });
+            setTransferInfo(info);
+            setPollingPayment(true);
+          } catch (pErr) {
+            console.error("Failed to load transfer info in chatbot", pErr);
+          } finally {
+            setLoadingTransfer(false);
+          }
+        }
       } else {
         throw new Error(response.data?.message || "Lỗi bất thường từ máy chủ.");
       }
@@ -408,17 +455,99 @@ function BookingFormCard({ data, accentColor }: { data: any; accentColor: string
       ? dayjs(createdReservation.time).format("HH:mm - DD/MM/YYYY")
       : dayjs(`${form.date}T${form.time}:00`).format("HH:mm - DD/MM/YYYY");
 
+    const hasDeposit = Number(createdReservation?.depositAmount) > 0;
+
     return (
       <div style={{ marginTop: 10, borderRadius: 14, padding: "16px", background: "var(--card)", border: "1.5px solid #22c55e" }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", marginBottom: 12 }}>
-          <CheckCircle2 style={{ width: 28, height: 28, color: "#22c55e", marginBottom: 6 }} />
-          <p style={{ fontWeight: 800, fontSize: 13, color: "#22c55e", margin: 0 }}>Yêu cầu đặt bàn đã được xác nhận!</p>
+          {depositPaid || !hasDeposit ? (
+            <>
+              <CheckCircle2 style={{ width: 28, height: 28, color: "#22c55e", marginBottom: 6 }} />
+              <p style={{ fontWeight: 800, fontSize: 13, color: "#22c55e", margin: 0 }}>
+                {depositPaid ? "Đã nhận cọc & Đặt bàn thành công!" : "Yêu cầu đặt bàn đã được xác nhận!"}
+              </p>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 24, marginBottom: 4 }}>⏳</div>
+              <p style={{ fontWeight: 800, fontSize: 13, color: "#b45309", margin: 0 }}>
+                {paymentExpired ? "Hết hạn thanh toán cọc" : "Vui lòng thanh toán cọc để giữ chỗ"}
+              </p>
+            </>
+          )}
+          
           {confirmationCode && (
             <div style={{ margin: "10px auto 6px", padding: "6px 12px", background: "rgba(34,197,94,0.1)", borderRadius: 8, border: "1px dashed #22c55e", display: "inline-block", fontSize: 13, fontWeight: 800, color: "#22c55e", fontFamily: "monospace" }}>
               MÃ XÁC NHẬN: {confirmationCode}
             </div>
           )}
         </div>
+
+        {/* Payment QR section */}
+        {hasDeposit && !depositPaid && (
+          <div style={{ marginBottom: 12, borderBottom: "1px dashed var(--border)", paddingBottom: 12 }}>
+            {paymentExpired ? (
+              <div style={{ background: "rgba(239,68,68,0.1)", border: "1px solid #ef4444", borderRadius: 10, padding: 12, textAlign: "center", fontSize: 12, color: "#ef4444" }}>
+                Thời gian giữ bàn (5 phút) đã hết hạn. Đặt bàn của bạn đã bị hủy tự động. Vui lòng thực hiện đặt lại.
+              </div>
+            ) : loadingTransfer ? (
+              <div style={{ textAlign: "center", padding: "16px 0", fontSize: 12, color: "var(--text-muted)" }}>
+                Đang khởi tạo mã QR thanh toán...
+              </div>
+            ) : transferInfo ? (
+              <div style={{ textAlign: "center" }}>
+                {createdReservation?.paymentDeadline && (
+                  <div style={{ display: "flex", justifyContent: "center" }}>
+                    <PaymentDeadlineCountdown
+                      deadline={createdReservation.paymentDeadline}
+                      onExpired={() => setPaymentExpired(true)}
+                    />
+                  </div>
+                )}
+                {transferInfo.qrUrl ? (
+                  <img
+                    src={transferInfo.qrUrl}
+                    alt="QR chuyển khoản cọc"
+                    style={{ width: 180, height: 180, borderRadius: 12, border: "1px solid var(--border)", margin: "0 auto 12px", display: "block" }}
+                  />
+                ) : (
+                  <div style={{ padding: 10, background: "var(--surface)", border: "1px dashed var(--border)", borderRadius: 10, fontSize: 11, color: "var(--text-muted)", marginBottom: 10 }}>
+                    Chưa cấu hình QR tự động. Thông tin chuyển khoản:
+                  </div>
+                )}
+
+                <div style={{ background: "var(--surface)", borderRadius: 10, padding: 10, border: "1px solid var(--border)", fontSize: 11, textAlign: "left", display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "var(--text-muted)" }}>Ngân hàng:</span>
+                    <strong style={{ color: "var(--text)" }}>{transferInfo.bankInfo.bankCode}</strong>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "var(--text-muted)" }}>Số tài khoản:</span>
+                    <strong style={{ color: "var(--text)" }}>{transferInfo.bankInfo.accountNumber}</strong>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "var(--text-muted)" }}>Chủ tài khoản:</span>
+                    <strong style={{ color: "var(--text)" }}>{transferInfo.bankInfo.accountName}</strong>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "var(--text-muted)" }}>Số tiền cọc:</span>
+                    <strong style={{ color: "var(--primary, #FF380B)" }}>{transferInfo.amount.toLocaleString("vi-VN")}đ</strong>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2, borderTop: "1px dashed var(--border)", paddingTop: 6 }}>
+                    <span style={{ color: "var(--text-muted)" }}>Nội dung chuyển khoản:</span>
+                    <strong style={{ color: "var(--text)", fontFamily: "monospace", background: "rgba(0,0,0,0.05)", padding: "2px 6px", borderRadius: 4, display: "inline-block" }}>
+                      {transferInfo.transferContent}
+                    </strong>
+                  </div>
+                </div>
+                <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 10, marginBottom: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                  Đang chờ xác nhận thanh toán tự động...
+                </p>
+              </div>
+            ) : null}
+          </div>
+        )}
 
         <div style={{ background: "var(--surface)", borderRadius: 10, padding: "12px", border: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ fontWeight: 700, fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", borderBottom: "1px solid var(--border)", paddingBottom: 4, marginBottom: 2 }}>
@@ -452,7 +581,9 @@ function BookingFormCard({ data, accentColor }: { data: any; accentColor: string
           )}
         </div>
 
-        <p style={{ fontSize: 10.5, color: "var(--text-muted)", textAlign: "center", margin: "10px 0 0" }}>Hệ thống đã gửi email chi tiết xác nhận đặt bàn của bạn.</p>
+        <p style={{ fontSize: 10.5, color: "var(--text-muted)", textAlign: "center", margin: "10px 0 0" }}>
+          {depositPaid || !hasDeposit ? "Hệ thống đã gửi email chi tiết xác nhận đặt bàn của bạn." : "Vui lòng quét QR để thanh toán cọc trong vòng 5 phút để giữ chỗ."}
+        </p>
       </div>
     );
   }
