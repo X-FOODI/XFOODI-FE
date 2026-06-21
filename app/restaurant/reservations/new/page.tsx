@@ -357,6 +357,11 @@ export default function NewReservationPage() {
       }, 0)
     : guests * 25000;
 
+  const selectedCapacity = selectedTableIds.reduce((sum, id) => {
+    const tbl = allTables.find((t) => t.id === id);
+    return sum + (tbl ? tbl.seatingCapacity : 0);
+  }, 0);
+
   // ── Step 0 → 1: check available tables ──────────────────────────────────────
   const handleCheckTables = async () => {
     if (!date || !time || !restaurantId) {
@@ -380,6 +385,11 @@ export default function NewReservationPage() {
       const isoTime = new Date(`${date}T${time}:00`).toISOString();
       const tables = await reservationService.checkTables({ restaurantId, time: isoTime, numberOfGuests: guests });
       setAllTables(tables);
+      
+      // Pre-select suggested tables by default
+      const suggestedIds = tables.filter(t => t.isSuggested).map(t => t.id);
+      setSelectedTableIds(suggestedIds);
+      
       setStep(1);
     } catch (err: any) {
       showToast("error", "Lỗi", err?.response?.data?.message || err.message || "Không thể kiểm tra bàn trống");
@@ -626,7 +636,11 @@ export default function NewReservationPage() {
                     </button>
 
                     <button
-                      onClick={() => setAssignmentMode("manual")}
+                      onClick={() => {
+                        setAssignmentMode("manual");
+                        const suggestedIds = allTables.filter(t => t.isSuggested).map(t => t.id);
+                        setSelectedTableIds(suggestedIds);
+                      }}
                       className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
                         assignmentMode === "manual"
                           ? "bg-[var(--primary)]/5 border-[var(--primary)] text-[var(--primary)]"
@@ -652,6 +666,37 @@ export default function NewReservationPage() {
                     </div>
                   ) : (
                     <div className="space-y-4">
+                      {/* Gợi ý ghép bàn / chọn bàn tối ưu */}
+                      {allTables.some(t => t.isSuggested) && (
+                        <div 
+                          className="p-4 rounded-xl border flex items-start gap-3 shadow-sm animate-fadeIn"
+                          style={{
+                            background: "rgba(16, 185, 129, 0.05)",
+                            borderColor: "rgba(16, 185, 129, 0.2)"
+                          }}
+                        >
+                          <span className="text-xl">💡</span>
+                          <div>
+                            <p className="m-0 text-xs font-bold text-[var(--text)]">Gợi ý xếp bàn tối ưu</p>
+                            <p className="m-0 mt-1 text-[11px] text-[var(--text-muted)] leading-relaxed">
+                              {allTables[0]?.isCombinedSuggestion ? (
+                                <>
+                                  Để đủ sức chứa cho đoàn <strong>{guests} khách</strong>, hệ thống đề xuất ghép các bàn: {" "}
+                                  <strong className="text-[var(--text)] animate-pulse">
+                                    {allTables.filter(t => t.isSuggested).map(t => t.code).join(", ")}
+                                  </strong>{" "}
+                                  (tổng sức chứa {allTables.filter(t => t.isSuggested).reduce((sum, t) => sum + t.seatingCapacity, 0)} chỗ).
+                                </>
+                              ) : (
+                                <>
+                                  Hệ thống đề xuất bàn <strong className="text-[var(--text)] animate-pulse">{allTables.find(t => t.isSuggested)?.code}</strong> ({allTables.find(t => t.isSuggested)?.seatingCapacity} chỗ) trống và phù hợp nhất cho đoàn <strong>{guests} khách</strong>.
+                                </>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Floor selection tabs */}
                       {floorsList.length > 1 && (
                         <div className="flex gap-2 border-b border-[var(--border)] pb-2 overflow-x-auto">
@@ -816,15 +861,33 @@ export default function NewReservationPage() {
 
                       {/* Selection Summary list */}
                       {selectedTableIds.length > 0 && (
-                        <div className="p-3.5 rounded-xl bg-emerald-500/5 border border-emerald-500/20 flex items-center gap-3">
-                          <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500">
-                            <Info className="w-4 h-4" />
+                        <div className="space-y-2">
+                          <div 
+                            className={`p-3.5 rounded-xl border flex items-center gap-3 transition-colors duration-300 ${
+                              selectedCapacity >= guests 
+                                ? "bg-emerald-500/5 border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                                : "bg-amber-500/5 border-amber-500/20 text-amber-600 dark:text-amber-400"
+                            }`}
+                          >
+                            <div className={`p-1.5 rounded-lg ${selectedCapacity >= guests ? "bg-emerald-500/10 text-emerald-500" : "bg-amber-500/10 text-amber-500"}`}>
+                              <Info className="w-4 h-4" />
+                            </div>
+                            <p className="text-xs m-0 leading-relaxed flex-1">
+                              {selectedCapacity >= guests ? (
+                                <>
+                                  Đã chọn: <strong>{
+                                    selectedTableIds.map(id => allTables.find(t => t.id === id)?.code).filter(Boolean).join(", ")
+                                  }</strong> (Tổng sức chứa: <strong>{selectedCapacity}/{guests}</strong> chỗ - Hợp lệ).
+                                </>
+                              ) : (
+                                <>
+                                  Đã chọn: <strong>{
+                                    selectedTableIds.map(id => allTables.find(t => t.id === id)?.code).filter(Boolean).join(", ")
+                                  }</strong> (Tổng sức chứa: <strong className="underline">{selectedCapacity}/{guests}</strong> chỗ). Vui lòng chọn thêm bàn để đủ chỗ cho {guests} người.
+                                </>
+                              )}
+                            </p>
                           </div>
-                          <p className="text-xs text-[var(--text)] m-0">
-                            Bạn đã chọn: <strong>{
-                              selectedTableIds.map(id => allTables.find(t => t.id === id)?.code).filter(Boolean).join(", ")
-                            }</strong>
-                          </p>
                         </div>
                       )}
                     </div>
@@ -842,11 +905,11 @@ export default function NewReservationPage() {
                 <Button 
                   type="primary" 
                   onClick={() => setStep(2)} 
-                  disabled={assignmentMode === "manual" && selectedTableIds.length === 0}
+                  disabled={assignmentMode === "manual" && (selectedTableIds.length === 0 || selectedCapacity < guests)}
                   className="flex-[2] rounded-xl h-11 font-bold border-none"
                   style={{ background: brandColor, color: "#fff" }}
                 >
-                  {assignmentMode === "auto" ? "Tiếp tục đặt bàn →" : (selectedTableIds.length > 0 ? `Tiếp tục (${selectedTableIds.length} bàn) →` : "Chọn bàn để tiếp tục")}
+                  {assignmentMode === "auto" ? "Tiếp tục đặt bàn →" : (selectedTableIds.length > 0 ? (selectedCapacity >= guests ? `Tiếp tục (${selectedTableIds.length} bàn) →` : `Thiếu sức chứa (${selectedCapacity}/{guests})`) : "Chọn bàn để tiếp tục")}
                 </Button>
               </div>
             </div>

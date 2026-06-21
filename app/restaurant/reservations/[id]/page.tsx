@@ -197,6 +197,28 @@ export default function ReservationDetailPage() {
           <Link href="/restaurant/reservations" style={{ color: "var(--text-muted)", fontSize: 13, textDecoration: "none" }}>← Danh sách đặt bàn</Link>
         </div>
 
+        {/* Needs Table Assignment warning banner */}
+        {["PENDING", "CONFIRMED"].includes(res.statusValue?.code) && (!res.tables || res.tables.length === 0) && (
+          <div style={{
+            background: "rgba(245, 158, 11, 0.08)",
+            border: "1.5px solid rgba(245, 158, 11, 0.3)",
+            borderRadius: 16,
+            padding: "14px 18px",
+            marginBottom: 16,
+            display: "flex",
+            alignItems: "center",
+            gap: 12
+          }}>
+            <span style={{ fontSize: 20 }}>🍽️</span>
+            <div>
+              <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#d97706" }}>Chưa phân bàn cho khách</h4>
+              <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--text-muted)", lineHeight: "1.4" }}>
+                Đặt bàn này được đặt ở chế độ <strong>Để nhà hàng tự sắp xếp</strong>. Vui lòng nhấn nút <strong>Chỉnh sửa</strong> ở mục Chi tiết đặt bàn bên dưới để kiểm tra bàn trống và phân bàn phù hợp.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Warning Banner for Must Leave By */}
         {res.metadata?.mustLeaveBy && (
           <div style={{

@@ -108,6 +108,8 @@ export interface AvailableTable {
   height?: number;
   rotation?: number;
   shape?: string;
+  isSuggested?: boolean;
+  isCombinedSuggestion?: boolean;
 }
 
 export interface ReservationFilterParams {
