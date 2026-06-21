@@ -347,39 +347,49 @@ export default function NewReservationPage() {
       setCurrentFloorId(prev => prev || allTables[0].floorId);
     }
   }, [allTables]);
-
-  // Build 2D layout for the reservation table picker (auto-positions, no floor layout API needed)
+  // Build 2D layout for the reservation table picker using real coordinates, dimensions and floor backgrounds
   const reservationLayout = useMemo((): Layout => {
     if (!allTables.length) return { id: "empty", name: "", floors: [], activeFloorId: "" };
 
     const floorMap = new Map<string, { id: string; name: string; tables: AvailableTable[] }>();
     for (const t of allTables) {
-      if (!floorMap.has(t.floorId)) floorMap.set(t.floorId, { id: t.floorId, name: t.floor.name, tables: [] });
+      const floorName = t.floor?.name || "Tầng chưa đặt tên";
+      if (!floorMap.has(t.floorId)) floorMap.set(t.floorId, { id: t.floorId, name: floorName, tables: [] });
       floorMap.get(t.floorId)!.tables.push(t);
     }
 
-    const COLS = 5, TW = 72, TH = 64, GX = 44, GY = 52, MARGIN = 36;
     const selectedSet = new Set(selectedTableIds);
 
-    const floors: Floor[] = Array.from(floorMap.values()).map(({ id, name, tables }) => ({
-      id,
-      name,
-      width: Math.max(640, COLS * (TW + GX) + MARGIN * 2 - GX),
-      height: Math.ceil(tables.length / COLS) * (TH + GY) + MARGIN * 2,
-      tables: tables.map((t, i) => ({
-        id: t.id,
-        tenantId: "",
-        name: t.code,
-        seats: t.seatingCapacity,
-        status: (selectedSet.has(t.id) ? "SELECTED" : "AVAILABLE") as "SELECTED" | "AVAILABLE",
-        area: name,
-        position: { x: (i % COLS) * (TW + GX) + MARGIN, y: Math.floor(i / COLS) * (TH + GY) + MARGIN },
-        shape: (t.seatingCapacity >= 8 ? "Rectangle" : t.seatingCapacity >= 5 ? "Oval" : "Square") as "Rectangle" | "Oval" | "Square",
-        width: TW,
-        height: TH,
-        rotation: 0,
-      })),
-    }));
+    const floors: Floor[] = Array.from(floorMap.values()).map(({ id, name, tables }) => {
+      const firstTableFloor = tables[0]?.floor;
+      const floorWidth = firstTableFloor?.width !== undefined && firstTableFloor?.width !== null ? Number(firstTableFloor.width) : 1200;
+      const floorHeight = firstTableFloor?.height !== undefined && firstTableFloor?.height !== null ? Number(firstTableFloor.height) : 800;
+      const floorImageUrl = firstTableFloor?.imageUrl || undefined;
+
+      return {
+        id,
+        name,
+        width: floorWidth,
+        height: floorHeight,
+        backgroundImage: floorImageUrl,
+        tables: tables.map((t) => ({
+          id: t.id,
+          tenantId: "",
+          name: t.code,
+          seats: t.seatingCapacity,
+          status: (selectedSet.has(t.id) ? "SELECTED" : "AVAILABLE") as "SELECTED" | "AVAILABLE",
+          area: name,
+          position: {
+            x: t.positionX !== undefined && t.positionX !== null ? Number(t.positionX) : 0,
+            y: t.positionY !== undefined && t.positionY !== null ? Number(t.positionY) : 0,
+          },
+          shape: (t.shape || "Square") as "Rectangle" | "Oval" | "Square" | "Circle",
+          width: t.width !== undefined && t.width !== null ? Number(t.width) : 80,
+          height: t.height !== undefined && t.height !== null ? Number(t.height) : 80,
+          rotation: t.rotation !== undefined && t.rotation !== null ? Number(t.rotation) : 0,
+        })),
+      };
+    });
 
     const resolvedFloorId = (currentFloorId && floors.some(f => f.id === currentFloorId))
       ? currentFloorId : floors[0]?.id || "";
@@ -805,7 +815,7 @@ export default function NewReservationPage() {
                           </span>
                         </div>
 
-                        <div className="h-[420px] rounded-2xl overflow-hidden border border-[var(--border)] bg-[var(--surface)]">
+                        <div className="h-[500px] md:h-[650px] rounded-2xl overflow-hidden border border-[var(--border)] bg-[var(--surface)]">
                           <TableMap2D
                             layout={reservationLayout}
                             onLayoutChange={handleReservationLayoutChange}
@@ -813,6 +823,7 @@ export default function NewReservationPage() {
                             onTablePositionChange={() => {}}
                             readOnly={true}
                             selectedTableIds={selectedTableIds}
+                            focusOnSelected={true}
                           />
                         </div>
                       </div>
