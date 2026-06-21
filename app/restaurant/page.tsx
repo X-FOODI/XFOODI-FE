@@ -1176,6 +1176,8 @@ export default function RestaurantLandingPage() {
   const [restaurantData, setRestaurantData] = useState<any>(null);
   const { user } = useAuth();
   const [publishedLayout, setPublishedLayout] = useState<any>(null);
+  // layoutChecked: false = still waiting for layout fetch, true = fetch done (with or without layout)
+  const [layoutChecked, setLayoutChecked] = useState(false);
 
   // Fetch public restaurant data by slug — không cần auth
   useEffect(() => {
@@ -1212,7 +1214,15 @@ export default function RestaurantLandingPage() {
   };
 
   useEffect(() => {
-    if (!data.id) return;
+    // If there's no tenantId yet, skip — will re-run once data.id is populated
+    if (!data.id) {
+      // When not in tenant context (no id), no layout to fetch — mark as checked
+      setLayoutChecked(true);
+      return;
+    }
+    
+    // Reset checked state while re-fetching (e.g. tenant change)
+    setLayoutChecked(false);
     
     // Fetch published layout from builder using dynamic URL and disable cache
     const builderUrl = process.env.NEXT_PUBLIC_BUILDER_URL || "http://localhost:3001";
@@ -1223,11 +1233,17 @@ export default function RestaurantLandingPage() {
           const published = layouts.find((l: any) => l.status === "published");
           if (published) {
             setPublishedLayout(published);
+          } else {
+            setPublishedLayout(null);
           }
         }
       })
       .catch((err) => {
         console.warn("Could not load published layout from MongoDB builder:", err);
+      })
+      .finally(() => {
+        // Mark layout check as complete — now it's safe to render
+        setLayoutChecked(true);
       });
   }, [data.id]);
 
@@ -1260,15 +1276,24 @@ export default function RestaurantLandingPage() {
     ? (todayHours.isOpen ? `${todayHours.open} - ${todayHours.close}` : "Đóng cửa hôm nay")
     : (data.businessOpeningHours || "08:00 – 22:00");
 
-  if (loading) {
-    return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg-base)" }}>
-        <div style={{ textAlign: "center" }}>
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 mx-auto mb-4" style={{ borderColor: brandColor }} />
-          <p style={{ color: "var(--text-muted)", fontSize: 15 }}>Đang tải trang nhà hàng...</p>
-        </div>
+  // Spinner shared component
+  const LoadingSpinner = () => (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg-base)" }}>
+      <div style={{ textAlign: "center" }}>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 mx-auto mb-4" style={{ borderColor: brandColor }} />
+        <p style={{ color: "var(--text-muted)", fontSize: 15 }}>Đang tải trang nhà hàng...</p>
       </div>
-    );
+    </div>
+  );
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
+
+  // Wait until layout fetch completes before rendering (prevents flash of default template)
+  // Only wait when we have a tenantId (data.id) — otherwise render fallback template immediately
+  if (data.id && !layoutChecked) {
+    return <LoadingSpinner />;
   }
 
   if (publishedLayout) {

@@ -394,10 +394,12 @@ function BookingFormCard({ data, accentColor }: { data: any; accentColor: string
           onChange={(val) => setForm(prev => ({ ...prev, date: val ? val.format("YYYY-MM-DD") : "" }))}
           disabledDate={(current) => current && current < dayjs().startOf("day")}
           style={{ width: "100%", height: 38, borderRadius: 8 }}
-          placeholder="Chọn ngày đặt bàn"
+          placeholder="dd/mm/yyyy"
           format="DD/MM/YYYY"
           allowClear={false}
-          inputReadOnly={true}
+          // Mount popup outside chatbox container to avoid overflow:clip clipping the panel
+          getPopupContainer={() => document.body}
+          popupStyle={{ zIndex: 99999 }}
         />
       </div>
 
@@ -410,9 +412,11 @@ function BookingFormCard({ data, accentColor }: { data: any; accentColor: string
           format="HH:mm"
           minuteStep={15}
           style={{ width: "100%", height: 38, borderRadius: 8 }}
-          placeholder="Chọn giờ đến"
+          placeholder="hh:mm"
           allowClear={false}
-          inputReadOnly={true}
+          // Mount popup outside chatbox container to avoid overflow:clip clipping the panel
+          getPopupContainer={() => document.body}
+          popupStyle={{ zIndex: 99999 }}
         />
       </div>
 
@@ -584,7 +588,7 @@ function ChatWindow({
         boxShadow: "0 20px 60px rgba(0,0,0,0.18), 0 4px 16px rgba(0,0,0,0.1)",
         border: "1px solid var(--border)",
         background: "var(--card)",
-        overflow: "hidden",
+        overflow: "clip", // 'clip' keeps rounded corners but doesn't clip fixed/absolute portals
         zIndex: 9998,
         transition: "width 0.25s cubic-bezier(0.4, 0, 0.2, 1), height 0.25s cubic-bezier(0.4, 0, 0.2, 1), bottom 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
       }}
