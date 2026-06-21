@@ -9,6 +9,7 @@ import { useCart } from "@/lib/contexts/CartContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { useParams } from "next/navigation";
 import axiosInstance from "@/lib/services/axiosInstance";
+import reservationService, { AvailableTable } from "@/lib/services/reservationService";
 import { io } from "socket.io-client";
 import DOMPurify from "dompurify";
 import {
@@ -314,12 +315,51 @@ function BookingFormCard({ data, accentColor }: { data: any; accentColor: string
   const [submitted, setSubmitted] = useState(false);
   const [confirmationCode, setConfirmationCode] = useState<string | null>(null);
 
+  // Table selection states
+  const [availableTables, setAvailableTables] = useState<AvailableTable[]>([]);
+  const [selectedTableIds, setSelectedTableIds] = useState<string[]>([]);
+  const [loadingTables, setLoadingTables] = useState(false);
+  const [assignmentMode, setAssignmentMode] = useState<"auto" | "manual">("auto");
+  const [createdReservation, setCreatedReservation] = useState<any>(null);
+
+  // Fetch available tables when date, time, or guest count changes
+  useEffect(() => {
+    if (form.date && form.time && tenant?.id) {
+      const fetchAvailableTables = async () => {
+        setLoadingTables(true);
+        try {
+          const isoTime = new Date(`${form.date}T${form.time}:00`).toISOString();
+          const tables = await reservationService.checkTables({
+            restaurantId: tenant.id,
+            time: isoTime,
+            numberOfGuests: Number(form.guests),
+          });
+          setAvailableTables(tables);
+        } catch (err: any) {
+          console.error("Failed to load tables", err);
+        } finally {
+          setLoadingTables(false);
+        }
+      };
+      fetchAvailableTables();
+    } else {
+      setAvailableTables([]);
+      setSelectedTableIds([]);
+    }
+  }, [form.date, form.time, form.guests, tenant?.id]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.date || !form.time) {
       setError("Vui lòng chọn đầy đủ ngày và giờ đặt bàn.");
       return;
     }
+
+    if (assignmentMode === "manual" && selectedTableIds.length === 0) {
+      setError("Vui lòng chọn ít nhất một bàn hoặc chọn chế độ Tự động xếp bàn.");
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
@@ -333,6 +373,7 @@ function BookingFormCard({ data, accentColor }: { data: any; accentColor: string
         numberOfGuests: Number(form.guests),
         time: new Date(`${form.date}T${form.time}:00`).toISOString(),
         specialRequests: form.note || undefined,
+        tableIds: assignmentMode === "manual" ? selectedTableIds : [],
       };
 
       if (!user) {
@@ -344,6 +385,7 @@ function BookingFormCard({ data, accentColor }: { data: any; accentColor: string
       const response = await axiosInstance.post("/reservations", payload);
       if (response.data?.success && response.data?.data) {
         setConfirmationCode(response.data.data.confirmationCode);
+        setCreatedReservation(response.data.data);
         setSubmitted(true);
       } else {
         throw new Error(response.data?.message || "Lỗi bất thường từ máy chủ.");
@@ -356,20 +398,64 @@ function BookingFormCard({ data, accentColor }: { data: any; accentColor: string
     }
   };
 
-  if (submitted) return (
-    <div style={{ marginTop: 10, borderRadius: 14, padding: "16px", background: "var(--card)", border: "1.5px solid #22c55e", textAlign: "center" }}>
-      <div style={{ display: "flex", justifyContent: "center", marginBottom: 6 }}>
-        <CheckCircle2 style={{ width: 28, height: 28, color: "#22c55e" }} />
-      </div>
-      <p style={{ fontWeight: 800, fontSize: 13, color: "#22c55e", margin: 0 }}>Yêu cầu đặt bàn đã được xác nhận!</p>
-      {confirmationCode && (
-        <div style={{ margin: "10px auto", padding: "6px 12px", background: "rgba(34,197,94,0.1)", borderRadius: 8, border: "1px dashed #22c55e", display: "inline-block", fontSize: 13, fontWeight: 800, color: "#22c55e", fontFamily: "monospace" }}>
-          MÃ XÁC NHẬN: {confirmationCode}
+  if (submitted) {
+    const tableCodes = createdReservation?.tables
+      ?.map((t: any) => t.table?.code)
+      .filter(Boolean)
+      .join(", ") || (assignmentMode === "manual" ? selectedTableIds.map(id => availableTables.find(t => t.id === id)?.code).filter(Boolean).join(", ") : "Chờ xếp bàn");
+
+    const formattedTime = createdReservation?.time
+      ? dayjs(createdReservation.time).format("HH:mm - DD/MM/YYYY")
+      : dayjs(`${form.date}T${form.time}:00`).format("HH:mm - DD/MM/YYYY");
+
+    return (
+      <div style={{ marginTop: 10, borderRadius: 14, padding: "16px", background: "var(--card)", border: "1.5px solid #22c55e" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", marginBottom: 12 }}>
+          <CheckCircle2 style={{ width: 28, height: 28, color: "#22c55e", marginBottom: 6 }} />
+          <p style={{ fontWeight: 800, fontSize: 13, color: "#22c55e", margin: 0 }}>Yêu cầu đặt bàn đã được xác nhận!</p>
+          {confirmationCode && (
+            <div style={{ margin: "10px auto 6px", padding: "6px 12px", background: "rgba(34,197,94,0.1)", borderRadius: 8, border: "1px dashed #22c55e", display: "inline-block", fontSize: 13, fontWeight: 800, color: "#22c55e", fontFamily: "monospace" }}>
+              MÃ XÁC NHẬN: {confirmationCode}
+            </div>
+          )}
         </div>
-      )}
-      <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "4px 0 0" }}>Hệ thống đã gửi email xác nhận đặt bàn của bạn.</p>
-    </div>
-  );
+
+        <div style={{ background: "var(--surface)", borderRadius: 10, padding: "12px", border: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ fontWeight: 700, fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", borderBottom: "1px solid var(--border)", paddingBottom: 4, marginBottom: 2 }}>
+            Thông tin đặt bàn
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5 }}>
+            <span style={{ color: "var(--text-muted)" }}>Khách hàng:</span>
+            <span style={{ fontWeight: 700, color: "var(--text)" }}>{createdReservation?.customer?.user?.fullName || form.fullName}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5 }}>
+            <span style={{ color: "var(--text-muted)" }}>Số điện thoại:</span>
+            <span style={{ fontWeight: 600, color: "var(--text)" }}>{createdReservation?.customer?.user?.phoneNumber || form.phoneNumber}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5 }}>
+            <span style={{ color: "var(--text-muted)" }}>Thời gian:</span>
+            <span style={{ fontWeight: 700, color: "var(--text)" }}>{formattedTime}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5 }}>
+            <span style={{ color: "var(--text-muted)" }}>Số khách:</span>
+            <span style={{ fontWeight: 700, color: "var(--text)" }}>{createdReservation?.numberOfGuests || form.guests} người</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5 }}>
+            <span style={{ color: "var(--text-muted)" }}>Bàn xếp:</span>
+            <span style={{ fontWeight: 700, color: accentColor }}>{tableCodes}</span>
+          </div>
+          {(createdReservation?.specialRequests || form.note) && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 2, fontSize: 11.5, borderTop: "1px dashed var(--border)", paddingTop: 6, marginTop: 2 }}>
+              <span style={{ color: "var(--text-muted)" }}>Yêu cầu đặc biệt:</span>
+              <span style={{ color: "var(--text)", fontStyle: "italic", whiteSpace: "pre-wrap" }}>{createdReservation?.specialRequests || form.note}</span>
+            </div>
+          )}
+        </div>
+
+        <p style={{ fontSize: 10.5, color: "var(--text-muted)", textAlign: "center", margin: "10px 0 0" }}>Hệ thống đã gửi email chi tiết xác nhận đặt bàn của bạn.</p>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit} style={{ marginTop: 10, background: "var(--surface)", borderRadius: 14, padding: "14px", border: "1px solid var(--border)" }}>
@@ -397,7 +483,6 @@ function BookingFormCard({ data, accentColor }: { data: any; accentColor: string
           placeholder="dd/mm/yyyy"
           format="DD/MM/YYYY"
           allowClear={false}
-          // Mount popup outside chatbox container to avoid overflow:clip clipping the panel
           getPopupContainer={() => document.body}
           popupStyle={{ zIndex: 99999 }}
         />
@@ -414,7 +499,6 @@ function BookingFormCard({ data, accentColor }: { data: any; accentColor: string
           style={{ width: "100%", height: 38, borderRadius: 8 }}
           placeholder="hh:mm"
           allowClear={false}
-          // Mount popup outside chatbox container to avoid overflow:clip clipping the panel
           getPopupContainer={() => document.body}
           popupStyle={{ zIndex: 99999 }}
         />
@@ -441,6 +525,102 @@ function BookingFormCard({ data, accentColor }: { data: any; accentColor: string
           </button>
         </div>
       </div>
+
+      {/* Table selection section */}
+      {form.date && form.time && (
+        <div style={{ marginBottom: 10 }}>
+          <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: 4 }}>
+            Phương thức xếp bàn
+          </label>
+          <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+            <button
+              type="button"
+              onClick={() => setAssignmentMode("auto")}
+              style={{
+                flex: 1,
+                padding: "6px 8px",
+                borderRadius: 8,
+                fontSize: 11,
+                fontWeight: 700,
+                border: assignmentMode === "auto" ? `1.5px solid ${accentColor}` : "1.5px solid var(--border)",
+                background: assignmentMode === "auto" ? `color-mix(in srgb, ${accentColor} 8%, var(--card))` : "var(--card)",
+                color: assignmentMode === "auto" ? accentColor : "var(--text)",
+                cursor: "pointer",
+                transition: "all 0.2s",
+              }}
+            >
+              Tự động xếp bàn
+            </button>
+            <button
+              type="button"
+              onClick={() => setAssignmentMode("manual")}
+              style={{
+                flex: 1,
+                padding: "6px 8px",
+                borderRadius: 8,
+                fontSize: 11,
+                fontWeight: 700,
+                border: assignmentMode === "manual" ? `1.5px solid ${accentColor}` : "1.5px solid var(--border)",
+                background: assignmentMode === "manual" ? `color-mix(in srgb, ${accentColor} 8%, var(--card))` : "var(--card)",
+                color: assignmentMode === "manual" ? accentColor : "var(--text)",
+                cursor: "pointer",
+                transition: "all 0.2s",
+              }}
+            >
+              Chọn bàn cụ thể
+            </button>
+          </div>
+
+          {assignmentMode === "manual" && (
+            <div style={{ marginTop: 8, padding: "10px", borderRadius: 8, background: "var(--card)", border: "1px solid var(--border)" }}>
+              {loadingTables ? (
+                <div style={{ fontSize: 11, color: "var(--text-muted)", textAlign: "center", padding: "8px 0" }}>
+                  Đang tìm bàn trống...
+                </div>
+              ) : availableTables.length === 0 ? (
+                <div style={{ fontSize: 11, color: "#ef4444", textAlign: "center", padding: "8px 0" }}>
+                  Không tìm thấy bàn trống phù hợp với thời gian và số khách đã chọn.
+                </div>
+              ) : (
+                <div>
+                  <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 6 }}>
+                    Chọn bàn trống (chọn nhiều bàn):
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, maxHeight: 150, overflowY: "auto", padding: "2px" }}>
+                    {availableTables.map((t) => {
+                      const isSelected = selectedTableIds.includes(t.id);
+                      return (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedTableIds(prev =>
+                              prev.includes(t.id) ? prev.filter(id => id !== t.id) : [...prev, t.id]
+                            );
+                          }}
+                          style={{
+                            padding: "4px 8px",
+                            borderRadius: 6,
+                            fontSize: 11,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            border: isSelected ? `1.5px solid ${accentColor}` : "1.5px solid var(--border)",
+                            background: isSelected ? accentColor : "var(--surface)",
+                            color: isSelected ? "white" : "var(--text)",
+                            transition: "all 0.15s",
+                          }}
+                        >
+                          {t.code} ({t.seatingCapacity} chỗ)
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       <div style={{ marginBottom: 10 }}>
         <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: 3 }}>Yêu cầu đặc biệt</label>
@@ -475,6 +655,12 @@ function BookingFormCard({ data, accentColor }: { data: any; accentColor: string
             </div>
           ))}
         </>
+      )}
+
+      {error && (
+        <div style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(239,68,68,0.1)", border: "1px solid #ef4444", color: "#ef4444", fontSize: 11.5, marginBottom: 10, marginTop: 10, lineHeight: 1.4 }}>
+          {error}
+        </div>
       )}
 
       <button type="submit" disabled={loading} style={{
