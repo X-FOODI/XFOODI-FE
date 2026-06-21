@@ -397,6 +397,7 @@ function BookingFormCard({ data, accentColor }: { data: any; accentColor: string
           placeholder="Chọn ngày đặt bàn"
           format="DD/MM/YYYY"
           allowClear={false}
+          inputReadOnly={true}
         />
       </div>
 
@@ -411,6 +412,7 @@ function BookingFormCard({ data, accentColor }: { data: any; accentColor: string
           style={{ width: "100%", height: 38, borderRadius: 8 }}
           placeholder="Chọn giờ đến"
           allowClear={false}
+          inputReadOnly={true}
         />
       </div>
 
