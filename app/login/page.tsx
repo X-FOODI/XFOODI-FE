@@ -83,7 +83,33 @@ function LoginEmailPageContent() {
 
   useEffect(() => {
     if (mounted && !authLoading && user) {
-      navigateAfterLogin(user);
+      // Only auto-redirect if the session matches the current domain context
+      const doesSessionMatchCurrentDomain = (u: User): boolean => {
+        if (typeof window === 'undefined') return false;
+        const host = window.location.hostname;
+        const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'xfoodi.website';
+
+        const userRoles = u.roles || (u.role ? [u.role] : []);
+        const isAdmin = userRoles.some(r => ['Admin', 'SuperAdmin', 'System Admin'].includes(r));
+        const isRestaurantUser = userRoles.some(r => ['Owner', 'Staff'].includes(r));
+
+        if (isAdmin) {
+          return host === `admin.${BASE_DOMAIN}` || host === 'admin.localhost';
+        }
+
+        if (isRestaurantUser) {
+          if (!u.restaurantSlug) return false;
+          return host === `${u.restaurantSlug}.${BASE_DOMAIN}` || host === `${u.restaurantSlug}.localhost`;
+        }
+
+        // Customers are global, so their session is valid on any non-admin domain
+        const isAdminDomain = host === `admin.${BASE_DOMAIN}` || host === 'admin.localhost';
+        return !isAdminDomain;
+      };
+
+      if (doesSessionMatchCurrentDomain(user)) {
+        navigateAfterLogin(user);
+      }
     }
   }, [mounted, authLoading, user]);
 
