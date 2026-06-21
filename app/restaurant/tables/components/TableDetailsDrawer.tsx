@@ -21,6 +21,11 @@ interface Table {
   rotation?: number;
   qrCodeUrl?: string;
   cubeFrontImageUrl?: string;
+  cubeBackImageUrl?: string;
+  cubeLeftImageUrl?: string;
+  cubeRightImageUrl?: string;
+  cubeTopImageUrl?: string;
+  cubeBottomImageUrl?: string;
   defaultViewUrl?: string;
 }
 
@@ -34,9 +39,11 @@ interface TableDetailsDrawerProps {
   table: Table | null;
   onClose: () => void;
   onSave: (values: Partial<Table>) => void;
-  onSavePanorama?: (tableId: string, file: File | null, clear: boolean) => Promise<void>;
+  onSavePanorama?: (tableId: string, files: Record<string, File | null>, clear: boolean) => Promise<void>;
   onDelete?: () => void;
   floors?: FloorOption[];
+  /** Called when admin clicks the 360° preview button. Only shown when table has a panorama image. */
+  onView360?: () => void;
 }
 
 const STATUS_OPTIONS = [
@@ -62,11 +69,47 @@ const SHAPE_OPTIONS = [
   { labelKey: "shape_oval", value: "Oval" },
 ];
 
+function translateTableDetails(t: any, key: string, options?: Record<string, unknown>): string {
+  const fullKey = `dashboard.tables.details.${key}`;
+  const result = t(fullKey, options);
+  if (result === fullKey) {
+    switch (key) {
+      case "status.available":
+        return "Sẵn sàng";
+      case "status.occupied":
+        return "Có khách";
+      case "status_unknown":
+        return "Không xác định";
+      case "qr_title":
+        return `Mã QR Bàn ${options?.number ?? ""}`;
+      case "qr_scan":
+        return "Quét để gọi món";
+      case "qr_load_failed":
+        return "Tải mã QR thất bại";
+      case "copied":
+        return "Đã sao chép";
+      case "copy_link":
+        return "Sao chép liên kết";
+      case "download_qr":
+        return "Tải mã QR";
+      case "title":
+        return "Chi tiết bàn ăn";
+      case "subtitle":
+        return "Quản lý và cấu hình thông tin chi tiết của bàn ăn";
+      case "current_status":
+        return "Trạng thái hiện tại";
+      default:
+        return key;
+    }
+  }
+  return result;
+}
+
 // ─── QR Code Section ───────────────────────────────────────────────────────────
 function QRCodeSection({ qrCodeUrl, tableNumber, tableId }: { qrCodeUrl: string; tableNumber: string; tableId: string }) {
   const { t } = useTranslation();
   const tDetails = (key: string, options?: Record<string, unknown>) =>
-    t(`dashboard.tables.details.${key}`, options);
+    translateTableDetails(t, key, options);
   const [copied, setCopied] = useState(false);
   const [imgError, setImgError] = useState(false);
 
@@ -258,58 +301,183 @@ function QRCodeSection({ qrCodeUrl, tableNumber, tableId }: { qrCodeUrl: string;
 
 function PanoramaSection({
   table,
-  panoramaFile,
-  setPanoramaFile,
-  panoramaPreview,
-  setPanoramaPreview,
+  cubeFiles,
+  setCubeFiles,
+  cubePreviews,
+  setCubePreviews,
   clearPanorama,
   setClearPanorama,
   saving,
   onSavePanorama,
+  onView360,
 }: {
   table: Table;
-  panoramaFile: File | null;
-  setPanoramaFile: (file: File | null) => void;
-  panoramaPreview: string | null;
-  setPanoramaPreview: (url: string | null) => void;
+  cubeFiles: Record<string, File | null>;
+  setCubeFiles: React.Dispatch<React.SetStateAction<Record<string, File | null>>>;
+  cubePreviews: Record<string, string | null>;
+  setCubePreviews: React.Dispatch<React.SetStateAction<Record<string, string | null>>>;
   clearPanorama: boolean;
   setClearPanorama: (v: boolean) => void;
   saving: boolean;
-  onSavePanorama?: (tableId: string, file: File | null, clear: boolean) => Promise<void>;
+  onSavePanorama?: (tableId: string, files: Record<string, File | null>, clear: boolean) => Promise<void>;
+  onView360?: () => void;
 }) {
   const { t } = useTranslation();
-  const fileRef = useRef<HTMLInputElement | null>(null);
-  const currentUrl = panoramaPreview || table.cubeFrontImageUrl || table.defaultViewUrl || null;
+  const faces = [
+    { key: 'Front', label: 'Trước (Front)' },
+    { key: 'Back', label: 'Sau (Back)' },
+    { key: 'Left', label: 'Trái (Left)' },
+    { key: 'Right', label: 'Phải (Right)' },
+    { key: 'Top', label: 'Trên (Top)' },
+    { key: 'Bottom', label: 'Dưới (Bottom)' },
+  ];
+
+  const frontInputRef = useRef<HTMLInputElement | null>(null);
+  const backInputRef = useRef<HTMLInputElement | null>(null);
+  const leftInputRef = useRef<HTMLInputElement | null>(null);
+  const rightInputRef = useRef<HTMLInputElement | null>(null);
+  const topInputRef = useRef<HTMLInputElement | null>(null);
+  const bottomInputRef = useRef<HTMLInputElement | null>(null);
+
+  const fileRefs: Record<string, React.MutableRefObject<HTMLInputElement | null>> = {
+    Front: frontInputRef,
+    Back: backInputRef,
+    Left: leftInputRef,
+    Right: rightInputRef,
+    Top: topInputRef,
+    Bottom: bottomInputRef,
+  };
+
+  const hasAnyImage = faces.some(
+    (f) => cubePreviews[f.key] || (table as any)[`cube${f.key}ImageUrl`] || table.defaultViewUrl
+  );
 
   return (
     <motion.div initial={{ scale: 0.96, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.18 }} style={{ marginBottom: 28, borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface)', overflow: 'hidden' }}>
       <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{t('dashboard.tables.details.panorama_title', { defaultValue: 'Ảnh panorama' })}</span>
-        {onSavePanorama && (panoramaFile || clearPanorama) && (
-          <button type="button" disabled={saving} onClick={() => onSavePanorama(table.id, panoramaFile, clearPanorama)} style={{ marginLeft: 'auto', padding: '5px 14px', borderRadius: 8, border: 'none', background: saving ? 'var(--border)' : 'linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%)', color: saving ? 'var(--text-muted)' : '#fff', fontSize: 12, fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{t('dashboard.tables.details.panorama_title', { defaultValue: 'Ảnh Cubemap 360° (6 mặt)' })}</span>
+        {onSavePanorama && (Object.values(cubeFiles).some(Boolean) || clearPanorama) && (
+          <button type="button" disabled={saving} onClick={() => onSavePanorama(table.id, cubeFiles, clearPanorama)} style={{ marginLeft: 'auto', padding: '5px 14px', borderRadius: 8, border: 'none', background: saving ? 'var(--border)' : 'linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%)', color: saving ? 'var(--text-muted)' : '#fff', fontSize: 12, fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
             {saving && (
               <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
                 <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
                 <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
               </svg>
             )}
-            {saving ? 'Đang lưu...' : t('dashboard.tables.details.panorama_save', { defaultValue: 'Lưu ảnh' })}
+            {saving ? 'Đang lưu...' : t('dashboard.tables.details.panorama_save', { defaultValue: 'Lưu 6 mặt' })}
           </button>
         )}
       </div>
       <div style={{ padding: '16px 18px' }}>
-        <div onClick={() => !clearPanorama && fileRef.current?.click()} style={{ borderRadius: 10, border: '1.5px dashed var(--border)', background: 'var(--card)', minHeight: 180, overflow: 'hidden', cursor: clearPanorama ? 'not-allowed' : 'pointer', opacity: clearPanorama ? 0.5 : 1 }}>
-          {currentUrl ? <img src={currentUrl} alt="Panorama" style={{ width: '100%', height: 220, objectFit: 'cover', display: 'block' }} /> : <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 12 }}>{t('dashboard.tables.details.panorama_upload_hint', { defaultValue: 'Bấm để tải ảnh panorama' })}</div>}
+        {/* VIEW 360 BANNER BUTTON */}
+        {hasAnyImage && onView360 && (
+          <div 
+            onClick={onView360}
+            style={{
+              width: '100%',
+              height: 44,
+              borderRadius: 8,
+              background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%)',
+              color: '#fff',
+              fontWeight: 700,
+              fontSize: 12,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              cursor: 'pointer',
+              marginBottom: 16,
+              boxShadow: '0 4px 15px rgba(255, 90, 44, 0.25)',
+              transition: 'transform 0.15s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.01)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+            XEM KHÔNG GIAN 360° (CUBEMAP)
+          </div>
+        )}
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+          {faces.map((f) => {
+            const currentUrl = cubePreviews[f.key] || (table as any)[`cube${f.key}ImageUrl`] || null;
+            return (
+              <div key={f.key} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>{f.label}</span>
+                <div 
+                  onClick={() => !clearPanorama && fileRefs[f.key].current?.click()}
+                  style={{
+                    position: 'relative',
+                    aspectRatio: '1',
+                    borderRadius: 8,
+                    border: '1.5px dashed var(--border)',
+                    background: 'var(--card)',
+                    overflow: 'hidden',
+                    cursor: clearPanorama ? 'not-allowed' : 'pointer',
+                    opacity: clearPanorama ? 0.5 : 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {currentUrl ? (
+                    <img src={currentUrl} alt={f.label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', textAlign: 'center', padding: 4 }}>
+                      + Tải lên
+                    </div>
+                  )}
+
+                  {/* Edit overlay */}
+                  {currentUrl && !clearPanorama && (
+                    <div style={{
+                      position: 'absolute',
+                      inset: 0,
+                      background: 'rgba(0,0,0,0.4)',
+                      opacity: 0,
+                      transition: 'opacity 0.2s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#fff',
+                      fontSize: 10,
+                      fontWeight: 600,
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.opacity = '0'; }}
+                    >
+                      Thay đổi
+                    </div>
+                  )}
+                </div>
+
+                <input 
+                  ref={fileRefs[f.key]} 
+                  type="file" 
+                  accept="image/*" 
+                  style={{ display: 'none' }} 
+                  onClick={(e) => { (e.currentTarget as HTMLInputElement).value = ''; }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] ?? null;
+                    setCubeFiles(prev => ({ ...prev, [f.key]: file }));
+                    if (file) {
+                      setCubePreviews(prev => ({ ...prev, [f.key]: URL.createObjectURL(file) }));
+                    }
+                  }} 
+                />
               </div>
-        <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onClick={(e) => { (e.currentTarget as HTMLInputElement).value = ''; }} onChange={e => {
-          const file = e.target.files?.[0] ?? null;
-          setPanoramaFile(file);
-          if (file) setPanoramaPreview(URL.createObjectURL(file));
-        }} />
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginTop: 10 }}>
+            );
+          })}
+        </div>
+
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginTop: 14 }}>
           <input type="checkbox" checked={clearPanorama} onChange={e => setClearPanorama(e.target.checked)} />
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('dashboard.tables.details.panorama_clear', { defaultValue: 'Xóa ảnh panorama hiện tại' })}</span>
-          </label>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('dashboard.tables.details.panorama_clear', { defaultValue: 'Xóa toàn bộ ảnh Cubemap hiện tại' })}</span>
+        </label>
       </div>
     </motion.div>
   );
@@ -422,10 +590,11 @@ export const TableDetailsDrawer: React.FC<TableDetailsDrawerProps> = ({
   onSavePanorama,
   onDelete,
   floors = [],
+  onView360,
 }) => {
   const { t } = useTranslation();
   const tDetails = (key: string, options?: Record<string, unknown>) =>
-    t(`dashboard.tables.details.${key}`, options);
+    translateTableDetails(t, key, options);
   const [formData, setFormData] = React.useState({
     number: "",
     capacity: 4,
@@ -437,8 +606,12 @@ export const TableDetailsDrawer: React.FC<TableDetailsDrawerProps> = ({
     rotation: 0,
   });
   const [, setErrors] = React.useState<Record<string, string>>({});
-  const [panoramaFile, setPanoramaFile] = useState<File | null>(null);
-  const [panoramaPreview, setPanoramaPreview] = useState<string | null>(null);
+  const [cubeFiles, setCubeFiles] = useState<Record<string, File | null>>({
+    Front: null, Back: null, Left: null, Right: null, Top: null, Bottom: null
+  });
+  const [cubePreviews, setCubePreviews] = useState<Record<string, string | null>>({
+    Front: null, Back: null, Left: null, Right: null, Top: null, Bottom: null
+  });
   const [clearPanorama, setClearPanorama] = useState(false);
   const [panoramaSaving, setPanoramaSaving] = useState(false);
 
@@ -473,8 +646,12 @@ export const TableDetailsDrawer: React.FC<TableDetailsDrawerProps> = ({
         rotation: table.rotation || 0,
       });
     }
-    setPanoramaFile(null);
-    setPanoramaPreview(null);
+    setCubeFiles({
+      Front: null, Back: null, Left: null, Right: null, Top: null, Bottom: null
+    });
+    setCubePreviews({
+      Front: null, Back: null, Left: null, Right: null, Top: null, Bottom: null
+    });
     setClearPanorama(false);
   }, [table, floors]);
 
@@ -508,10 +685,10 @@ export const TableDetailsDrawer: React.FC<TableDetailsDrawerProps> = ({
     setIsSaving(true);
     try {
       await Promise.resolve(onSave(formData));
-      if (onSavePanorama && (panoramaFile || clearPanorama)) {
+      if (onSavePanorama && (Object.values(cubeFiles).some(Boolean) || clearPanorama)) {
         setPanoramaSaving(true);
         try {
-          await onSavePanorama(table.id, panoramaFile, clearPanorama);
+          await onSavePanorama(table.id, cubeFiles, clearPanorama);
         } finally {
           setPanoramaSaving(false);
         }
@@ -522,13 +699,17 @@ export const TableDetailsDrawer: React.FC<TableDetailsDrawerProps> = ({
     }
   };
 
-  const handlePanoramaSaveClick = async (tableId: string, file: File | null, clear: boolean) => {
+  const handlePanoramaSaveClick = async (tableId: string, files: Record<string, File | null>, clear: boolean) => {
     if (!onSavePanorama) return;
     setPanoramaSaving(true);
     try {
-      await onSavePanorama(tableId, file, clear);
-      setPanoramaFile(null);
-      setPanoramaPreview(null);
+      await onSavePanorama(tableId, files, clear);
+      setCubeFiles({
+        Front: null, Back: null, Left: null, Right: null, Top: null, Bottom: null
+      });
+      setCubePreviews({
+        Front: null, Back: null, Left: null, Right: null, Top: null, Bottom: null
+      });
       setClearPanorama(false);
     } finally {
       setPanoramaSaving(false);
@@ -656,6 +837,38 @@ export const TableDetailsDrawer: React.FC<TableDetailsDrawerProps> = ({
                     <p style={{ margin: 0, fontSize: 13, opacity: 0.9, lineHeight: 1.45 }}>
                       {tDetails("subtitle")}
                     </p>
+                    {/* 360° Preview Button — shown only when the table has a panorama image */}
+                    {onView360 && (
+                      <motion.button
+                        whileHover={{ scale: 1.04 }}
+                        whileTap={{ scale: 0.96 }}
+                        type="button"
+                        onClick={onView360}
+                        style={{
+                          marginTop: 14,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          padding: '9px 18px',
+                          borderRadius: 10,
+                          border: '2px solid rgba(255,255,255,0.5)',
+                          background: 'rgba(255,255,255,0.18)',
+                          backdropFilter: 'blur(8px)',
+                          color: '#fff',
+                          fontSize: 13,
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          letterSpacing: '0.3px',
+                        }}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                          <circle cx="12" cy="12" r="10" />
+                          <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
+                          <circle cx="12" cy="12" r="3" />
+                        </svg>
+                        Xem không gian 360°
+                      </motion.button>
+                    )}
                   </div>
 
                   <motion.button
@@ -745,14 +958,15 @@ export const TableDetailsDrawer: React.FC<TableDetailsDrawerProps> = ({
                   {!isDeco && (
                     <PanoramaSection
                       table={table}
-                      panoramaFile={panoramaFile}
-                      setPanoramaFile={setPanoramaFile}
-                      panoramaPreview={panoramaPreview}
-                      setPanoramaPreview={setPanoramaPreview}
+                      cubeFiles={cubeFiles}
+                      setCubeFiles={setCubeFiles}
+                      cubePreviews={cubePreviews}
+                      setCubePreviews={setCubePreviews}
                       clearPanorama={clearPanorama}
                       setClearPanorama={setClearPanorama}
                       saving={panoramaSaving}
                       onSavePanorama={handlePanoramaSaveClick}
+                      onView360={onView360}
                     />
                   )}
 

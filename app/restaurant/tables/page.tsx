@@ -15,6 +15,7 @@ import { AddTableModal } from "./components/AddTableModal";
 import { AddAreaModal } from "./components/AddAreaModal";
 import { TableDetailsDrawer } from "./components/TableDetailsDrawer";
 import { DeleteConfirmModal } from "./components/DeleteConfirmModal";
+import TablePreview3DModal from "./components/TablePreview3DModal";
 import { tableService, floorService, TableStatus } from "@/lib/services/tableService";
 import { extractApiErrorMessage } from "@/lib/utils/extractApiErrorMessage";
 import { useTranslation } from "react-i18next";
@@ -46,6 +47,11 @@ interface Table {
   defaultViewUrl?: string;
   qrCodeUrl?: string;
   cubeFrontImageUrl?: string;
+  cubeBackImageUrl?: string;
+  cubeLeftImageUrl?: string;
+  cubeRightImageUrl?: string;
+  cubeTopImageUrl?: string;
+  cubeBottomImageUrl?: string;
 }
 
 export default function TablesManagementPage() {
@@ -91,6 +97,10 @@ export default function TablesManagementPage() {
 
   const [isUploadingPanorama, setIsUploadingPanorama] = useState(false);
 
+  // 360° Preview modal state
+  const [preview3DOpen, setPreview3DOpen] = useState(false);
+  const [preview3DTable, setPreview3DTable] = useState<{ id: string; name: string; seats: number; shape: string; status: string; imageUrl?: string; cubeUrls?: string[] } | null>(null);
+
   // 1. Load Data
   const fetchTables = async () => {
     try {
@@ -130,6 +140,11 @@ export default function TablesManagementPage() {
           defaultViewUrl: item.defaultViewUrl,
           qrCodeUrl: item.qrCodeUrl,
           cubeFrontImageUrl: withCacheBust(item.cubeFrontImageUrl),
+          cubeBackImageUrl: withCacheBust(item.cubeBackImageUrl),
+          cubeLeftImageUrl: withCacheBust(item.cubeLeftImageUrl),
+          cubeRightImageUrl: withCacheBust(item.cubeRightImageUrl),
+          cubeTopImageUrl: withCacheBust(item.cubeTopImageUrl),
+          cubeBottomImageUrl: withCacheBust(item.cubeBottomImageUrl),
         };
       });
 
@@ -346,17 +361,21 @@ export default function TablesManagementPage() {
     const formData = new FormData(e.currentTarget);
 
     try {
-      const selectedFloorId = formData.get('area') as string;
+      const selectedFloorId = (formData.get('area') as string)?.trim();
+      if (!selectedFloorId || !beFloors.some((f) => f.id === selectedFloorId)) {
+        message.error("Vui lòng chọn khu vực hợp lệ trước khi tạo bàn.");
+        return;
+      }
       const selectedFloor = beFloors.find(f => f.id === selectedFloorId);
       const floorName = selectedFloor?.name || 'Indoor';
       const code = formData.get('number') as string;
-      const seatingCapacity = parseInt(formData.get('capacity') as string);
+      const seatingCapacity = parseInt(formData.get('capacity') as string, 10);
 
       const isDeco = code.startsWith("DECO_");
 
       const newTableData = {
         code,
-        seatingCapacity,
+        seatingCapacity: isDeco ? 0 : seatingCapacity,
         type: floorName,
         floorId: selectedFloorId,
         tableStatusId: TableStatus.Available,
@@ -449,38 +468,26 @@ export default function TablesManagementPage() {
   };
 
   // Upload Panorama Image
-  const handleSavePanorama = async (tableId: string, file: File | null, clear: boolean) => {
+  const handleSavePanorama = async (tableId: string, files: Record<string, File | null>, clear: boolean) => {
     const tableToUpdate = tables.find(t => t.id === tableId);
     if (!tableToUpdate) return;
 
     try {
-      const tableData = {
-        id: tableToUpdate.id,
-        code: String(tableToUpdate.number),
-        seatingCapacity: tableToUpdate.capacity,
-        type: tableToUpdate.area,
-        floorId: tableToUpdate.floorId || selectedFloorId,
-        shape: tableToUpdate.shape,
-        positionX: tableToUpdate.positionX,
-        positionY: tableToUpdate.positionY,
-        width: tableToUpdate.width,
-        height: tableToUpdate.height,
-        rotation: tableToUpdate.rotation,
-        isActive: tableToUpdate.isActive,
-        tableStatusId: tableToUpdate.status === 'occupied' ? TableStatus.Occupied : TableStatus.Available,
-        has3DView: clear ? false : Boolean(file || tableToUpdate.cubeFrontImageUrl || tableToUpdate.defaultViewUrl),
-        viewDescription: clear ? '' : 'Panorama',
-        defaultViewUrl: clear ? '' : (tableToUpdate.cubeFrontImageUrl || tableToUpdate.defaultViewUrl || ''),
-        qrCodeUrl: tableToUpdate.qrCodeUrl,
-        cubeFrontImageUrl: clear ? '' : tableToUpdate.cubeFrontImageUrl,
-      };
+      const fd = new FormData();
+      fd.append('ClearCubemap', String(clear));
 
-      const panoramaPayload = {
-        front: file,
-      };
+      if (!clear) {
+        Object.entries(files).forEach(([face, file]) => {
+          if (file) {
+            fd.append(`Cube${face}Image`, file);
+          }
+        });
+      }
 
       setIsUploadingPanorama(true);
-      await tableService.updateTableWithPanorama(tableId, tableData, panoramaPayload, clear);
+      await axiosInstance.put(`/tables/${tableId}`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
       setIsUploadingPanorama(false);
       message.success("Lưu ảnh panorama thành công");
       fetchTables();
@@ -490,6 +497,7 @@ export default function TablesManagementPage() {
       message.error(extractApiErrorMessage(err, "Lưu ảnh panorama thất bại"));
     }
   };
+
 
   // Floor CRUD handlers
   const handleAddArea = async (values: { name: string; width: number; height: number }) => {
@@ -669,7 +677,7 @@ export default function TablesManagementPage() {
                   onClick={() => setViewMode("view")}
                   className={`px-4 py-2.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
                     viewMode === "view"
-                      ? "bg-white text-gray-900 shadow-md dark:bg-gray-700 dark:text-white"
+                      ? "bg-orange-500 text-white shadow-md"
                       : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                   }`}
                 >
@@ -683,7 +691,7 @@ export default function TablesManagementPage() {
                   onClick={() => setViewMode("edit")}
                   className={`px-4 py-2.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
                     viewMode === "edit"
-                      ? "bg-white text-gray-900 shadow-md dark:bg-gray-700 dark:text-white"
+                      ? "bg-orange-500 text-white shadow-md"
                       : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                   }`}
                 >
@@ -696,7 +704,7 @@ export default function TablesManagementPage() {
                   onClick={() => setViewMode("list")}
                   className={`px-4 py-2.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
                     viewMode === "list"
-                      ? "bg-white text-gray-900 shadow-md dark:bg-gray-700 dark:text-white"
+                      ? "bg-orange-500 text-white shadow-md"
                       : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                   }`}
                 >
@@ -956,6 +964,7 @@ export default function TablesManagementPage() {
         onClose={() => setAddModalOpen(false)}
         onAdd={handleAddTable}
         floors={beFloors.map(f => ({ id: f.id, name: f.name }))}
+        defaultFloorId={selectedFloorId}
       />
 
       {/* ─── TABLE CONFIG DETAILS DRAWER ─── */}
@@ -970,9 +979,77 @@ export default function TablesManagementPage() {
         onSavePanorama={handleSavePanorama}
         onDelete={handleDeleteTable}
         floors={beFloors.map(f => ({ id: f.id, name: f.name }))}
+        onView360={selectedTable?.cubeFrontImageUrl || selectedTable?.defaultViewUrl ? () => {
+          const t = selectedTable;
+          if (!t) return;
+          
+          const getFullUrl = (rawUrl?: string) => {
+            if (!rawUrl) return '';
+            if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://') || rawUrl.startsWith('data:')) {
+              return rawUrl;
+            }
+            const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+            const cleanBase = apiBase.endsWith('/api') ? apiBase.slice(0, -4) : apiBase;
+            const cleanUrl = rawUrl.startsWith('/') ? rawUrl : `/${rawUrl}`;
+            return `${cleanBase}${cleanUrl}`;
+          };
+
+          const rawUrl = t.cubeFrontImageUrl || t.defaultViewUrl;
+          const imageUrl = getFullUrl(rawUrl);
+
+          const hasCubemap = !!(
+            t.cubeFrontImageUrl &&
+            t.cubeBackImageUrl &&
+            t.cubeLeftImageUrl &&
+            t.cubeRightImageUrl &&
+            t.cubeTopImageUrl &&
+            t.cubeBottomImageUrl
+          );
+
+          const cubeUrls = hasCubemap ? [
+            getFullUrl(t.cubeRightImageUrl),
+            getFullUrl(t.cubeLeftImageUrl),
+            getFullUrl(t.cubeTopImageUrl),
+            getFullUrl(t.cubeBottomImageUrl),
+            getFullUrl(t.cubeFrontImageUrl),
+            getFullUrl(t.cubeBackImageUrl),
+          ] : undefined;
+
+          setPreview3DTable({
+            id: t.id,
+            name: t.number,
+            seats: t.capacity,
+            shape: t.shape,
+            status: t.status === 'occupied' ? 'OCCUPIED' : 'AVAILABLE',
+            imageUrl: imageUrl,
+            cubeUrls: cubeUrls,
+          });
+          setPreview3DOpen(true);
+        } : undefined}
       />
 
-      {/* ─── FLOOR ADD AREA MODAL ─── */}
+      {/* ─── 360° PANORAMA PREVIEW MODAL ─── */}
+      <TablePreview3DModal
+        open={preview3DOpen}
+        table={preview3DTable ? {
+          id: preview3DTable.id,
+          tenantId: '',
+          name: preview3DTable.name,
+          seats: preview3DTable.seats,
+          status: preview3DTable.status as any,
+          area: '',
+          position: { x: 0, y: 0 },
+          shape: preview3DTable.shape as any,
+          width: 80,
+          height: 80,
+          rotation: 0,
+        } : null}
+        tableImageUrl={preview3DTable?.imageUrl}
+        cubeUrls={preview3DTable?.cubeUrls}
+        onClose={() => setPreview3DOpen(false)}
+        onBookNow={() => setPreview3DOpen(false)}
+      />
+
       <AddAreaModal
         open={addAreaModalOpen}
         onClose={() => setAddAreaModalOpen(false)}
