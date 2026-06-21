@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { ArrowUp } from "lucide-react";
 
 interface KPICardProps {
   title: string;
@@ -71,19 +72,10 @@ export default function KPICard({
                 : "dashboard-kpi-card-trend-down"
             }`}
           >
-            <svg
-              className={`w-3 h-3 ${trend.isPositive ? "" : "rotate-180"}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2.5}
-                d="M5 15l7-7 7 7"
-              />
-            </svg>
+            <ArrowUp
+              className={`w-3 h-3 transition-transform ${trend.isPositive ? "" : "rotate-180"}`}
+              strokeWidth={2.5}
+            />
             {Math.abs(trend.value)}%
           </span>
         ) : null}

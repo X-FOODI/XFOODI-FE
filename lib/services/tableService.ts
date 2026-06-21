@@ -28,6 +28,11 @@ export interface TableItem {
     qrCodeUrl?: string;
     // Single panorama image URL (front face)
     cubeFrontImageUrl?: string;
+    cubeBackImageUrl?: string;
+    cubeLeftImageUrl?: string;
+    cubeRightImageUrl?: string;
+    cubeTopImageUrl?: string;
+    cubeBottomImageUrl?: string;
 }
 
 /** Panorama image upload payload */
@@ -240,6 +245,11 @@ function buildTableFormData(id: string, table: Partial<TableItem>): FormData {
     if (table.qrCodeUrl !== undefined) fd.append('QRCodeUrl', table.qrCodeUrl ?? '');
     // Pass-through panorama URL so BE does not clear it
     fd.append('CubeFrontImageUrl', table.cubeFrontImageUrl ?? '');
+    fd.append('CubeBackImageUrl', table.cubeBackImageUrl ?? '');
+    fd.append('CubeLeftImageUrl', table.cubeLeftImageUrl ?? '');
+    fd.append('CubeRightImageUrl', table.cubeRightImageUrl ?? '');
+    fd.append('CubeTopImageUrl', table.cubeTopImageUrl ?? '');
+    fd.append('CubeBottomImageUrl', table.cubeBottomImageUrl ?? '');
     fd.append('ClearCubemap', 'false');
     return fd;
 }
@@ -330,6 +340,16 @@ export const tableService = {
     /** DELETE /api/tables/{id} — Requires Admin role */
     deleteTable: async (id: string): Promise<void> => {
         await axiosInstance.delete(`/tables/${id}`);
+    },
+
+    /** DELETE /api/tables — Bulk delete multiple tables at once */
+    bulkDeleteTables: async (ids: string[]): Promise<{ deleted: string[]; skipped: string[]; failed: string[] }> => {
+        const response = await axiosInstance.delete<{
+            success: boolean;
+            message: string;
+            data: { deleted: string[]; skipped: string[]; failed: string[] };
+        }>('/tables', { data: { ids } });
+        return response.data.data;
     },
 
     /** PUT /api/tables/{id}/status — Requires Auth */

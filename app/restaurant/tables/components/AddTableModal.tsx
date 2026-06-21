@@ -2,6 +2,7 @@
 
 import { DropDown } from "@/components/ui/DropDown";
 import { AnimatePresence, motion } from "framer-motion";
+import { ChevronDown, Plus } from "lucide-react";
 import React, { useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
@@ -16,6 +17,7 @@ interface AddTableModalProps {
   onClose: () => void;
   onAdd: (e: React.FormEvent<HTMLFormElement>) => void;
   floors?: FloorOption[];
+  defaultFloorId?: string;
 }
 
 export const AddTableModal: React.FC<AddTableModalProps> = ({
@@ -23,18 +25,36 @@ export const AddTableModal: React.FC<AddTableModalProps> = ({
   onClose,
   onAdd,
   floors = [],
+  defaultFloorId = "",
 }) => {
   const { t } = useTranslation();
   const [mode, setMode] = useState<"table" | "deco">("table");
-  const [decoType, setDecoType] = useState<"PLANT" | "WALL" | "RECEPTION">("PLANT");
+  const [decoType, setDecoType] = useState<"PLANT" | "WALL" | "RECEPTION" | "WINDOW" | "DOOR" | "BAR" | "STAIRS">("PLANT");
   const [decoName, setDecoName] = useState("");
+  const resolveDefaultArea = () => {
+    if (defaultFloorId && floors.some((f) => f.id === defaultFloorId)) {
+      return defaultFloorId;
+    }
+    return floors[0]?.id || "";
+  };
   const [formData, setFormData] = useState({
     number: "",
     capacity: "4",
-    area: floors[0]?.id || "",
+    area: resolveDefaultArea(),
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  React.useEffect(() => {
+    if (!open) return;
+    const nextArea = resolveDefaultArea();
+    if (nextArea) {
+      setFormData((prev) => ({
+        ...prev,
+        area: prev.area && floors.some((f) => f.id === prev.area) ? prev.area : nextArea,
+      }));
+    }
+  }, [open, floors, defaultFloorId]);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -67,8 +87,17 @@ export const AddTableModal: React.FC<AddTableModalProps> = ({
       return;
     }
 
+    if (!formData.area || !floors.some((f) => f.id === formData.area)) {
+      setErrors({
+        area: t("dashboard.tables.add_table_modal.errors.area_required", {
+          defaultValue: "Vui lòng chọn khu vực hợp lệ",
+        }),
+      });
+      return;
+    }
+
     onAdd(e);
-    setFormData({ number: "", capacity: "4", area: floors[0]?.id || "" });
+    setFormData({ number: "", capacity: "4", area: resolveDefaultArea() });
     setDecoName("");
     setErrors({});
   };
@@ -163,16 +192,7 @@ export const AddTableModal: React.FC<AddTableModalProps> = ({
                       alignItems: "center",
                       justifyContent: "center",
                     }}>
-                    <svg
-                      width="28"
-                      height="28"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="#fff"
-                      strokeWidth="2.5"
-                      strokeLinecap="round">
-                      <path d="M12 5v14M5 12h14" />
-                    </svg>
+                    <Plus width={28} height={28} stroke="#fff" strokeWidth={2.5} />
                   </motion.div>
                   <h2
                     style={{
@@ -435,8 +455,12 @@ export const AddTableModal: React.FC<AddTableModalProps> = ({
                               <option value="PLANT">{t("dashboard.tables.add_table_modal.deco_type_plant", { defaultValue: "Cây cảnh (Potted Plant)" })}</option>
                               <option value="WALL">{t("dashboard.tables.add_table_modal.deco_type_wall", { defaultValue: "Vách tường / Hàng rào ngăn (Wall Partition)" })}</option>
                               <option value="RECEPTION">{t("dashboard.tables.add_table_modal.deco_type_reception", { defaultValue: "Quầy lễ tân (Reception Counter)" })}</option>
+                              <option value="WINDOW">{t("dashboard.tables.add_table_modal.deco_type_window", { defaultValue: "Cửa sổ (Window)" })}</option>
+                              <option value="DOOR">{t("dashboard.tables.add_table_modal.deco_type_door", { defaultValue: "Cửa ra vào (Door)" })}</option>
+                              <option value="BAR">{t("dashboard.tables.add_table_modal.deco_type_bar", { defaultValue: "Quầy bar (Bar Counter)" })}</option>
+                              <option value="STAIRS">{t("dashboard.tables.add_table_modal.deco_type_stairs", { defaultValue: "Cầu thang (Stairs)" })}</option>
                             </DropDown>
-                            <svg
+                            <ChevronDown
                               style={{
                                 position: "absolute",
                                 right: 16,
@@ -444,14 +468,11 @@ export const AddTableModal: React.FC<AddTableModalProps> = ({
                                 transform: "translateY(-50%)",
                                 pointerEvents: "none",
                               }}
-                              width="16"
-                              height="16"
-                              viewBox="0 0 24 24"
-                              fill="none"
+                              width={16}
+                              height={16}
                               stroke="var(--text-muted)"
-                              strokeWidth="2.5">
-                              <path d="M6 9l6 6 6-6" strokeLinecap="round" />
-                            </svg>
+                              strokeWidth={2.5}
+                            />
                           </div>
                         </motion.div>
 
@@ -563,22 +584,14 @@ export const AddTableModal: React.FC<AddTableModalProps> = ({
                               </option>
                             ))
                           ) : (
-                            <>
-                              <option value="VIP">
-                                {t("dashboard.tables.add_table_modal.areas.vip")}
-                              </option>
-                              <option value="Indoor">
-                                {t("dashboard.tables.add_table_modal.areas.indoor")}
-                              </option>
-                              <option value="Outdoor">
-                                {t(
-                                  "dashboard.tables.add_table_modal.areas.outdoor",
-                                )}
-                              </option>
-                            </>
+                            <option value="" disabled>
+                              {t("dashboard.tables.add_table_modal.no_floors", {
+                                defaultValue: "Chưa có khu vực — hãy thêm tầng trước",
+                              })}
+                            </option>
                           )}
                         </DropDown>
-                        <svg
+                        <ChevronDown
                           style={{
                             position: "absolute",
                             right: 16,
@@ -586,14 +599,11 @@ export const AddTableModal: React.FC<AddTableModalProps> = ({
                             transform: "translateY(-50%)",
                             pointerEvents: "none",
                           }}
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
+                          width={16}
+                          height={16}
                           stroke="var(--text-muted)"
-                          strokeWidth="2.5">
-                          <path d="M6 9l6 6 6-6" strokeLinecap="round" />
-                        </svg>
+                          strokeWidth={2.5}
+                        />
                       </div>
                     </motion.div>
                   </div>
@@ -648,16 +658,7 @@ export const AddTableModal: React.FC<AddTableModalProps> = ({
                         boxShadow: "0 4px 16px var(--primary-glow)",
                         letterSpacing: "-0.01em",
                       }}>
-                      <svg
-                        width="18"
-                        height="18"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round">
-                        <path d="M12 5v14M5 12h14" />
-                      </svg>
+                      <Plus width={18} height={18} stroke="currentColor" strokeWidth={2.5} />
                       {t("dashboard.tables.add_table_modal.submit")}
                     </motion.button>
                   </motion.div>

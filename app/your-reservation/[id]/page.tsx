@@ -436,9 +436,11 @@ export default function CustomerReservationDetailPage() {
                 <div>
                   <span className="text-[var(--text-muted)] block mb-1">Bàn xếp</span>
                   <span className="font-semibold text-sm">
-                    {res.tables && res.tables.length > 0 
-                      ? res.tables.map(t => t.table?.code).join(", ") 
-                      : "Nhà hàng tự sắp xếp bàn tương đương"}
+                    {res.metadata?.isAutoAssignment === true
+                      ? "Nhà hàng tự sắp xếp bàn tương đương"
+                      : (res.tables && res.tables.length > 0
+                          ? res.tables.map(t => t.table?.code).join(", ")
+                          : "Nhà hàng tự sắp xếp bàn tương đương")}
                   </span>
                 </div>
               </div>

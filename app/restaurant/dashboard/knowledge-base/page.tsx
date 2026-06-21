@@ -115,6 +115,7 @@ interface DocumentItem {
   fileType: string;
   status: "STORED" | "PENDING" | "PROCESSING" | "INDEXED" | "FAILED";
   createdAt: string;
+  errorLog?: string | null;
 }
 
 interface ChatMessage {
@@ -362,6 +363,7 @@ export default function RestaurantKnowledgeBasePage() {
   const [loadingChunks, setLoadingChunks] = useState(false);
 
   const [mounted, setMounted] = useState(false);
+  const [errorLogDoc, setErrorLogDoc] = useState<DocumentItem | null>(null);
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -2232,7 +2234,17 @@ export default function RestaurantKnowledgeBasePage() {
                                           <span className="text-[10px] text-[var(--text-muted)] block mt-0.5">{new Date(doc.createdAt).toLocaleDateString("vi-VN")}</span>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold" style={{ color: st.color, background: st.bg }}>
+                                          <span
+                                            onClick={(e) => {
+                                              if (doc.status === "FAILED") {
+                                                e.stopPropagation();
+                                                setErrorLogDoc(doc);
+                                              }
+                                            }}
+                                            title={doc.status === "FAILED" ? "Click để xem chi tiết lỗi" : undefined}
+                                            className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${doc.status === "FAILED" ? "cursor-pointer hover:opacity-80" : ""}`}
+                                            style={{ color: st.color, background: st.bg }}
+                                          >
                                             {st.label}
                                           </span>
                                           <button
@@ -2291,7 +2303,16 @@ export default function RestaurantKnowledgeBasePage() {
                                   {(() => {
                                     const st = getDocStatus(selectedDoc.status);
                                     return (
-                                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold" style={{ color: st.color, background: st.bg }}>
+                                      <span
+                                        onClick={() => {
+                                          if (selectedDoc.status === "FAILED") {
+                                            setErrorLogDoc(selectedDoc);
+                                          }
+                                        }}
+                                        title={selectedDoc.status === "FAILED" ? "Click để xem chi tiết lỗi" : undefined}
+                                        className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${selectedDoc.status === "FAILED" ? "cursor-pointer hover:opacity-80" : ""}`}
+                                        style={{ color: st.color, background: st.bg }}
+                                      >
                                         {st.label}
                                       </span>
                                     );
@@ -2620,6 +2641,52 @@ export default function RestaurantKnowledgeBasePage() {
 
                 <div className="flex justify-end pt-3 border-t mt-3 flex-shrink-0" style={{ borderColor: "var(--border)" }}>
                   <button type="button" onClick={() => setIsTestSuiteOpen(false)} className="px-4 py-2 text-xs font-bold rounded-lg border hover:bg-[var(--surface)] cursor-pointer" style={{ color: "var(--text)", borderColor: "var(--border)" }}>
+                    Đóng
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+
+      {/* ─── MODAL: ERROR LOG VIEW ─── */}
+      {mounted && typeof document !== "undefined" && createPortal(
+        <AnimatePresence>
+          {errorLogDoc && (
+            <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 0.6 }} exit={{ opacity: 0 }} onClick={() => setErrorLogDoc(null)} className="absolute inset-0 bg-black/60" />
+              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-2xl h-[60vh] z-[1] p-6 rounded-2xl border shadow-2xl flex flex-col" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+                <div className="flex justify-between items-center pb-2 border-b flex-shrink-0" style={{ borderColor: "var(--border)" }}>
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center flex-shrink-0">
+                      <CloseCircleOutlined className="text-base" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-red-600 dark:text-red-400">Chi tiết lỗi xử lý tài liệu</h3>
+                      <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{errorLogDoc.filename}</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setErrorLogDoc(null)} style={{ color: "var(--text-muted)" }} className="flex-shrink-0"><CloseCircleOutlined className="text-lg" /></button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto mt-4 p-4 rounded-xl font-mono text-[11px] leading-relaxed select-text" style={{ background: "var(--bg-base)", color: "var(--text)" }}>
+                  {errorLogDoc.errorLog ? (
+                    <pre className="whitespace-pre-wrap break-all text-red-500/95 dark:text-red-400/95">{errorLogDoc.errorLog}</pre>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full gap-2 text-[var(--text-muted)] font-sans">
+                      <InfoCircleOutlined className="text-2xl" />
+                      <span>Không tìm thấy chi tiết log lỗi cho tài liệu này.</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-end pt-4 flex-shrink-0">
+                  <button
+                    onClick={() => setErrorLogDoc(null)}
+                    className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-[var(--primary)] hover:opacity-90 transition-all"
+                  >
                     Đóng
                   </button>
                 </div>

@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next";
 interface AddAreaModalProps {
   open: boolean;
   onClose: () => void;
-  onSubmit: (values: { name: string; width: number; height: number }) => void;
+  onSubmit: (values: { name: string; width: number; height: number; template?: string }) => void;
   initialName?: string;
   initialWidth?: number;
   initialHeight?: number;
@@ -79,10 +79,13 @@ export const AddAreaModal: React.FC<AddAreaModalProps> = ({
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
+    const templateValue = formData.get("template") as string;
+
     onSubmit({
       name,
       width: showDimensions ? Math.round(widthValue) : initialWidth,
       height: showDimensions ? Math.round(heightValue) : initialHeight,
+      template: showDimensions ? templateValue : undefined,
     });
   };
 
@@ -118,6 +121,32 @@ export const AddAreaModal: React.FC<AddAreaModalProps> = ({
               <p className="text-xs text-red-500 mt-1">{errors.name}</p>
             )}
           </div>
+
+          {showDimensions && (
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-muted)] mb-1">
+                {t("dashboard.tables.add_area_modal.template_label", { defaultValue: "Bố cục mẫu" })}
+              </label>
+              <select
+                name="template"
+                defaultValue="empty"
+                className="w-full px-4 py-2.5 rounded-lg bg-[var(--bg-base)] border border-[var(--border)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/50 mb-4"
+              >
+                <option value="empty" className="bg-[var(--card)] text-[var(--text)]">
+                  {t("dashboard.tables.add_area_modal.template_empty", { defaultValue: "Khu vực trống (Tự thiết kế)" })}
+                </option>
+                <option value="standard" className="bg-[var(--card)] text-[var(--text)]">
+                  {t("dashboard.tables.add_area_modal.template_standard", { defaultValue: "Nhà hàng tiêu chuẩn (Standard)" })}
+                </option>
+                <option value="vip" className="bg-[var(--card)] text-[var(--text)]">
+                  {t("dashboard.tables.add_area_modal.template_vip", { defaultValue: "Phòng VIP sang trọng (Luxury VIP)" })}
+                </option>
+                <option value="cafe_bar" className="bg-[var(--card)] text-[var(--text)]">
+                  {t("dashboard.tables.add_area_modal.template_cafe_bar", { defaultValue: "Quán Cafe & Quầy Bar (Cafe & Bar)" })}
+                </option>
+              </select>
+            </div>
+          )}
 
           {showDimensions && (
             <div className="grid grid-cols-2 gap-4">

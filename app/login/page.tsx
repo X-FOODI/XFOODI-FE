@@ -549,7 +549,7 @@ function LoginEmailPageContent() {
               <div className="space-y-3">
                 <button
                   type="submit"
-                  disabled={loading || unlockLoading}
+                  disabled={loading || unlockLoading || !turnstileToken}
                   className="group relative w-full flex justify-center py-3.5 px-4 border border-transparent text-sm font-bold rounded-2xl text-white bg-[var(--primary)] hover:bg-[#ff5722] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#1a100e] focus:ring-[var(--primary)] transition-all duration-300 shadow-[0_4px_14px_0_rgba(255,56,11,0.39)] hover:shadow-[0_6px_20px_rgba(255,56,11,0.23)] hover:-translate-y-0.5 disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:transform-none"
                 >
                   <span className="absolute inset-y-0 left-0 flex items-center pl-3">
@@ -567,7 +567,7 @@ function LoginEmailPageContent() {
                 <button
                   type="button"
                   onClick={handleUnlockAccount}
-                  disabled={loading || unlockLoading}
+                  disabled={loading || unlockLoading || !turnstileToken}
                   className={`w-full flex items-center justify-center gap-2 py-3 px-4 text-sm font-bold rounded-2xl border transition-all duration-300 bg-transparent cursor-pointer ${
                     isDark 
                       ? 'border-amber-500/30 text-amber-500 hover:text-amber-400 hover:bg-amber-500/5' 
@@ -775,7 +775,7 @@ function LoginEmailPageContent() {
                 <div className="space-y-3">
                   <button
                     type="submit"
-                    disabled={loading}
+                    disabled={loading || !turnstileToken}
                     className="group relative w-full flex justify-center py-3.5 px-4 border border-transparent text-sm font-bold rounded-xl text-white bg-[var(--primary)] hover:bg-[#ff5722] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#1a100e] focus:ring-[var(--primary)] transition-all duration-300 shadow-[0_4px_14px_0_rgba(255,56,11,0.39)] hover:shadow-[0_6px_20px_rgba(255,56,11,0.23)] hover:-translate-y-0.5 disabled:opacity-70 disabled:cursor-not-allowed"
                   >
                     <span className="absolute inset-y-0 left-0 flex items-center pl-3">
@@ -961,7 +961,7 @@ function LoginEmailPageContent() {
                 <div>
                   <button
                     type="submit"
-                    disabled={loading}
+                    disabled={loading || !turnstileToken}
                     className="group relative w-full flex justify-center py-3.5 px-4 border border-transparent text-sm font-bold rounded-xl text-white bg-[var(--primary)] hover:bg-[#ff5722] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#1a100e] focus:ring-[var(--primary)] transition-all duration-300 shadow-[0_4px_14px_0_rgba(255,56,11,0.39)] hover:shadow-[0_6px_20px_rgba(255,56,11,0.23)] hover:-translate-y-0.5 disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:transform-none"
                   >
                     <span className="absolute inset-y-0 left-0 flex items-center pl-3">
