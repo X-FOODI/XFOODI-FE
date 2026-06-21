@@ -176,6 +176,15 @@ const Header: React.FC = () => {
       ),
       label: <Link href="/your-reservation">{t("homepage.header.my_reservations", "Lịch sử đặt bàn")}</Link>,
     },
+    {
+      key: "my-orders",
+      icon: (
+        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ display: "inline" }} className="mr-1.5">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+        </svg>
+      ),
+      label: <Link href="/my-orders">{t("homepage.header.my_orders", "Lịch sử đơn hàng")}</Link>,
+    },
     // Admin Dashboard — chỉ hiện cho Admin
     ...(isAdmin ? [{
       key: "admin-dashboard",
@@ -492,6 +501,24 @@ const Header: React.FC = () => {
               <Link href="/profile" style={{ width: '100%' }}>
                 <Button block size="large" icon={<ProfileOutlined />} style={{ fontWeight: 500 }}>
                   {t("homepage.header.view_profile", "View Profile")}
+                </Button>
+              </Link>
+              <Link href="/your-reservation" style={{ width: '100%' }}>
+                <Button block size="large" icon={
+                  <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                } style={{ fontWeight: 500 }}>
+                  {t("homepage.header.my_reservations", "Lịch sử đặt bàn")}
+                </Button>
+              </Link>
+              <Link href="/my-orders" style={{ width: '100%' }}>
+                <Button block size="large" icon={
+                  <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                  </svg>
+                } style={{ fontWeight: 500 }}>
+                  {t("homepage.header.my_orders", "Lịch sử đơn hàng")}
                 </Button>
               </Link>
               {isAdmin && (

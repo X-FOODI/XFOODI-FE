@@ -89,7 +89,7 @@ export default function ReservationsPage() {
   const [loading, setLoading] = useState(false);
 
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [activeTab, setActiveTab] = useState<"pending" | "confirmed">("pending");
   const [checkInTarget, setCheckInTarget] = useState<Reservation | null>(null);
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
@@ -107,10 +107,12 @@ export default function ReservationsPage() {
         restaurantId,
         page,
         limit: 20,
-        status: statusFilter || undefined,
+        status: activeTab === "pending" ? "PENDING" : "CONFIRMED",
         search: search || undefined,
         from: dateFrom ? new Date(`${dateFrom}T00:00:00+07:00`).toISOString() : undefined,
         to: dateTo ? new Date(`${dateTo}T23:59:59+07:00`).toISOString() : undefined,
+        sortBy: activeTab === "pending" ? "createdAt" : "time",
+        sortOrder: "asc",
       });
       setItems(result.items);
       setTotal(result.total);
@@ -119,7 +121,7 @@ export default function ReservationsPage() {
     } finally {
       setLoading(false);
     }
-  }, [restaurantId, page, statusFilter, search, dateFrom, dateTo]);
+  }, [restaurantId, page, activeTab, search, dateFrom, dateTo]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -192,14 +194,54 @@ export default function ReservationsPage() {
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: "var(--text)", margin: 0 }}>Quản lý Đặt bàn</h1>
-          <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "4px 0 0" }}>{total} đặt bàn</p>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: "var(--text)", margin: 0 }}>Duyệt Đặt bàn</h1>
+          <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "4px 0 0" }}>{total} đặt bàn {activeTab === "pending" ? "chờ duyệt" : "đã xác nhận"}</p>
         </div>
         <Link href="/restaurant/reservations/new">
           <Button type="primary" style={{ background: brandColor, borderColor: brandColor, borderRadius: 10, fontWeight: 700 }}>
             + Đặt bàn mới
           </Button>
         </Link>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: "flex", borderBottom: "1px solid var(--border)", marginBottom: 20 }}>
+        <button
+          onClick={() => { setActiveTab("pending"); setPage(1); }}
+          style={{
+            padding: "12px 24px",
+            fontSize: 14,
+            fontWeight: 700,
+            color: activeTab === "pending" ? brandColor : "var(--text-muted)",
+            borderBottom: activeTab === "pending" ? `3px solid ${brandColor}` : "3px solid transparent",
+            background: "none",
+            borderTop: "none",
+            borderLeft: "none",
+            borderRight: "none",
+            cursor: "pointer",
+            transition: "all 0.2s",
+          }}
+        >
+          📥 Chờ duyệt {activeTab === "pending" ? `(${total})` : ""}
+        </button>
+        <button
+          onClick={() => { setActiveTab("confirmed"); setPage(1); }}
+          style={{
+            padding: "12px 24px",
+            fontSize: 14,
+            fontWeight: 700,
+            color: activeTab === "confirmed" ? brandColor : "var(--text-muted)",
+            borderBottom: activeTab === "confirmed" ? `3px solid ${brandColor}` : "3px solid transparent",
+            background: "none",
+            borderTop: "none",
+            borderLeft: "none",
+            borderRight: "none",
+            cursor: "pointer",
+            transition: "all 0.2s",
+          }}
+        >
+          ✓ Đã xác nhận {activeTab === "confirmed" ? `(${total})` : ""}
+        </button>
       </div>
 
       {/* Top Banner Alert for Pending Actions */}
@@ -231,11 +273,7 @@ export default function ReservationsPage() {
       <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
         <Input.Search placeholder="Tìm mã xác nhận, tên, SĐT..." value={search} onChange={(e) => setSearch(e.target.value)}
           onSearch={() => { setPage(1); fetchData(); }} style={{ width: 280 }} allowClear />
-        <Select value={statusFilter} onChange={(v) => { setStatusFilter(v); setPage(1); }} style={{ width: 180 }}>
-          {STATUS_OPTIONS.map((o) => (
-            <Select.Option key={o.value} value={o.value}>{o.label}</Select.Option>
-          ))}
-        </Select>
+
         {/* Date range filter */}
         <DatePicker.RangePicker
           format="DD/MM/YYYY"
@@ -300,7 +338,26 @@ export default function ReservationsPage() {
                     <td style={{ padding: "12px 16px", fontSize: 13, color: "var(--text)", whiteSpace: "nowrap" }}>{formatTime(r.time)}</td>
                     <td style={{ padding: "12px 16px", fontSize: 13, color: "var(--text)", textAlign: "center" }}>{r.numberOfGuests}</td>
                     <td style={{ padding: "12px 16px", fontSize: 12, color: "var(--text-muted)" }}>
-                      {r.tables?.length > 0 ? r.tables.map((t) => t.table.code).join(", ") : "—"}
+                      {r.tables?.length > 0 ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                          <span>{r.tables.map((t) => t.table.code).join(", ")}</span>
+                          {r.metadata?.isAutoAssignment && (
+                            <span style={{
+                              display: "inline-block",
+                              padding: "1px 4px",
+                              borderRadius: 4,
+                              fontSize: 9,
+                              fontWeight: 700,
+                              background: "rgba(59, 130, 246, 0.08)",
+                              border: "1px solid rgba(59, 130, 246, 0.2)",
+                              color: "#2563eb",
+                              whiteSpace: "nowrap"
+                            }}>
+                              Tự xếp
+                            </span>
+                          )}
+                        </div>
+                      ) : "—"}
                     </td>
                     <td style={{ padding: "12px 16px" }}>
                       <StatusBadge code={r.statusValue?.code ?? ""} name={r.statusValue?.name ?? ""} />

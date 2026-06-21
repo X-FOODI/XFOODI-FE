@@ -171,6 +171,192 @@ export default function RestaurantDashboardPage() {
   }
 
 
+  // Check if user is staff
+  const isOwner = user?.roles?.includes("Owner") || user?.role === "Owner";
+  const isAdminUser = user?.roles?.some(r => ["Admin", "SuperAdmin", "System Admin"].includes(r)) || ["Admin", "SuperAdmin", "System Admin"].includes(user?.role || "");
+  const isStaff = !isOwner && !isAdminUser;
+  const staffRole = user?.role || (user?.roles && user?.roles[0]) || "";
+  const staffPosition = (user as any)?.position || "";
+
+  const isKitchen = /kitchen|bếp|chef/i.test(staffRole) || /kitchen|bếp|chef/i.test(staffPosition);
+  const isWaiter = /waiter|phục vụ/i.test(staffRole) || /waiter|phục vụ/i.test(staffPosition);
+  const isCashier = /cashier|thu ngân/i.test(staffRole) || /cashier|thu ngân/i.test(staffPosition);
+
+  if (isStaff) {
+
+    return (
+      <div className="flex flex-col h-screen overflow-hidden" style={{ background: "var(--bg-base)" }}>
+        <DashboardHeader
+          role="restaurant"
+          restaurantName={tenant?.name ?? "Cửa hàng"}
+          userName={user?.fullName ?? user?.name ?? ""}
+        />
+
+        <div className="flex flex-1 overflow-hidden">
+          <DashboardSidebar
+            role="restaurant"
+            restaurantName={tenant?.name ?? "Cửa hàng"}
+            userName={user?.fullName ?? user?.name ?? ""}
+            userEmail={user?.email ?? ""}
+          />
+
+          <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8" style={{ background: "var(--bg-base)" }}>
+            <div className="max-w-4xl mx-auto space-y-8">
+              {/* Welcome Banner */}
+              <div className="p-6 sm:p-8 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-6" 
+                   style={{ 
+                     background: "linear-gradient(135deg, rgba(255, 90, 44, 0.1) 0%, rgba(255, 90, 44, 0.02) 100%)", 
+                     borderColor: "var(--primary-border)" 
+                   }}>
+                <div className="space-y-2">
+                  <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: "var(--text)" }}>
+                    Xin chào, {user?.fullName || user?.name || "Nhân viên"}! 👋
+                  </h1>
+                  <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                    Chúc bạn có một ngày làm việc tuyệt vời. Bạn đang đăng nhập với vai trò:{" "}
+                    <span className="font-semibold" style={{ color: "var(--primary)" }}>
+                      {isKitchen ? "Nhân viên Bếp" : isWaiter ? "Nhân viên Phục vụ" : isCashier ? "Thu ngân" : staffRole || "Nhân viên"}
+                    </span>
+                  </p>
+                </div>
+                <div className="px-4 py-2 rounded-full text-xs font-semibold uppercase tracking-wider" 
+                     style={{ 
+                       background: "var(--primary)", 
+                       color: "#fff" 
+                     }}>
+                  Ca trực hoạt động
+                </div>
+              </div>
+
+              {/* Role specific quick access cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                {isKitchen && (
+                  <div className="p-6 rounded-2xl border transition-all hover:scale-[1.02] space-y-4" 
+                       style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: "rgba(255, 90, 44, 0.1)", color: "var(--primary)" }}>
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                      </svg>
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="font-bold text-lg" style={{ color: "var(--text)" }}>Màn hình Bếp (KDS)</h3>
+                      <p className="text-sm" style={{ color: "var(--text-muted)" }}>Theo dõi các món ăn cần chế biến, cập nhật trạng thái món phục vụ khách hàng.</p>
+                    </div>
+                    <button
+                      onClick={() => router.push("/restaurant/live-orders")}
+                      className="w-full py-2.5 rounded-lg text-sm font-semibold text-white transition-colors"
+                      style={{ background: "var(--primary)" }}
+                    >
+                      Vào màn hình Bếp
+                    </button>
+                  </div>
+                )}
+
+                {isWaiter && (
+                  <>
+                    <div className="p-6 rounded-2xl border transition-all hover:scale-[1.02] space-y-4" 
+                         style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+                      <div className="w-12 h-12 bg-blue-500/10 text-blue-500 rounded-xl flex items-center justify-center">
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                      <div className="space-y-1">
+                        <h3 className="font-bold text-lg" style={{ color: "var(--text)" }}>Đặt bàn</h3>
+                        <p className="text-sm" style={{ color: "var(--text-muted)" }}>Theo dõi danh sách khách đặt trước, check-in khi khách đến nhà hàng.</p>
+                      </div>
+                      <button
+                        onClick={() => router.push("/restaurant/reservations")}
+                        className="w-full py-2.5 rounded-lg text-sm font-semibold text-white transition-colors"
+                        style={{ background: "var(--primary)" }}
+                      >
+                        Xem danh sách đặt bàn
+                      </button>
+                    </div>
+
+                    <div className="p-6 rounded-2xl border transition-all hover:scale-[1.02] space-y-4" 
+                         style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+                      <div className="w-12 h-12 bg-purple-500/10 text-purple-500 rounded-xl flex items-center justify-center">
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                      <div className="space-y-1">
+                        <h3 className="font-bold text-lg" style={{ color: "var(--text)" }}>Sơ đồ bàn ăn</h3>
+                        <p className="text-sm" style={{ color: "var(--text-muted)" }}>Xem vị trí và trạng thái bàn (Đang trống, Đang ăn, Đang dọn dẹp).</p>
+                      </div>
+                      <button
+                        onClick={() => router.push("/restaurant/tables")}
+                        className="w-full py-2.5 rounded-lg text-sm font-semibold text-white transition-colors"
+                        style={{ background: "var(--primary)" }}
+                      >
+                        Xem sơ đồ bàn
+                      </button>
+                    </div>
+                  </>
+                )}
+
+                {isCashier && (
+                  <>
+                    <div className="p-6 rounded-2xl border transition-all hover:scale-[1.02] space-y-4" 
+                         style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+                      <div className="w-12 h-12 bg-indigo-500/10 text-indigo-500 rounded-xl flex items-center justify-center">
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                      </div>
+                      <div className="space-y-1">
+                        <h3 className="font-bold text-lg" style={{ color: "var(--text)" }}>Hóa đơn & Đơn hàng</h3>
+                        <p className="text-sm" style={{ color: "var(--text-muted)" }}>Xem lịch sử đơn, in hóa đơn và kiểm soát các giao dịch gọi món.</p>
+                      </div>
+                      <button
+                        onClick={() => router.push("/restaurant/orders")}
+                        className="w-full py-2.5 rounded-lg text-sm font-semibold text-white transition-colors"
+                        style={{ background: "var(--primary)" }}
+                      >
+                        Xem lịch sử đơn
+                      </button>
+                    </div>
+
+                    <div className="p-6 rounded-2xl border transition-all hover:scale-[1.02] space-y-4" 
+                         style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+                      <div className="w-12 h-12 bg-emerald-500/10 text-emerald-500 rounded-xl flex items-center justify-center">
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                        </svg>
+                      </div>
+                      <div className="space-y-1">
+                        <h3 className="font-bold text-lg" style={{ color: "var(--text)" }}>Thanh toán</h3>
+                        <p className="text-sm" style={{ color: "var(--text-muted)" }}>Quản lý cổng thanh toán, đối soát doanh thu ca trực nhanh chóng.</p>
+                      </div>
+                      <button
+                        onClick={() => router.push("/restaurant/payments")}
+                        className="w-full py-2.5 rounded-lg text-sm font-semibold text-white transition-colors"
+                        style={{ background: "var(--primary)" }}
+                      >
+                        Quản lý thanh toán
+                      </button>
+                    </div>
+                  </>
+                )}
+
+                {!isKitchen && !isWaiter && !isCashier && (
+                  <div className="p-6 rounded-2xl border transition-all hover:scale-[1.02] space-y-4 col-span-2" 
+                       style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+                    <div className="space-y-1">
+                      <h3 className="font-bold text-lg" style={{ color: "var(--text)" }}>Trang chủ nhân viên</h3>
+                      <p className="text-sm" style={{ color: "var(--text-muted)" }}>Vui lòng sử dụng thanh menu bên trái để truy cập các tính năng phù hợp với vị trí của bạn.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen overflow-hidden" style={{ background: "var(--bg-base)" }}>
       <DashboardHeader

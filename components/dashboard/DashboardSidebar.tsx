@@ -399,7 +399,68 @@ export default function DashboardSidebar({
   ];
 
 
-  const sections = role === "admin" ? adminSections : restaurantSections;
+  // Check user roles/positions
+  const isOwner = user?.roles?.includes("Owner") || user?.role === "Owner";
+  const isAdminUser = role === "admin" || user?.roles?.some(r => ["Admin", "SuperAdmin", "System Admin"].includes(r));
+  const isStaff = !isOwner && !isAdminUser;
+  // Use role field primarily; also check position for more granular access
+  const staffRole = user?.role || (user?.roles && user?.roles[0]) || "";
+  const staffPosition = (user as any)?.position || "";
+
+  const isKitchenRole = /kitchen|bếp|chef/i.test(staffRole) || /kitchen|bếp|chef/i.test(staffPosition);
+  const isWaiterRole = /waiter|phục vụ/i.test(staffRole) || /waiter|phục vụ/i.test(staffPosition);
+  const isCashierRole = /cashier|thu ngân/i.test(staffRole) || /cashier|thu ngân/i.test(staffPosition);
+
+  const findItemById = (id: string): NavItem | undefined => {
+    for (const section of restaurantSections) {
+      const item = section.items.find(i => i.id === id);
+      if (item) return item;
+    }
+    return undefined;
+  };
+
+  let sections: NavSection[] = [];
+  if (role === "admin") {
+    sections = adminSections;
+  } else if (isStaff) {
+    // Customize sections specifically for staff members based on their role
+    const items: NavItem[] = [];
+
+    if (isKitchenRole) {
+      const liveOrders = findItemById("live-orders");
+      if (liveOrders) items.push(liveOrders);
+    } else if (isWaiterRole) {
+      const reservations = findItemById("reservations");
+      const tables = findItemById("tables");
+      if (reservations) items.push(reservations);
+      if (tables) items.push(tables);
+    } else if (isCashierRole) {
+      const reservations = findItemById("reservations");
+      const orders = findItemById("orders");
+      const payments = findItemById("payments");
+      if (reservations) items.push(reservations);
+      if (orders) items.push(orders);
+      if (payments) items.push(payments);
+    } else {
+      // Fallback: show basic operational links
+      const reservations = findItemById("reservations");
+      const tables = findItemById("tables");
+      const liveOrders = findItemById("live-orders");
+      if (reservations) items.push(reservations);
+      if (tables) items.push(tables);
+      if (liveOrders) items.push(liveOrders);
+    }
+
+    sections = [
+      {
+        label: isKitchenRole ? "Bếp" : isWaiterRole ? "Phục vụ" : isCashierRole ? "Thu ngân" : "Nhân viên",
+        items
+      }
+    ];
+  } else {
+    sections = restaurantSections;
+  }
+
   const initials = userName.split(" ").slice(-1)[0]?.[0]?.toUpperCase() ?? "U";
 
   return (

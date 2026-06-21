@@ -100,6 +100,21 @@ export default function EditReservationForm({ reservation, onSave, brandColor = 
         ✏️ Chỉnh sửa đặt bàn
       </h4>
 
+      {reservation.metadata?.isAutoAssignment && (
+        <div style={{
+          padding: "10px 12px",
+          borderRadius: 10,
+          fontSize: 12,
+          background: "rgba(59, 130, 246, 0.08)",
+          border: "1px solid rgba(59, 130, 246, 0.2)",
+          color: "#2563eb",
+          marginBottom: 14,
+          lineHeight: "1.4"
+        }}>
+          ℹ️ Khách chọn chế độ <strong>Để nhà hàng tự sắp xếp bàn</strong>. Bạn có thể tự do thay đổi hoặc chọn bất kỳ bàn trống nào phù hợp cho họ.
+        </div>
+      )}
+
       {/* Number of guests */}
       <div style={{ marginBottom: 14 }}>
         <label style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: 6 }}>

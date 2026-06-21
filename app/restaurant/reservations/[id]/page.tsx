@@ -198,23 +198,45 @@ export default function ReservationDetailPage() {
         </div>
 
         {/* Needs Table Assignment warning banner */}
-        {["PENDING", "CONFIRMED"].includes(res.statusValue?.code) && (!res.tables || res.tables.length === 0) && (
-          <div style={{
-            background: "rgba(245, 158, 11, 0.08)",
-            border: "1.5px solid rgba(245, 158, 11, 0.3)",
-            borderRadius: 16,
-            padding: "14px 18px",
-            marginBottom: 16,
-            display: "flex",
-            alignItems: "center",
-            gap: 12
-          }}>
+        {["PENDING", "CONFIRMED"].includes(res.statusValue?.code) && (res.metadata?.isAutoAssignment || !res.tables || res.tables.length === 0) && (
+          <div style={
+            res.tables && res.tables.length > 0 ? {
+              background: "rgba(16, 185, 129, 0.08)",
+              border: "1.5px solid rgba(16, 185, 129, 0.3)",
+              borderRadius: 16,
+              padding: "14px 18px",
+              marginBottom: 16,
+              display: "flex",
+              alignItems: "center",
+              gap: 12
+            } : {
+              background: "rgba(245, 158, 11, 0.08)",
+              border: "1.5px solid rgba(245, 158, 11, 0.3)",
+              borderRadius: 16,
+              padding: "14px 18px",
+              marginBottom: 16,
+              display: "flex",
+              alignItems: "center",
+              gap: 12
+            }
+          }>
             <span style={{ fontSize: 20 }}>🍽️</span>
             <div>
-              <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#d97706" }}>Chưa phân bàn cho khách</h4>
-              <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--text-muted)", lineHeight: "1.4" }}>
-                Đặt bàn này được đặt ở chế độ <strong>Để nhà hàng tự sắp xếp</strong>. Vui lòng nhấn nút <strong>Chỉnh sửa</strong> ở mục Chi tiết đặt bàn bên dưới để kiểm tra bàn trống và phân bàn phù hợp.
-              </p>
+              {res.tables && res.tables.length > 0 ? (
+                <>
+                  <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#059669" }}>Yêu cầu nhà hàng xếp bàn (Đã gán tự động)</h4>
+                  <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--text-muted)", lineHeight: "1.4" }}>
+                    Khách đặt ở chế độ <strong>Để nhà hàng tự sắp xếp</strong>. Hệ thống đã tự động gán bàn: <strong>{res.tables.map((t) => t.table.code).join(", ")}</strong>. Bạn có thể nhấn <strong>Chỉnh sửa</strong> bên dưới để đổi sang bàn khác tùy ý nếu cần tối ưu không gian.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#d97706" }}>Chưa phân bàn cho khách</h4>
+                  <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--text-muted)", lineHeight: "1.4" }}>
+                    Khách đặt ở chế độ <strong>Để nhà hàng tự sắp xếp</strong> nhưng chưa được phân bàn. Vui lòng nhấn nút <strong>Chỉnh sửa</strong> bên dưới để chọn bàn trống phù hợp.
+                  </p>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -449,7 +471,18 @@ export default function ReservationDetailPage() {
             {[
               { label: "Thời gian", value: fmt(res.time) },
               { label: "Số khách", value: `${res.numberOfGuests} người` },
-              { label: "Bàn", value: res.tables?.length > 0 ? res.tables.map((t) => t.table.code).join(", ") : "Chưa phân bàn" },
+              {
+                label: "Bàn",
+                value: res.tables?.length > 0
+                  ? `${res.tables.map((t) => t.table.code).join(", ")}${
+                      res.metadata?.isAutoAssignment === true
+                        ? " (Tự xếp)"
+                        : res.metadata?.isAutoAssignment === false
+                          ? " (Khách chọn)"
+                          : ""
+                    }`
+                  : "Chưa phân bàn"
+              },
               { label: "Check-in", value: res.checkedInAt ? fmt(res.checkedInAt) : "Chưa check-in" },
               ...(res.metadata?.mustLeaveBy ? [{ label: "Hạn trả bàn", value: fmt(res.metadata.mustLeaveBy), highlight: true }] : []),
             ].map((item) => (

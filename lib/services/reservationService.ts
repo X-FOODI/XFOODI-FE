@@ -48,6 +48,7 @@ export interface Reservation {
     cancellationInfo?: { cancelledReason?: string; at?: string; requestedAt?: string; rejectedAt?: string; refundAmount?: number } | null;
     isCancellationManualReviewPending?: boolean;
     noShowAutoPending?: boolean;
+    isAutoAssignment?: boolean | null;
   };
   refunds?: RefundInfo[];
   createdAt: string;
@@ -90,6 +91,11 @@ export interface CreateReservationDto {
     accountNumber: string;
     accountName: string;
   };
+  dishes?: Array<{
+    dishId: string;
+    quantity: number;
+    note?: string;
+  }>;
 }
 
 export interface AvailableTable {
@@ -98,7 +104,7 @@ export interface AvailableTable {
   seatingCapacity: number;
   type: string;
   floorId: string;
-  floor: { id: string; name: string };
+  floor: { id: string; name: string; width?: number; height?: number; imageUrl?: string };
   tableStatus: { id: string; code: string; name: string };
   isAvailable?: boolean;
   conflictTime?: string | null;
@@ -120,6 +126,8 @@ export interface ReservationFilterParams {
   from?: string;
   to?: string;
   search?: string;
+  sortBy?: string;
+  sortOrder?: string;
 }
 
 export interface UpdateReservationDto {
