@@ -10,6 +10,7 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        primary: "var(--primary)",
         white: "var(--card)",
         black: "var(--bg-base)",
         gray: {

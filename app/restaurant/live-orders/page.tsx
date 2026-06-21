@@ -467,9 +467,9 @@ export default function LiveOrdersPage() {
                       <span className="font-extrabold text-sm text-zinc-100 bg-zinc-800 px-2 py-1 rounded-md border border-zinc-700/50">
                         #{order.reference || order.id.slice(0,6).toUpperCase()}
                       </span>
-                      {order.table && (
+                      {(order.table || !order.reservationId || order.reservationId) && (
                         <span className="text-xs font-extrabold bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2 py-0.5 rounded-md">
-                          {order.table}
+                          {order.table || (order.reservationId ? "Chưa xếp bàn" : "Mang đi")}
                         </span>
                       )}
                     </div>
@@ -687,7 +687,7 @@ export default function LiveOrdersPage() {
                   #{selectedOrder.reference || selectedOrder.id.slice(0, 6).toUpperCase()}
                 </span>
                 <span className="text-sm font-extrabold bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2.5 py-1 rounded-md">
-                  {selectedOrder.table || "Mang đi"}
+                  {selectedOrder.table || (selectedOrder.reservationId ? "Chưa xếp bàn" : "Mang đi")}
                 </span>
                 <span className={`text-xs font-black px-2.5 py-1 rounded-md border uppercase tracking-wider ${
                   selectedOrder.status === "PENDING" ? "bg-amber-500/10 text-amber-500 border-amber-500/20" :

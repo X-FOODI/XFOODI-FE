@@ -32,6 +32,7 @@ import {
   Search
 } from "lucide-react";
 import { TableMap2D, Layout, Floor } from "@/app/restaurant/tables/components/TableMap2D";
+import TablePreview3DModal from "@/app/restaurant/tables/components/TablePreview3DModal";
 
 // ── Vietnamese banks (reused from wallet page) ─────────────────────────────────
 const VIETNAMESE_BANKS = [
@@ -252,16 +253,20 @@ function SePayQR({ info, deadline, onSuccess, onSkip }: {
   );
 }
 
-// ── Main page ──────────────────────────────────────────────────────────────────
 export default function NewReservationPage() {
   const { user } = useAuth();
-  const { tenant } = useTenant();
+  const { tenant, refreshTenant } = useTenant();
   const { showToast } = useToast();
   const { mode } = useThemeMode();
   const router = useRouter();
 
+  useEffect(() => {
+    refreshTenant();
+  }, []);
+
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [configFromApi, setConfigFromApi] = useState<any>(null);
 
   // Step 0 — time & guests
   const [date, setDate] = useState("");
@@ -274,6 +279,8 @@ export default function NewReservationPage() {
   const [currentFloorId, setCurrentFloorId] = useState<string>("");
   const [assignmentMode, setAssignmentMode] = useState<"auto" | "manual">("auto");
   const [pendingConflictTable, setPendingConflictTable] = useState<AvailableTable | null>(null);
+  const [preview360Open, setPreview360Open] = useState(false);
+  const [preview360Table, setPreview360Table] = useState<AvailableTable | null>(null);
 
   // Step 2 — personal info
   const [name, setName] = useState(user?.fullName || user?.name || "");
@@ -301,6 +308,18 @@ export default function NewReservationPage() {
       setEmail((prev) => prev || user.email || "");
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!tenant) {
+      axiosInstance.get("/restaurants/me")
+        .then((res) => {
+          if (res.data?.data?.metadata?.reservationConfig) {
+            setConfigFromApi(res.data.data.metadata.reservationConfig);
+          }
+        })
+        .catch(err => console.log("Lỗi tải cấu hình:", err));
+    }
+  }, [tenant]);
 
   // Step 3 — result
   const [createdId, setCreatedId] = useState("");
@@ -347,39 +366,49 @@ export default function NewReservationPage() {
       setCurrentFloorId(prev => prev || allTables[0].floorId);
     }
   }, [allTables]);
-
-  // Build 2D layout for the reservation table picker (auto-positions, no floor layout API needed)
+  // Build 2D layout for the reservation table picker using real coordinates, dimensions and floor backgrounds
   const reservationLayout = useMemo((): Layout => {
     if (!allTables.length) return { id: "empty", name: "", floors: [], activeFloorId: "" };
 
     const floorMap = new Map<string, { id: string; name: string; tables: AvailableTable[] }>();
     for (const t of allTables) {
-      if (!floorMap.has(t.floorId)) floorMap.set(t.floorId, { id: t.floorId, name: t.floor.name, tables: [] });
+      const floorName = t.floor?.name || "Tầng chưa đặt tên";
+      if (!floorMap.has(t.floorId)) floorMap.set(t.floorId, { id: t.floorId, name: floorName, tables: [] });
       floorMap.get(t.floorId)!.tables.push(t);
     }
 
-    const COLS = 5, TW = 72, TH = 64, GX = 44, GY = 52, MARGIN = 36;
     const selectedSet = new Set(selectedTableIds);
 
-    const floors: Floor[] = Array.from(floorMap.values()).map(({ id, name, tables }) => ({
-      id,
-      name,
-      width: Math.max(640, COLS * (TW + GX) + MARGIN * 2 - GX),
-      height: Math.ceil(tables.length / COLS) * (TH + GY) + MARGIN * 2,
-      tables: tables.map((t, i) => ({
-        id: t.id,
-        tenantId: "",
-        name: t.code,
-        seats: t.seatingCapacity,
-        status: (selectedSet.has(t.id) ? "SELECTED" : "AVAILABLE") as "SELECTED" | "AVAILABLE",
-        area: name,
-        position: { x: (i % COLS) * (TW + GX) + MARGIN, y: Math.floor(i / COLS) * (TH + GY) + MARGIN },
-        shape: (t.seatingCapacity >= 8 ? "Rectangle" : t.seatingCapacity >= 5 ? "Oval" : "Square") as "Rectangle" | "Oval" | "Square",
-        width: TW,
-        height: TH,
-        rotation: 0,
-      })),
-    }));
+    const floors: Floor[] = Array.from(floorMap.values()).map(({ id, name, tables }) => {
+      const firstTableFloor = tables[0]?.floor;
+      const floorWidth = firstTableFloor?.width !== undefined && firstTableFloor?.width !== null ? Number(firstTableFloor.width) : 1200;
+      const floorHeight = firstTableFloor?.height !== undefined && firstTableFloor?.height !== null ? Number(firstTableFloor.height) : 800;
+      const floorImageUrl = firstTableFloor?.imageUrl || undefined;
+
+      return {
+        id,
+        name,
+        width: floorWidth,
+        height: floorHeight,
+        backgroundImage: floorImageUrl,
+        tables: tables.map((t) => ({
+          id: t.id,
+          tenantId: "",
+          name: t.code,
+          seats: t.seatingCapacity,
+          status: (selectedSet.has(t.id) ? "SELECTED" : "AVAILABLE") as "SELECTED" | "AVAILABLE",
+          area: name,
+          position: {
+            x: t.positionX !== undefined && t.positionX !== null ? Number(t.positionX) : 0,
+            y: t.positionY !== undefined && t.positionY !== null ? Number(t.positionY) : 0,
+          },
+          shape: (t.shape || "Square") as "Rectangle" | "Oval" | "Square" | "Circle",
+          width: t.width !== undefined && t.width !== null ? Number(t.width) : 80,
+          height: t.height !== undefined && t.height !== null ? Number(t.height) : 80,
+          rotation: t.rotation !== undefined && t.rotation !== null ? Number(t.rotation) : 0,
+        })),
+      };
+    });
 
     const resolvedFloorId = (currentFloorId && floors.some(f => f.id === currentFloorId))
       ? currentFloorId : floors[0]?.id || "";
@@ -438,13 +467,21 @@ export default function NewReservationPage() {
     }
   }, [wantPreOrder, menu.length, restaurantId, showToast]);
 
-  // Estimate deposit amount (25k per seat capacity of selected tables, or per guest if auto-arranged)
-  const estimatedDeposit = (assignmentMode === "manual" && selectedTableIds.length > 0)
-    ? selectedTableIds.reduce((sum, id) => {
-        const tbl = allTables.find((t) => t.id === id);
-        return sum + (tbl ? tbl.seatingCapacity * 25000 : 0);
-      }, 0)
-    : guests * 25000;
+  // Estimate deposit amount based on restaurant settings (reservationConfig)
+  const reservationConfig = configFromApi || tenant?.metadata?.reservationConfig || {};
+  const depositEnabled = reservationConfig.deposit_enabled === true;
+  const depositAmountSetting = reservationConfig.deposit_amount;
+
+  const estimatedDeposit = !depositEnabled
+    ? 0
+    : (depositAmountSetting !== undefined && depositAmountSetting !== null && Number(depositAmountSetting) > 0)
+      ? Number(depositAmountSetting)
+      : (assignmentMode === "manual" && selectedTableIds.length > 0)
+        ? selectedTableIds.reduce((sum, id) => {
+            const tbl = allTables.find((t) => t.id === id);
+            return sum + (tbl ? tbl.seatingCapacity * 25000 : 0);
+          }, 0)
+        : guests * 25000;
 
   // ── Step 0 → 1: check available tables ──────────────────────────────────────
   const handleCheckTables = async () => {
@@ -548,7 +585,7 @@ export default function NewReservationPage() {
           setTransferInfo(info);
         } catch { /* optional */ }
       } else {
-        showToast("success", "Đặt bàn thành công", `Mã xác nhận: ${res.confirmationCode}`);
+        showToast("success", "Tiếp nhận thành công", "Yêu cầu đặt bàn đã được gửi và đang chờ xác nhận");
       }
       setStep(3);
     } catch (err: any) {
@@ -805,7 +842,7 @@ export default function NewReservationPage() {
                           </span>
                         </div>
 
-                        <div className="h-[420px] rounded-2xl overflow-hidden border border-[var(--border)] bg-[var(--surface)]">
+                        <div className="h-[500px] md:h-[650px] rounded-2xl overflow-hidden border border-[var(--border)] bg-[var(--surface)]">
                           <TableMap2D
                             layout={reservationLayout}
                             onLayoutChange={handleReservationLayoutChange}
@@ -833,15 +870,31 @@ export default function NewReservationPage() {
                             Click vào bàn trên sơ đồ để chọn
                           </p>
                         ) : (
-                          <div className="flex flex-col gap-2 mb-4 max-h-[160px] overflow-y-auto pr-1">
+                          <div className="flex flex-col gap-2 mb-4 max-h-[200px] overflow-y-auto pr-1">
                             {selectedTableIds.map(id => {
                               const t = allTables.find(t => t.id === id);
                               if (!t) return null;
+                              const has360 = !!(t.cubeFrontImageUrl || t.defaultViewUrl);
                               return (
-                                <div key={id} className="flex items-center justify-between p-2 bg-[var(--card)] rounded-xl border border-[var(--border)] text-xs">
-                                  <span className="font-bold text-[var(--text)]">Bàn {t.code}</span>
-                                  <span className="text-[var(--text-muted)]">{t.seatingCapacity} chỗ</span>
-                                  <button onClick={() => handleTableToggle(id)} className="bg-transparent border-none cursor-pointer text-[var(--text-muted)] hover:text-red-500 text-sm p-0.5 leading-none">×</button>
+                                <div key={id} className="flex flex-col gap-1.5 p-2 bg-[var(--card)] rounded-xl border border-[var(--border)] text-xs">
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-bold text-[var(--text)]">Bàn {t.code}</span>
+                                    <span className="text-[var(--text-muted)]">{t.seatingCapacity} chỗ</span>
+                                    <button onClick={() => handleTableToggle(id)} className="bg-transparent border-none cursor-pointer text-[var(--text-muted)] hover:text-red-500 text-sm p-0.5 leading-none">×</button>
+                                  </div>
+                                  {has360 && (
+                                    <button
+                                      onClick={() => {
+                                        setPreview360Table(t);
+                                        setPreview360Open(true);
+                                      }}
+                                      className="flex items-center justify-center gap-1.5 w-full rounded-lg py-1 text-[10px] font-bold border cursor-pointer transition-all"
+                                      style={{ background: `${brandColor}18`, borderColor: brandColor, color: brandColor }}
+                                    >
+                                      <span>360°</span>
+                                      <span>Xem góc nhìn 360°</span>
+                                    </button>
+                                  )}
                                 </div>
                               );
                             })}
@@ -1307,10 +1360,17 @@ export default function NewReservationPage() {
                       </div>
                     </>
                   )}
-                  <div className="flex justify-between border-t border-dashed border-[var(--border)] pt-2 mt-1">
-                    <span className="text-[var(--text-muted)] font-medium">💰 Yêu cầu cọc (bắt buộc)</span>
-                    <span className="font-black text-sm text-[var(--primary)]">{estimatedDeposit.toLocaleString("vi-VN")}đ</span>
-                  </div>
+                  {estimatedDeposit > 0 ? (
+                    <div className="flex justify-between border-t border-dashed border-[var(--border)] pt-2 mt-1">
+                      <span className="text-[var(--text-muted)] font-medium">💰 Yêu cầu cọc (bắt buộc)</span>
+                      <span className="font-black text-sm text-[var(--primary)]">{estimatedDeposit.toLocaleString("vi-VN")}đ</span>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between border-t border-dashed border-[var(--border)] pt-2 mt-1">
+                      <span className="text-[var(--text-muted)] font-medium">💰 Yêu cầu cọc</span>
+                      <span className="font-bold text-sm text-green-500">Miễn phí (Không yêu cầu)</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1469,6 +1529,52 @@ export default function NewReservationPage() {
           </div>
         </div>
       )}
+
+      {/* ─── 360° PANORAMA PREVIEW MODAL ─── */}
+      {preview360Table && (() => {
+        const t = preview360Table;
+        const getFullUrl = (rawUrl?: string | null) => {
+          if (!rawUrl) return '';
+          if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://') || rawUrl.startsWith('data:')) return rawUrl;
+          const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+          const cleanBase = apiBase.endsWith('/api') ? apiBase.slice(0, -4) : apiBase;
+          const cleanUrl = rawUrl.startsWith('/') ? rawUrl : `/${rawUrl}`;
+          return `${cleanBase}${cleanUrl}`;
+        };
+        const rawUrl = t.cubeFrontImageUrl || t.defaultViewUrl;
+        const imageUrl = rawUrl ? getFullUrl(rawUrl) : undefined;
+        const hasCubemap = !!(t.cubeFrontImageUrl && t.cubeBackImageUrl && t.cubeLeftImageUrl && t.cubeRightImageUrl && t.cubeTopImageUrl && t.cubeBottomImageUrl);
+        const cubeUrls = hasCubemap ? [
+          getFullUrl(t.cubeRightImageUrl),
+          getFullUrl(t.cubeLeftImageUrl),
+          getFullUrl(t.cubeTopImageUrl),
+          getFullUrl(t.cubeBottomImageUrl),
+          getFullUrl(t.cubeFrontImageUrl),
+          getFullUrl(t.cubeBackImageUrl),
+        ] : undefined;
+        return (
+          <TablePreview3DModal
+            open={preview360Open}
+            table={{
+              id: t.id,
+              tenantId: '',
+              name: t.code,
+              seats: t.seatingCapacity,
+              status: 'AVAILABLE',
+              area: t.floor?.name || '',
+              position: { x: 0, y: 0 },
+              shape: (t.shape || 'Square') as any,
+              width: t.width ? Number(t.width) : 80,
+              height: t.height ? Number(t.height) : 80,
+              rotation: t.rotation ? Number(t.rotation) : 0,
+            }}
+            tableImageUrl={imageUrl}
+            cubeUrls={cubeUrls}
+            onClose={() => setPreview360Open(false)}
+            onBookNow={() => setPreview360Open(false)}
+          />
+        );
+      })()}
     </div>
   );
 }
