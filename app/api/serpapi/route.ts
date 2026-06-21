@@ -29,7 +29,9 @@ export async function GET(request: Request) {
       );
     }
 
-    const apiKey = process.env.SERPAPI_KEY || process.env.NEXT_PUBLIC_SERPAPI_KEY;
+    // Server-only secret — never fall back to a NEXT_PUBLIC_ var (would leak the
+    // key into the client bundle).
+    const apiKey = process.env.SERPAPI_KEY;
     
     if (!apiKey) {
       console.warn('SerpApi API key is not configured on the server.');

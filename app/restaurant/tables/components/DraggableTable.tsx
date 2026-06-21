@@ -1,4 +1,5 @@
 import React, { useEffect, useCallback, useRef } from "react";
+import { Tooltip } from "antd";
 
 type TableStatus = "AVAILABLE" | "OCCUPIED" | "DISABLED" | "SELECTED" | "RESERVED";
 
@@ -26,32 +27,33 @@ interface DraggableTableProps {
   renderContent?: (table: TableData) => React.ReactNode;
   scale?: number;
   reduceEffects?: boolean;
+  isFlashing?: boolean;
 }
 
 const STATUS_CONFIG = {
   AVAILABLE: {
     stroke: "#52c41a",
-    fill: "rgba(246, 255, 237, 0.85)",
+    fill: "rgba(82, 196, 26, 0.13)",
     text: "#52c41a",
   },
   OCCUPIED: {
     stroke: "#ff4d4f",
-    fill: "rgba(255, 241, 240, 0.85)",
+    fill: "rgba(255, 77, 79, 0.14)",
     text: "#ff4d4f",
   },
   DISABLED: {
     stroke: "#bfbfbf",
-    fill: "rgba(245, 245, 245, 0.85)",
+    fill: "rgba(150, 150, 150, 0.08)",
     text: "#8c8c8c",
   },
   RESERVED: {
     stroke: "#faad14",
-    fill: "rgba(255, 250, 230, 0.85)",
-    text: "#faad14",
+    fill: "rgba(250, 173, 20, 0.13)",
+    text: "#d48806",
   },
   SELECTED: {
     stroke: "var(--primary)",
-    fill: "rgba(255, 255, 255, 0.92)",
+    fill: "var(--primary-soft, rgba(255, 90, 44, 0.10))",
     text: "var(--primary)",
   },
 };
@@ -92,6 +94,7 @@ export const DraggableTable: React.FC<DraggableTableProps> = ({
   renderContent,
   scale = 1,
   reduceEffects = false,
+  isFlashing = false,
 }) => {
   const isDeco = table.name.startsWith("DECO_");
   const statusStyle = STATUS_CONFIG[table.status] || STATUS_CONFIG.AVAILABLE;
@@ -210,11 +213,32 @@ export const DraggableTable: React.FC<DraggableTableProps> = ({
     }
   }, [onClick, table, isResizing]);
 
+  const STATUS_LABEL: Record<string, string> = {
+    AVAILABLE: "Trống",
+    OCCUPIED: "Đang phục vụ",
+    RESERVED: "Đặt trước",
+    DISABLED: "Không sử dụng",
+    SELECTED: "Đã chọn",
+  };
+
+  const tooltipTitle = !draggable && !isDeco ? (
+    <div style={{ fontSize: 12, lineHeight: 1.7 }}>
+      <div><strong>Bàn {table.name}</strong></div>
+      <div style={{ color: "rgba(255,255,255,0.75)" }}>{table.seats} chỗ ngồi</div>
+      <div style={{ color: statusStyle.stroke }}>● {STATUS_LABEL[table.status] ?? table.status}</div>
+      <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 10, marginTop: 2 }}>Click để xem chi tiết</div>
+    </div>
+  ) : undefined;
+
   // ── Render SVG for decorations ──
   const renderDecoration = () => {
     const isPlant = table.name.startsWith("DECO_PLANT") || table.name.toLowerCase().includes("plant") || table.name.toLowerCase().includes("cây");
     const isWall = table.name.startsWith("DECO_WALL") || table.name.toLowerCase().includes("wall") || table.name.toLowerCase().includes("tường");
     const isReception = table.name.startsWith("DECO_RECEPTION") || table.name.toLowerCase().includes("reception") || table.name.toLowerCase().includes("lễ tân");
+    const isWindow = table.name.startsWith("DECO_WINDOW") || table.name.toLowerCase().includes("window") || table.name.toLowerCase().includes("cửa sổ");
+    const isDoor = table.name.startsWith("DECO_DOOR") || table.name.toLowerCase().includes("door") || table.name.toLowerCase().includes("cửa ra vào");
+    const isBar = table.name.startsWith("DECO_BAR") || table.name.toLowerCase().includes("_bar") || table.name.toLowerCase().includes("quầy bar");
+    const isStairs = table.name.startsWith("DECO_STAIRS") || table.name.toLowerCase().includes("stairs") || table.name.toLowerCase().includes("cầu thang");
 
     const borderStyle = table.status === "SELECTED" ? "2px solid var(--primary)" : "none";
     const borderRadius = isPlant ? "50%" : "4px";
@@ -399,6 +423,133 @@ export const DraggableTable: React.FC<DraggableTableProps> = ({
       );
     }
 
+    if (isWindow) {
+      return (
+        <div style={{ width: "100%", height: "100%", border: borderStyle, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <svg viewBox="0 0 120 40" width="100%" height="100%" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="glassGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#bae6fd" stopOpacity="0.7" />
+                <stop offset="100%" stopColor="#93c5fd" stopOpacity="0.5" />
+              </linearGradient>
+            </defs>
+            {/* Wall section */}
+            <rect width="120" height="40" fill="#3d2010" />
+            {/* Window opening */}
+            <rect x="6" y="4" width="108" height="32" fill="url(#glassGrad)" stroke="#5c3318" strokeWidth="2" rx="1" />
+            {/* Mullion cross */}
+            <line x1="60" y1="4" x2="60" y2="36" stroke="#5c3318" strokeWidth="3" />
+            <line x1="6" y1="20" x2="114" y2="20" stroke="#5c3318" strokeWidth="3" />
+            {/* Glass highlights */}
+            <rect x="9" y="7" width="48" height="10" fill="rgba(255,255,255,0.3)" rx="1" />
+            <rect x="63" y="7" width="48" height="10" fill="rgba(255,255,255,0.3)" rx="1" />
+            {/* Sill */}
+            <rect x="2" y="35" width="116" height="5" fill="#6b3a1f" rx="1" />
+          </svg>
+        </div>
+      );
+    }
+
+    if (isDoor) {
+      return (
+        <div style={{ width: "100%", height: "100%", border: borderStyle, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <svg viewBox="0 0 80 90" width="100%" height="100%" preserveAspectRatio="xMidYMid meet">
+            <defs>
+              <linearGradient id="doorGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#92400e" />
+                <stop offset="100%" stopColor="#78350f" />
+              </linearGradient>
+            </defs>
+            {/* Door frame (wall segment) */}
+            <rect x="0" y="0" width="80" height="14" fill="#3d2010" />
+            {/* Swing arc (dashed quarter circle) */}
+            <path d="M 48 14 A 40 40 0 0 1 8 54" fill="rgba(147,197,253,0.15)" stroke="#3b82f6" strokeWidth="1.5" strokeDasharray="5 3" />
+            {/* Door panel */}
+            <rect x="8" y="14" width="40" height="64" fill="url(#doorGrad)" stroke="#451a03" strokeWidth="2" rx="1" />
+            {/* Panel recesses */}
+            <rect x="12" y="18" width="32" height="26" fill="rgba(0,0,0,0.15)" rx="2" />
+            <rect x="12" y="48" width="32" height="24" fill="rgba(0,0,0,0.15)" rx="2" />
+            {/* Door handle */}
+            <circle cx="44" cy="46" r="3" fill="#eab308" stroke="#ca8a04" strokeWidth="1" />
+            <line x1="44" y1="46" x2="48" y2="46" stroke="#ca8a04" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        </div>
+      );
+    }
+
+    if (isBar) {
+      return (
+        <div style={{ width: "100%", height: "100%", border: borderStyle, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <svg viewBox="0 0 130 85" width="100%" height="100%" preserveAspectRatio="xMidYMid meet">
+            <defs>
+              <linearGradient id="barTopGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#1c1917" />
+                <stop offset="50%" stopColor="#292524" />
+                <stop offset="100%" stopColor="#1c1917" />
+              </linearGradient>
+              <linearGradient id="barFrontGrad" x1="0%" y1="100%" x2="0%" y2="0%">
+                <stop offset="0%" stopColor="#451a03" />
+                <stop offset="100%" stopColor="#78350f" />
+              </linearGradient>
+            </defs>
+            {/* Backwall / shelving */}
+            <rect x="10" y="0" width="110" height="16" fill="#1c1917" rx="1" />
+            {/* Bottles on shelf */}
+            {[16, 26, 35, 44, 53, 62, 71, 80, 89, 98, 107].map((x, i) => (
+              <rect key={i} x={x} y={2} width={5} height={12} rx="1.5"
+                fill={["#7c3aed","#0369a1","#065f46","#c2410c","#92400e","#1d4ed8","#047857","#7e1d1d","#1e3a5f","#78350f","#3b0764"][i]}
+                opacity="0.85" />
+            ))}
+            {/* Bar counter body */}
+            <rect x="8" y="22" width="114" height="38" rx="3" fill="url(#barFrontGrad)" stroke="#451a03" strokeWidth="2" />
+            {/* Counter top (granite/dark marble) */}
+            <rect x="5" y="17" width="120" height="12" rx="3" fill="url(#barTopGrad)" stroke="#0c0a09" strokeWidth="1.5" />
+            {/* Counter edge highlight */}
+            <rect x="6" y="17" width="118" height="2" rx="1" fill="rgba(255,255,255,0.08)" />
+            {/* BAR label on counter */}
+            <text x="65" y="44" textAnchor="middle" fill="#f5f5f4" fontSize="9" fontWeight="800" fontFamily="sans-serif" letterSpacing="2">BAR</text>
+            {/* Bar stools */}
+            {[18, 38, 58, 78, 98, 118].map((x, i) => (
+              <g key={i}>
+                <circle cx={x} cy={74} r={7} fill="#44403c" stroke="#292524" strokeWidth="1.5" />
+                <line x1={x} y1={67} x2={x} y2={61} stroke="#292524" strokeWidth="2.5" />
+              </g>
+            ))}
+          </svg>
+        </div>
+      );
+    }
+
+    if (isStairs) {
+      return (
+        <div style={{ width: "100%", height: "100%", border: borderStyle, borderRadius: "4px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <svg viewBox="0 0 80 80" width="100%" height="100%" preserveAspectRatio="xMidYMid meet">
+            <defs>
+              <linearGradient id="stepGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#d4b896" />
+                <stop offset="100%" stopColor="#b89d82" />
+              </linearGradient>
+            </defs>
+            {/* Base area */}
+            <rect x="4" y="4" width="72" height="72" fill="#c4a882" stroke="#8c735a" strokeWidth="1.5" rx="2" />
+            {/* Stair steps — each step is slightly inset */}
+            <rect x="4" y="4"  width="72" height="8" fill="#a08060" stroke="#8c735a" strokeWidth="0.8" />
+            <rect x="4" y="12" width="63" height="8" fill="url(#stepGrad)" stroke="#8c735a" strokeWidth="0.8" />
+            <rect x="4" y="20" width="54" height="8" fill="#a08060" stroke="#8c735a" strokeWidth="0.8" />
+            <rect x="4" y="28" width="45" height="8" fill="url(#stepGrad)" stroke="#8c735a" strokeWidth="0.8" />
+            <rect x="4" y="36" width="36" height="8" fill="#a08060" stroke="#8c735a" strokeWidth="0.8" />
+            <rect x="4" y="44" width="27" height="8" fill="url(#stepGrad)" stroke="#8c735a" strokeWidth="0.8" />
+            <rect x="4" y="52" width="18" height="8" fill="#a08060" stroke="#8c735a" strokeWidth="0.8" />
+            <rect x="4" y="60" width="9"  height="8" fill="url(#stepGrad)" stroke="#8c735a" strokeWidth="0.8" />
+            {/* Direction arrow */}
+            <path d="M 52 36 L 70 44 L 52 52" fill="none" stroke="#3d2010" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            {/* UP label */}
+            <text x="56" y="74" textAnchor="middle" fill="#3d2010" fontSize="7" fontWeight="700" fontFamily="sans-serif">UP</text>
+          </svg>
+        </div>
+      );
+    }
+
     // Generic decoration
     return (
       <div style={{ width: "100%", height: "100%", border: "2px dashed var(--border)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 10 }}>
@@ -505,6 +656,7 @@ export const DraggableTable: React.FC<DraggableTableProps> = ({
   };
 
   return (
+    <Tooltip title={tooltipTitle} placement="top" mouseEnterDelay={0.4} destroyOnHidden>
     <div
       data-table-node="true"
       data-table-id={table.id}
@@ -527,6 +679,21 @@ export const DraggableTable: React.FC<DraggableTableProps> = ({
         touchAction: draggable ? "none" : "auto",
       }}
     >
+      {/* Flash glow overlay for newly added tables/items (3 pulses) */}
+      {isFlashing && (
+        <div
+          style={{
+            position: "absolute",
+            inset: -8,
+            borderRadius: "inherit",
+            pointerEvents: "none",
+            zIndex: 20,
+            animation: "tableFlashGlow 0.6s ease-in-out 3",
+            border: "3px solid rgba(255, 210, 50, 0.9)",
+            boxShadow: "0 0 0 4px rgba(255, 200, 50, 0.6), 0 0 24px 10px rgba(255, 200, 50, 0.4)",
+          }}
+        />
+      )}
       {isDeco ? (
         renderDecoration()
       ) : (
@@ -584,5 +751,6 @@ export const DraggableTable: React.FC<DraggableTableProps> = ({
         />
       )}
     </div>
+    </Tooltip>
   );
 };

@@ -3,6 +3,18 @@
 import { DropDown } from "@/components/ui/DropDown";
 import { Spin } from "antd";
 import { AnimatePresence, motion } from "framer-motion";
+import {
+  Check,
+  Copy,
+  Download,
+  Eye,
+  Loader2,
+  QrCode,
+  Save,
+  Trash2,
+  UtensilsCrossed,
+  X,
+} from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -152,13 +164,7 @@ function QRCodeSection({ qrCodeUrl, tableNumber, tableId }: { qrCodeUrl: string;
         alignItems: 'center',
         gap: 8,
       }}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-          stroke="var(--primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="3" y="3" width="7" height="7" rx="1" />
-          <rect x="14" y="3" width="7" height="7" rx="1" />
-          <rect x="3" y="14" width="7" height="7" rx="1" />
-          <path d="M14 14h2v2h-2zM18 14h3M14 18v3M18 18h3v3h-3z" />
-        </svg>
+        <QrCode width={16} height={16} stroke="var(--primary)" strokeWidth={2} />
         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
           {tDetails("qr_title", { number: tableNumber })}
         </span>
@@ -197,12 +203,7 @@ function QRCodeSection({ qrCodeUrl, tableNumber, tableId }: { qrCodeUrl: string;
             color: 'var(--text-muted)',
             fontSize: 12,
           }}>
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="1.5">
-              <rect x="3" y="3" width="7" height="7" rx="1" />
-              <rect x="14" y="3" width="7" height="7" rx="1" />
-              <rect x="3" y="14" width="7" height="7" rx="1" />
-            </svg>
+            <QrCode width={32} height={32} stroke="currentColor" strokeWidth={1.5} />
             <span style={{ textAlign: 'center' }}>{tDetails("qr_load_failed")}</span>
           </div>
         ) : (
@@ -247,19 +248,12 @@ function QRCodeSection({ qrCodeUrl, tableNumber, tableId }: { qrCodeUrl: string;
           >
             {copied ? (
               <>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-                  stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                  <path d="M20 6L9 17l-5-5" />
-                </svg>
+                <Check width={13} height={13} strokeWidth={2.5} />
                 {tDetails("copied")}
               </>
             ) : (
               <>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-                  stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                  <rect x="9" y="9" width="13" height="13" rx="2" />
-                  <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
-                </svg>
+                <Copy width={13} height={13} strokeWidth={2} />
                 {tDetails("copy_link")}
               </>
             )}
@@ -285,12 +279,7 @@ function QRCodeSection({ qrCodeUrl, tableNumber, tableId }: { qrCodeUrl: string;
               boxShadow: '0 2px 8px var(--primary-glow)',
             }}
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
+            <Download width={13} height={13} strokeWidth={2.5} />
             {tDetails("download_qr")}
           </button>
         </div>
@@ -359,10 +348,7 @@ function PanoramaSection({
         {onSavePanorama && (Object.values(cubeFiles).some(Boolean) || clearPanorama) && (
           <button type="button" disabled={saving} onClick={() => onSavePanorama(table.id, cubeFiles, clearPanorama)} style={{ marginLeft: 'auto', padding: '5px 14px', borderRadius: 8, border: 'none', background: saving ? 'var(--border)' : 'linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%)', color: saving ? 'var(--text-muted)' : '#fff', fontSize: 12, fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
             {saving && (
-              <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
-                <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
-              </svg>
+              <Loader2 width={12} height={12} strokeWidth={3} className="animate-spin" />
             )}
             {saving ? 'Đang lưu...' : t('dashboard.tables.details.panorama_save', { defaultValue: 'Lưu 6 mặt' })}
           </button>
@@ -393,11 +379,7 @@ function PanoramaSection({
             onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.01)'; }}
             onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; }}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
-              <circle cx="12" cy="12" r="3" />
-            </svg>
+            <Eye width={16} height={16} strokeWidth={2.5} />
             XEM KHÔNG GIAN 360° (CUBEMAP)
           </div>
         )}
@@ -628,8 +610,26 @@ export const TableDetailsDrawer: React.FC<TableDetailsDrawerProps> = ({
     } else if (formData.number.startsWith("DECO_RECEPTION_")) {
       decoType = "RECEPTION";
       decoName = formData.number.replace("DECO_RECEPTION_", "");
+    } else if (formData.number.startsWith("DECO_WINDOW_")) {
+      decoType = "WINDOW";
+      decoName = formData.number.replace("DECO_WINDOW_", "");
+    } else if (formData.number.startsWith("DECO_DOOR_")) {
+      decoType = "DOOR";
+      decoName = formData.number.replace("DECO_DOOR_", "");
+    } else if (formData.number.startsWith("DECO_BAR_")) {
+      decoType = "BAR";
+      decoName = formData.number.replace("DECO_BAR_", "");
+    } else if (formData.number.startsWith("DECO_STAIRS_")) {
+      decoType = "STAIRS";
+      decoName = formData.number.replace("DECO_STAIRS_", "");
     } else {
-      decoName = formData.number.replace("DECO_", "");
+      const parts = formData.number.split("_");
+      if (parts.length >= 3) {
+        decoType = parts[1];
+        decoName = parts.slice(2).join("_");
+      } else {
+        decoName = formData.number.replace("DECO_", "");
+      }
     }
   }
 
@@ -813,16 +813,7 @@ export const TableDetailsDrawer: React.FC<TableDetailsDrawerProps> = ({
                           alignItems: "center",
                           justifyContent: "center",
                         }}>
-                        <svg
-                          width="22"
-                          height="22"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="#fff"
-                          strokeWidth="2">
-                          <rect x="3" y="10" width="18" height="10" rx="2" />
-                          <path d="M7 10 V6 M17 10 V6" />
-                        </svg>
+                        <UtensilsCrossed width={22} height={22} stroke="#fff" strokeWidth={2} />
                       </div>
                       <h2
                         style={{
@@ -861,11 +852,7 @@ export const TableDetailsDrawer: React.FC<TableDetailsDrawerProps> = ({
                           letterSpacing: '0.3px',
                         }}
                       >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                          <circle cx="12" cy="12" r="10" />
-                          <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
-                          <circle cx="12" cy="12" r="3" />
-                        </svg>
+                        <Eye width={16} height={16} strokeWidth={2.5} />
                         Xem không gian 360°
                       </motion.button>
                     )}
@@ -887,15 +874,7 @@ export const TableDetailsDrawer: React.FC<TableDetailsDrawerProps> = ({
                       color: "#fff",
                       marginTop: -4,
                     }}>
-                    <svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5">
-                      <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
-                    </svg>
+                    <X width={20} height={20} strokeWidth={2.5} />
                   </motion.button>
                 </div>
 
@@ -943,7 +922,7 @@ export const TableDetailsDrawer: React.FC<TableDetailsDrawerProps> = ({
                           letterSpacing: "-0.02em",
                         }}>
                         {currentStatus
-                          ? tDetails(`status.${currentStatus.value}`)
+                          ? tDetails(`status_${currentStatus.value}`)
                           : tDetails("status_unknown")}
                       </p>
                     </div>
@@ -1001,8 +980,12 @@ export const TableDetailsDrawer: React.FC<TableDetailsDrawerProps> = ({
                               }}
                             >
                               <option value="PLANT">{tDetails("deco_type_plant", { defaultValue: "Cây cảnh (Plant)" })}</option>
-                              <option value="WALL">{tDetails("deco_type_wall", { defaultValue: "Tường / Vách ngăn (Wall)" })}</option>
-                              <option value="RECEPTION">{tDetails("deco_type_reception", { defaultValue: "Quầy lễ tân (Reception Counter)" })}</option>
+                              <option value="WALL">{tDetails("deco_type_wall", { defaultValue: "Vách tường / Vách ngăn (Wall)" })}</option>
+                              <option value="RECEPTION">{tDetails("deco_type_reception", { defaultValue: "Quầy lễ tân (Reception)" })}</option>
+                              <option value="WINDOW">{tDetails("deco_type_window", { defaultValue: "Cửa sổ (Window)" })}</option>
+                              <option value="DOOR">{tDetails("deco_type_door", { defaultValue: "Cửa ra vào (Door)" })}</option>
+                              <option value="BAR">{tDetails("deco_type_bar", { defaultValue: "Quầy bar (Bar)" })}</option>
+                              <option value="STAIRS">{tDetails("deco_type_stairs", { defaultValue: "Cầu thang (Stairs)" })}</option>
                             </DropDown>
                           </div>
                           <div>
@@ -1344,15 +1327,7 @@ export const TableDetailsDrawer: React.FC<TableDetailsDrawerProps> = ({
                     gap: 8,
                     letterSpacing: "-0.01em",
                   }}>
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5">
-                    <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
-                  </svg>
+                  <Trash2 width={16} height={16} strokeWidth={2.5} />
                   {tDetails("delete")}
                 </motion.button>
               )}
@@ -1403,26 +1378,12 @@ export const TableDetailsDrawer: React.FC<TableDetailsDrawerProps> = ({
                 }}>
                 {isSaving ? (
                   <>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                      stroke="currentColor" strokeWidth="2.5"
-                      style={{ animation: "spin 1s linear infinite" }}>
-                      <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0" strokeLinecap="round" />
-                    </svg>
+                    <Loader2 width={16} height={16} strokeWidth={2.5} className="animate-spin" />
                     {t('dashboard.tables.details.save_changes', { defaultValue: 'Save Changes' })}...
                   </>
                 ) : (
                   <>
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5">
-                      <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" />
-                      <polyline points="17 21 17 13 7 13 7 21" />
-                      <polyline points="7 3 7 8 15 8" />
-                    </svg>
+                    <Save width={16} height={16} strokeWidth={2.5} />
                     {t('dashboard.tables.details.save_changes', { defaultValue: 'Save changes' })}
                   </>
                 )}

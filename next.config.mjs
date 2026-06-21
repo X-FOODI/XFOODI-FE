@@ -35,14 +35,21 @@ const nextConfig = {
     const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'xfoodi.website';
 
     // Server-side rewrite destinations — prefer internal URL to avoid proxy loops
-    const adminApiUrl =
+    let adminApiUrl =
       process.env.INTERNAL_ADMIN_API_URL ||
       process.env.NEXT_PUBLIC_ADMIN_API_URL ||
       `https://api.${BASE_DOMAIN}/api`;
-    const tenantApiUrl =
+    let tenantApiUrl =
       process.env.INTERNAL_API_URL ||
       process.env.NEXT_PUBLIC_API_URL ||
       `https://api.${BASE_DOMAIN}/api`;
+
+    // Local Windows/Mac fallback for native run (outside Docker)
+    const isLocalPlatform = process.platform === 'win32' || process.platform === 'darwin';
+    if (isLocalPlatform) {
+      adminApiUrl = adminApiUrl.replace('xfoodi-backend', 'localhost');
+      tenantApiUrl = tenantApiUrl.replace('xfoodi-backend', 'localhost');
+    }
 
     // Strip trailing /api to avoid double /api/api
     const tenantBase = tenantApiUrl.replace(/\/api$/, '');
@@ -69,6 +76,27 @@ const nextConfig = {
       {
         source: '/api/:path*',
         destination: `${tenantBase}/api/:path*`,
+      },
+    ];
+  },
+  // Baseline security headers. These do NOT affect resource loading (no full CSP
+  // yet — a strict CSP needs nonce wiring for the inline theme script + emotion/MUI
+  // inline styles, tracked as a follow-up). frame-ancestors is handled via
+  // X-Frame-Options SAMEORIGIN so the in-app builder iframe still works.
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(self)' },
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=31536000; includeSubDomains',
+          },
+        ],
       },
     ];
   },

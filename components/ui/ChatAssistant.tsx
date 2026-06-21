@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useParams } from "next/navigation";
 import axiosInstance from "@/lib/services/axiosInstance";
 import { io } from "socket.io-client";
+import DOMPurify from "dompurify";
 import {
   Trash2,
   X,
@@ -86,7 +87,9 @@ function renderMessageContent(text: string) {
     // Single newline
     .replace(/\n/g, '<br/>');
 
-  return <div dangerouslySetInnerHTML={{ __html: `<p style="margin:0">${clean}</p>` }} />;
+  // Input is already HTML-escaped above; sanitize the final markup as defense-in-depth.
+  const safeHtml = DOMPurify.sanitize(`<p style="margin:0">${clean}</p>`);
+  return <div dangerouslySetInnerHTML={{ __html: safeHtml }} />;
 }
 
 /* ─────────────────────────── Sub-components ─────────────────────────── */
@@ -864,8 +867,12 @@ export function ChatAssistant() {
       withCredentials: true,
     });
 
+    const closeSocket = () => {
+      if (socket.connected) socket.disconnect();
+      else socket.close();
+    };
+
     socket.on("connect", () => {
-      console.log("[ChatAssistant Socket] Connected to broadcast CALL_STAFF");
       socket.emit("join_restaurant", tenant.id);
       socket.emit("CALL_STAFF", {
         restaurantId: tenant.id,
@@ -875,17 +882,15 @@ export function ChatAssistant() {
         message: "Khách hàng yêu cầu hỗ trợ tại bàn thông qua AI Chatbot",
         type: "ASSISTANCE"
       });
-      
-      // Close socket after sending
-      setTimeout(() => {
-        socket.disconnect();
-        console.log("[ChatAssistant Socket] Disconnected after emit");
-      }, 1000);
+      // Close as soon as the message is delivered so the socket cannot leak.
+      closeSocket();
     });
 
     socket.on("connect_error", (err: any) => {
       console.error("[ChatAssistant Socket] Connection error:", err);
     });
+    // Safety net: tear down even if the socket never connects.
+    setTimeout(closeSocket, 5000);
   }, [tenant?.id, activeTableId, tableInfo]);
 
   /* ── Context detection ──

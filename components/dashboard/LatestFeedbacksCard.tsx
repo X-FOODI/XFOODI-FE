@@ -1,5 +1,7 @@
 "use client";
 
+import { MessageSquare } from "lucide-react";
+
 interface FeedbackItem {
   id: string;
   customerName?: string;
@@ -75,10 +77,7 @@ export default function LatestFeedbacksCard({
           <h3 className="dashboard-data-card-title">Đánh giá gần đây</h3>
         </div>
         <div className="text-center py-8 rounded-lg" style={{ background: "var(--surface)" }}>
-          <svg className="w-10 h-10 mx-auto mb-2" style={{ color: "var(--text-muted)", opacity: 0.4 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-              d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-          </svg>
+          <MessageSquare className="w-10 h-10 mx-auto mb-2 text-zinc-400 opacity-40" />
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>Chưa có đánh giá nào</p>
         </div>
       </div>
