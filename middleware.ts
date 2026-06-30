@@ -97,7 +97,8 @@ export function middleware(req: NextRequest) {
 
     // 2. Direct login path is blocked and redirected to landing page
     if (pathname === '/login') {
-      const landingUrl = new URL('/', `http://${BASE_DOMAIN}`);
+      const port = req.nextUrl.port ? `:${req.nextUrl.port}` : '';
+      const landingUrl = new URL('/', `http://${BASE_DOMAIN}${port}`);
       landingUrl.protocol = req.nextUrl.protocol;
       return NextResponse.redirect(landingUrl);
     }
@@ -108,7 +109,8 @@ export function middleware(req: NextRequest) {
         return NextResponse.redirect(new URL(`/login/${ADMIN_GATE_CODE}`, req.url));
       }
       // If gate code is not configured, redirect to landing page safely
-      const landingUrl = new URL('/', `http://${BASE_DOMAIN}`);
+      const port = req.nextUrl.port ? `:${req.nextUrl.port}` : '';
+      const landingUrl = new URL('/', `http://${BASE_DOMAIN}${port}`);
       landingUrl.protocol = req.nextUrl.protocol;
       return NextResponse.redirect(landingUrl);
     }
@@ -150,8 +152,7 @@ export function middleware(req: NextRequest) {
         : ADMIN_DOMAIN;
       const adminLoginUrl = new URL(req.nextUrl);
       adminLoginUrl.host = adminHost;
-      adminLoginUrl.pathname = '/login';
-      adminLoginUrl.searchParams.set('redirect', pathname);
+      adminLoginUrl.pathname = '/';
       return NextResponse.redirect(adminLoginUrl);
     }
 
