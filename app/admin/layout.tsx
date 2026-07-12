@@ -7,22 +7,22 @@ import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { user, isAuthReady } = useAuth();
-  const router = useRouter();
+  const { user, isAuthReady, logout } = useAuth();
 
   // Auth guard — chỉ Admin / SuperAdmin mới vào được
   useEffect(() => {
     if (!isAuthReady) return;
     if (!user) {
-      router.replace("/login?redirect=/admin/dashboard");
+      window.location.href = "/";
       return;
     }
     const roles: string[] = user?.roles || (user?.role ? [user.role] : []);
     if (!roles.includes("Admin") && !roles.includes("SuperAdmin") && !roles.includes("System Admin")) {
-      router.replace("/login?redirect=/admin/dashboard");
+      logout();
+      window.location.href = "/";
       return;
     }
-  }, [isAuthReady, user, router]);
+  }, [isAuthReady, user, logout]);
 
   if (!isAuthReady || !user) {
     return (
