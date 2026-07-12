@@ -513,7 +513,7 @@ export default function EmployeeManagement({
                         {/* Role / Position */}
                         <td className="px-6 py-4">
                           <div className="space-y-1">
-                            <span className="px-2 py-0.5 rounded-full text-xs font-semibold" style={{ color: rBadge.color, background: rBadge.bg }}>
+                            <span className="px-2 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap inline-block" style={{ color: rBadge.color, background: rBadge.bg }}>
                               {rBadge.label}
                             </span>
                             <p className="text-xs" style={{ color: "var(--text-muted)" }}>{emp.position}</p>
@@ -528,7 +528,7 @@ export default function EmployeeManagement({
 
                         {/* Status */}
                         <td className="px-6 py-4">
-                          <span className="px-2.5 py-1 rounded-full text-xs font-bold" style={{ color: sBadge.color, background: sBadge.bg }}>
+                          <span className="px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap inline-block" style={{ color: sBadge.color, background: sBadge.bg }}>
                             {sBadge.label}
                           </span>
                         </td>

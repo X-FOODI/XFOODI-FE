@@ -426,11 +426,11 @@ export default function LiveOrdersPage() {
         }}
         className={`flex-1 min-w-[340px] rounded-2xl p-5 flex flex-col border transition-all duration-300 shadow-lg ${
           dragOverColumn === status 
-            ? "bg-zinc-800/60 border-amber-500/50 scale-[1.01] ring-2 ring-amber-500/10" 
-            : "bg-zinc-900/50 border-zinc-800/80"
+            ? "bg-slate-200/80 dark:bg-zinc-800/60 border-amber-500/50 scale-[1.01] ring-2 ring-amber-500/10" 
+            : "bg-slate-100/80 dark:bg-zinc-900/50 border-slate-200 dark:border-zinc-800/80"
         }`}
       >
-        <div className="flex items-center justify-between mb-5 pb-3 border-b border-zinc-800/80">
+        <div className="flex items-center justify-between mb-5 pb-3 border-b border-slate-200 dark:border-zinc-800/80">
           <div className="flex items-center gap-2">
             <span className={`w-2.5 h-2.5 rounded-full ${
               status === "PENDING" ? "bg-amber-500 animate-pulse" :
@@ -438,14 +438,14 @@ export default function LiveOrdersPage() {
             }`} />
             <h3 className={`font-black text-xs tracking-widest uppercase ${colorClass}`}>{title}</h3>
           </div>
-          <span className="bg-zinc-800 text-zinc-300 text-xs font-black px-2.5 py-1 rounded-lg border border-zinc-700/30">
+          <span className="bg-slate-200 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 text-xs font-black px-2.5 py-1 rounded-lg border border-slate-300 dark:border-zinc-700/30">
             {colOrders.length} đơn
           </span>
         </div>
         
         <div className="flex-1 overflow-y-auto space-y-4 pr-1 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
           {colOrders.length === 0 ? (
-            <div className="text-center py-16 text-zinc-600 text-sm font-semibold italic">Chưa có đơn hàng</div>
+            <div className="text-center py-16 text-slate-400 dark:text-zinc-600 text-sm font-semibold italic">Chưa có đơn hàng</div>
           ) : (
             colOrders.map(order => (
               <div 
@@ -455,16 +455,16 @@ export default function LiveOrdersPage() {
                   e.dataTransfer.setData("text/plain", order.id);
                 }}
                 onClick={() => setSelectedOrder(order)}
-                className={`bg-zinc-900 border p-4 rounded-xl shadow-md hover:border-zinc-700 transition-all duration-350 cursor-pointer hover:shadow-lg hover:scale-[1.01] animate-fade-in-up ${
+                className={`bg-white dark:bg-zinc-900 border p-4 rounded-xl shadow-md transition-all duration-350 cursor-pointer hover:shadow-lg hover:scale-[1.01] animate-fade-in-up ${
                   pendingPayments[order.id]
-                    ? "border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.15)] ring-1 ring-emerald-500/30 animate-pulse-border"
-                    : "border-zinc-800/80 hover:shadow-amber-500/5"
+                    ? "border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.15)] ring-1 ring-emerald-500/30 animate-pulse-border hover:border-emerald-400"
+                    : "border-slate-200 dark:border-zinc-800/80 hover:border-slate-300 dark:hover:border-zinc-700 hover:shadow-amber-500/5"
                 }`}
               >
                 <div className="flex justify-between items-start mb-3">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-extrabold text-sm text-zinc-100 bg-zinc-800 px-2 py-1 rounded-md border border-zinc-700/50">
+                      <span className="font-extrabold text-sm text-slate-800 dark:text-zinc-100 bg-slate-100 dark:bg-zinc-800 px-2 py-1 rounded-md border border-slate-300 dark:border-zinc-700/50">
                         #{order.reference || order.id.slice(0,6).toUpperCase()}
                       </span>
                       {(order.table || !order.reservationId || order.reservationId) && (
@@ -492,19 +492,19 @@ export default function LiveOrdersPage() {
                       </div>
                     )}
                     {order.customerName && (
-                      <div className="mt-2 text-xs font-bold text-zinc-400 flex items-center gap-1.5">
-                        <span className="text-zinc-500">👤</span>
+                      <div className="mt-2 text-xs font-bold text-slate-500 dark:text-zinc-400 flex items-center gap-1.5">
+                        <span className="text-slate-400 dark:text-zinc-500">👤</span>
                         <span>{order.customerName}</span>
                       </div>
                     )}
                   </div>
-                  <span className="text-xs font-bold text-zinc-500">
+                  <span className="text-xs font-bold text-slate-400 dark:text-zinc-500">
                     {order.createdAt ? new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ""}
                   </span>
                 </div>
                 
                 {/* List items with images */}
-                <div className="space-y-3 mb-4 border-t border-b border-zinc-800/50 py-3 my-3">
+                <div className="space-y-3 mb-4 border-t border-b border-slate-200 dark:border-zinc-800/50 py-3 my-3">
                   {order.items?.map((item, idx) => (
                     <div key={idx} className="flex items-start gap-3">
                       {item.imageUrl ? (
@@ -520,10 +520,10 @@ export default function LiveOrdersPage() {
                       )}
                       <div className="flex-1 min-w-0">
                         <div className="flex justify-between items-baseline gap-2">
-                          <p className="text-xs font-extrabold text-zinc-200 truncate leading-tight">
+                          <p className="text-xs font-extrabold text-slate-800 dark:text-zinc-200 truncate leading-tight">
                             {item.name}
                           </p>
-                          <span className="text-xs font-black text-zinc-400 bg-zinc-800 px-1.5 py-0.5 rounded">
+                          <span className="text-xs font-black text-slate-500 dark:text-zinc-400 bg-slate-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">
                             x{item.quantity}
                           </span>
                         </div>
@@ -539,7 +539,7 @@ export default function LiveOrdersPage() {
                 
                 <div className="flex justify-between items-center mt-4 pt-1">
                   <div>
-                    <p className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold">Tổng thanh toán</p>
+                    <p className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-zinc-500 font-bold">Tổng thanh toán</p>
                     <span className="font-black text-sm text-amber-500">
                       {order.totalAmount.toLocaleString('vi-VN')} đ
                     </span>
@@ -594,14 +594,14 @@ export default function LiveOrdersPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--bg-base)" }}>
         <div className="w-8 h-8 rounded-full border-2 animate-spin border-primary border-t-transparent" />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
+    <div className="flex flex-col h-screen overflow-hidden" style={{ background: "var(--bg-base)" }}>
       <DashboardHeader
         role="restaurant"
         restaurantName={tenant?.name ?? "Cửa hàng"}
@@ -620,14 +620,14 @@ export default function LiveOrdersPage() {
           <div className="p-4 sm:p-6 lg:p-8 flex-1 flex flex-col h-full max-w-[1400px] mx-auto w-full">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                   <span>Màn hình Bếp (Live Orders)</span>
                   <span className="relative flex h-3 w-3">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
                   </span>
                 </h1>
-                <p className="text-sm text-gray-500 mt-1">Đơn hàng mới sẽ tự động nảy lên và phát âm thanh.</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Đơn hàng mới sẽ tự động nảy lên và phát âm thanh.</p>
               </div>
             </div>
 

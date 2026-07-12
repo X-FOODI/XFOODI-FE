@@ -1097,22 +1097,22 @@ export default function TablesManagementPage() {
           <div className="flex flex-col gap-6 max-w-[1400px] mx-auto w-full flex-1">
             
             {/* Header section with view toggle */}
-            <div className="flex flex-wrap items-center justify-between gap-4 border-b pb-5 border-gray-200 dark:border-gray-800">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b pb-5 border-slate-200 dark:border-slate-800">
               <div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Sơ đồ bàn ăn &amp; Thiết kế</h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Sơ đồ bàn ăn &amp; Thiết kế</h1>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
                   Quản lý mặt bằng khu vực, đặt bàn ăn, vẽ tường, cây cảnh, quầy lễ tân, và theo dõi trạng thái bàn trực quan.
                 </p>
               </div>
 
               {/* View mode toggle */}
-              <div className="flex bg-gray-100 dark:bg-gray-800/80 p-1.5 rounded-xl border border-gray-200 dark:border-gray-700/80 shadow-inner">
+              <div className="flex bg-slate-100 dark:bg-gray-800/80 p-1.5 rounded-xl border border-slate-200 dark:border-slate-700/80 shadow-inner">
                 <button
                   onClick={() => setViewMode("view")}
                   className={`px-4 py-2.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
                     viewMode === "view"
                       ? "bg-orange-500 text-white shadow-md"
-                      : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                      : "text-slate-500 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white"
                   }`}
                 >
                   <Eye className="w-4 h-4" />
@@ -1123,7 +1123,7 @@ export default function TablesManagementPage() {
                   className={`px-4 py-2.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
                     viewMode === "edit"
                       ? "bg-orange-500 text-white shadow-md"
-                      : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                      : "text-slate-500 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white"
                   }`}
                 >
                   <Edit className="w-4 h-4" />
@@ -1134,7 +1134,7 @@ export default function TablesManagementPage() {
                   className={`px-4 py-2.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
                     viewMode === "list"
                       ? "bg-orange-500 text-white shadow-md"
-                      : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                      : "text-slate-500 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white"
                   }`}
                 >
                   <List className="w-4 h-4" />
@@ -1358,12 +1358,12 @@ export default function TablesManagementPage() {
 
                 {/* Visual Panning Canvas */}
                 {beFloors.length === 0 ? (
-                  <div className="text-center py-24 bg-white dark:bg-[#1E293B] rounded-2xl border border-gray-200 dark:border-gray-800 flex flex-col items-center justify-center p-6 shadow-sm">
-                    <svg className="w-16 h-16 text-gray-300 dark:text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="text-center py-24 bg-white dark:bg-[#1E293B] rounded-2xl border border-slate-200 dark:border-gray-800 flex flex-col items-center justify-center p-6 shadow-sm">
+                    <svg className="w-16 h-16 text-slate-300 dark:text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                     </svg>
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">Chưa cấu hình khu vực tầng</h3>
-                    <p className="text-sm text-gray-500 max-w-sm mt-1">
+                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">Chưa cấu hình khu vực tầng</h3>
+                    <p className="text-sm text-slate-500 max-w-sm mt-1">
                       Nhấp vào nút "Thêm khu vực" phía trên để khởi tạo sơ đồ tầng đầu tiên của nhà hàng.
                     </p>
                   </div>
@@ -1737,9 +1737,9 @@ export default function TablesManagementPage() {
           <div className="space-y-6 pt-3">
             
             {/* Current status info */}
-            <div className="p-4 rounded-xl border flex items-center justify-between bg-gray-50 dark:bg-slate-900 border-gray-100 dark:border-gray-800">
+            <div className="p-4 rounded-xl border flex items-center justify-between bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-gray-800">
               <div>
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{t("dashboard.tables.operational_modal.current_status", { defaultValue: "Trạng thái hiện tại" })}</p>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{t("dashboard.tables.operational_modal.current_status", { defaultValue: "Trạng thái hiện tại" })}</p>
                 <h4 className={`font-extrabold text-lg mt-0.5 ${sessionActionTable.status === "occupied" ? "text-red-500" : "text-emerald-500"}`}>
                   {sessionActionTable.status === "occupied" 
                     ? t("dashboard.tables.operational_modal.status_occupied", { defaultValue: "Đang có khách" }) 
@@ -1754,10 +1754,10 @@ export default function TablesManagementPage() {
             {/* Session details */}
             {sessionActionTable.status === "occupied" && sessionActionTable.currentOrder && (
               <div className="space-y-2">
-                <h5 className="font-bold text-xs text-gray-400 uppercase tracking-wider">{t("dashboard.tables.operational_modal.session_info", { defaultValue: "Thông tin phiên ăn" })}</h5>
-                <div className="bg-gray-50 dark:bg-slate-950 p-3.5 rounded-xl border border-gray-100 dark:border-gray-900 space-y-1.5 text-sm">
+                <h5 className="font-bold text-xs text-slate-400 uppercase tracking-wider">{t("dashboard.tables.operational_modal.session_info", { defaultValue: "Thông tin phiên ăn" })}</h5>
+                <div className="bg-slate-50 dark:bg-slate-950 p-3.5 rounded-xl border border-slate-100 dark:border-gray-900 space-y-1.5 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-500">{t("dashboard.tables.operational_modal.order_code", { defaultValue: "Mã đơn hàng:" })}</span>
+                    <span className="text-slate-500">{t("dashboard.tables.operational_modal.order_code", { defaultValue: "Mã đơn hàng:" })}</span>
                     <span className="font-bold text-[#FF5A2C]">#{sessionActionTable.currentOrder}</span>
                   </div>
                 </div>
