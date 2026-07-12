@@ -29,6 +29,7 @@ interface RestaurantMetadata {
     last_booking_before_close_minutes?: number;
     min_advance_booking_hours?: number;
     max_advance_booking_days?: number;
+    dining_duration_minutes?: number;
     closed_dates?: string[];
     early_checkin_minutes?: number;
     late_checkin_minutes?: number;
@@ -105,6 +106,7 @@ export default function RestaurantSettingsPage() {
       last_booking_before_close_minutes: 60,
       min_advance_booking_hours: 1,
       max_advance_booking_days: 30,
+      dining_duration_minutes: 90,
       closed_dates: [] as string[],
       early_checkin_minutes: 15,
       late_checkin_minutes: 30,
@@ -153,6 +155,7 @@ export default function RestaurantSettingsPage() {
             last_booking_before_close_minutes: config.last_booking_before_close_minutes ?? 60,
             min_advance_booking_hours: config.min_advance_booking_hours ?? 1,
             max_advance_booking_days: config.max_advance_booking_days ?? 30,
+            dining_duration_minutes: config.dining_duration_minutes ?? 90,
             closed_dates: config.closed_dates || [],
             early_checkin_minutes: config.early_checkin_minutes ?? 15,
             late_checkin_minutes: config.late_checkin_minutes ?? 30,
@@ -582,7 +585,7 @@ export default function RestaurantSettingsPage() {
                   </h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Giờ mở cửa đặt bàn</label>
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Giờ bắt đầu nhận khách đặt bàn</label>
                       <input 
                         type="time" 
                         value={formData.reservationConfig.opening_time} 
@@ -594,7 +597,7 @@ export default function RestaurantSettingsPage() {
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Giờ đóng cửa đặt bàn</label>
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Giờ ngưng nhận khách đặt bàn</label>
                       <input 
                         type="time" 
                         value={formData.reservationConfig.closing_time} 
@@ -607,8 +610,8 @@ export default function RestaurantSettingsPage() {
                     </div>
                     <div className="space-y-1.5 md:col-span-2">
                       <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block">
-                        Thời gian đặt bàn muộn nhất trước giờ đóng cửa (phút){" "}
-                        <span className="text-xs text-gray-400 font-normal ml-1.5">(PRD mặc định: 60 phút)</span>
+                        Đặt bàn trễ nhất trước giờ đóng cửa (số phút){" "}
+                        <span className="text-xs text-gray-400 font-normal ml-1.5">(Mặc định: 60 phút)</span>
                       </label>
                       <input 
                         type="number" 
@@ -623,8 +626,8 @@ export default function RestaurantSettingsPage() {
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block">
-                        Thời gian đặt trước tối thiểu (tiếng){" "}
-                        <span className="text-xs text-gray-400 font-normal ml-1.5">(PRD mặc định: 1 tiếng)</span>
+                        Khách phải đặt trước giờ ăn tối thiểu (số tiếng){" "}
+                        <span className="text-xs text-gray-400 font-normal ml-1.5">(Mặc định: 1 tiếng)</span>
                       </label>
                       <input 
                         type="number" 
@@ -639,8 +642,8 @@ export default function RestaurantSettingsPage() {
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block">
-                        Thời gian đặt trước tối đa (ngày){" "}
-                        <span className="text-xs text-gray-400 font-normal ml-1.5">(PRD mặc định: 30 ngày)</span>
+                        Cho phép khách đặt trước tối đa (số ngày){" "}
+                        <span className="text-xs text-gray-400 font-normal ml-1.5">(Mặc định: 30 ngày)</span>
                       </label>
                       <input 
                         type="number" 
@@ -653,6 +656,22 @@ export default function RestaurantSettingsPage() {
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-transparent text-gray-900 dark:text-white"
                       />
                     </div>
+                    <div className="space-y-1.5 md:col-span-2">
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block">
+                        Thời gian ăn trung bình của khách (số phút) - Dùng chặn trùng ca dọn bàn{" "}
+                        <span className="text-xs text-gray-400 font-normal ml-1.5">(Mặc định: 90 phút)</span>
+                      </label>
+                      <input 
+                        type="number" 
+                        min={30}
+                        value={formData.reservationConfig.dining_duration_minutes ?? 90} 
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          reservationConfig: { ...formData.reservationConfig, dining_duration_minutes: parseInt(e.target.value) || 90 }
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-transparent text-gray-900 dark:text-white"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -660,13 +679,13 @@ export default function RestaurantSettingsPage() {
                 <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm space-y-4">
                   <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                     <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
-                    Quy Trình Check-in & Tự Động Đánh Dấu No-show
+                    Quy Trình Check-in & Hủy Lịch (Nếu khách không đến)
                   </h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block">
-                        Cho phép check-in sớm tối đa (phút){" "}
-                        <span className="text-xs text-gray-400 font-normal ml-1.5">(PRD mặc định: 15 phút)</span>
+                        Khách được phép đến sớm tối đa (số phút){" "}
+                        <span className="text-xs text-gray-400 font-normal ml-1.5">(Mặc định: 15 phút)</span>
                       </label>
                       <input 
                         type="number" 
@@ -681,8 +700,8 @@ export default function RestaurantSettingsPage() {
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block">
-                        Thời gian trễ tối đa trước khi No-show (phút){" "}
-                        <span className="text-xs text-gray-400 font-normal ml-1.5">(PRD mặc định: 30 phút)</span>
+                        Khách trễ tối đa (số phút) trước khi tự động hủy bàn (Khách không đến){" "}
+                        <span className="text-xs text-gray-400 font-normal ml-1.5">(Mặc định: 30 phút)</span>
                       </label>
                       <input 
                         type="number" 
@@ -740,8 +759,8 @@ export default function RestaurantSettingsPage() {
                       </div>
                       <div className="space-y-1.5">
                         <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block">
-                          Thời hạn xác nhận cọc (phút){" "}
-                          <span className="text-xs text-gray-400 font-normal ml-1.5">(PRD mặc định: 120 phút)</span>
+                          Hạn thanh toán cọc (số phút) sau khi đặt bàn{" "}
+                          <span className="text-xs text-gray-400 font-normal ml-1.5">(Mặc định: 120 phút)</span>
                         </label>
                         <input 
                           type="number" 
@@ -756,8 +775,8 @@ export default function RestaurantSettingsPage() {
                       </div>
                       <div className="space-y-1.5">
                         <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block">
-                          Thời hạn hủy cọc miễn phí (tiếng){" "}
-                          <span className="text-xs text-gray-400 font-normal ml-1.5">(PRD mặc định: 12 tiếng)</span>
+                          Hủy đặt bàn trước bao lâu để được hoàn 100% tiền cọc (số tiếng){" "}
+                          <span className="text-xs text-gray-400 font-normal ml-1.5">(Mặc định: 12 tiếng)</span>
                         </label>
                         <input 
                           type="number" 
