@@ -10,7 +10,7 @@ import { useTenant } from "@/lib/contexts/TenantContext";
 import { useToast } from "@/lib/contexts/ToastContext";
 import { useThemeMode } from "@/app/theme/AntdProvider";
 import Header from "@/app/components/Header";
-import { Button, DatePicker, TimePicker } from "antd";
+import { Button, DatePicker, TimePicker, Modal } from "antd";
 import dayjs from "dayjs";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -271,7 +271,11 @@ export default function NewReservationPage() {
   // Step 0 — time & guests
   const [date, setDate] = useState("");
   const [time, setTime] = useState("18:00");
+  const [isManualTime, setIsManualTime] = useState(false);
   const [guests, setGuests] = useState(2);
+
+  const [checkingConflict, setCheckingConflict] = useState(false);
+  const [conflictError, setConflictError] = useState("");
 
   // Step 1 — table selection
   const [allTables, setAllTables] = useState<AvailableTable[]>([]);
@@ -279,6 +283,8 @@ export default function NewReservationPage() {
   const [currentFloorId, setCurrentFloorId] = useState<string>("");
   const [assignmentMode, setAssignmentMode] = useState<"auto" | "manual">("auto");
   const [pendingConflictTable, setPendingConflictTable] = useState<AvailableTable | null>(null);
+  const [conflictingTableCode, setConflictingTableCode] = useState("");
+  const [raceConditionModalOpen, setRaceConditionModalOpen] = useState(false);
   const [preview360Open, setPreview360Open] = useState(false);
   const [preview360Table, setPreview360Table] = useState<AvailableTable | null>(null);
 
@@ -396,7 +402,15 @@ export default function NewReservationPage() {
           tenantId: "",
           name: t.code,
           seats: t.seatingCapacity,
-          status: (selectedSet.has(t.id) ? "SELECTED" : "AVAILABLE") as "SELECTED" | "AVAILABLE",
+          status: (
+            selectedSet.has(t.id)
+              ? "SELECTED"
+              : t.isAvailable === false
+                ? "RESERVED"
+                : t.seatingCapacity > guests + 2
+                  ? "UNAVAILABLE"
+                  : "AVAILABLE"
+          ) as "SELECTED" | "RESERVED" | "UNAVAILABLE" | "AVAILABLE",
           area: name,
           position: {
             x: t.positionX !== undefined && t.positionX !== null ? Number(t.positionX) : 0,
@@ -414,16 +428,99 @@ export default function NewReservationPage() {
       ? currentFloorId : floors[0]?.id || "";
 
     return { id: "reservation", name: "Chọn bàn", floors, activeFloorId: resolvedFloorId };
-  }, [allTables, selectedTableIds, currentFloorId]);
+  }, [allTables, selectedTableIds, currentFloorId, guests]);
 
   const handleReservationLayoutChange = (updated: Layout) => {
     if (updated.activeFloorId !== currentFloorId) setCurrentFloorId(updated.activeFloorId);
   };
 
+  const selectedDayKey = useMemo(() => {
+    if (!date) return "";
+    const days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+    const d = dayjs(date);
+    return days[d.day()];
+  }, [date]);
+
+  const timeSlots = useMemo(() => {
+    const config = configFromApi || tenant?.metadata?.reservationConfig || {};
+    let openStr = config.opening_time ?? "10:00";
+    let closeStr = config.closing_time ?? "22:00";
+
+    if (selectedDayKey) {
+      const meta = tenant?.metadata || {};
+      const operatingHours = meta.operatingHours || {};
+      const dayConfig = operatingHours[selectedDayKey];
+      if (dayConfig && dayConfig.isOpen) {
+        openStr = dayConfig.open || openStr;
+        closeStr = dayConfig.close || closeStr;
+      }
+    }
+
+    const openParts = openStr.split(":");
+    const closeParts = closeStr.split(":");
+    const openMin = parseInt(openParts[0]) * 60 + parseInt(openParts[1] || "0");
+    let closeMin = parseInt(closeParts[0]) * 60 + parseInt(closeParts[1] || "0");
+    
+    if (closeMin < openMin) {
+      closeMin += 24 * 60;
+    }
+    
+    const lastBookingBeforeClose = config.last_booking_before_close_minutes ?? 60;
+    const latestBookingMin = closeMin - lastBookingBeforeClose;
+    
+    const slots = [];
+    for (let min = openMin; min <= latestBookingMin; min += 30) {
+      const displayMin = min % (24 * 60);
+      const h = Math.floor(displayMin / 60).toString().padStart(2, '0');
+      const m = (displayMin % 60).toString().padStart(2, '0');
+      slots.push(`${h}:${m}`);
+    }
+    return slots;
+  }, [configFromApi, tenant, selectedDayKey]);
+
+  useEffect(() => {
+    if (timeSlots.length > 0 && !timeSlots.includes(time)) {
+      setTime(timeSlots[0]);
+    }
+  }, [timeSlots, time]);
+
+  // Max allowed table capacity = guests + 2 (buffer to avoid wasting big tables)
+  const maxTableCapacity = guests + 2;
+
   const handleTableToggle = (tableId: string) => {
-    setSelectedTableIds(prev =>
-      prev.includes(tableId) ? prev.filter(id => id !== tableId) : [...prev, tableId]
-    );
+    const table = allTables.find(t => t.id === tableId);
+    // Deselect always allowed
+    if (selectedTableIds.includes(tableId)) {
+      setSelectedTableIds(prev => prev.filter(id => id !== tableId));
+      return;
+    }
+    // Show warning modal if table is already reserved
+    if (table && table.isAvailable === false) {
+      setPendingConflictTable(table);
+      return;
+    }
+    // Block if table is on a different floor than already selected tables
+    if (selectedTableIds.length > 0) {
+      const firstTable = allTables.find(t => t.id === selectedTableIds[0]);
+      if (firstTable && table && firstTable.floorId !== table.floorId) {
+        showToast(
+          "error",
+          "Không thể chọn bàn khác tầng",
+          `Bàn ${table.code} nằm ở tầng khác với các bàn bạn đã chọn trước đó. Vui lòng chỉ chọn các bàn cùng một tầng.`
+        );
+        return;
+      }
+    }
+    // Block if table alone is way too large (capacity > guests + 2)
+    if (table && table.seatingCapacity > maxTableCapacity) {
+      showToast(
+        "error",
+        "Bàn quá lớn cho nhóm của bạn",
+        `Bàn ${table.code} có sức chứa ${table.seatingCapacity} chỗ, trong khi nhóm của bạn chỉ có ${guests} người. Vui lòng chọn bàn phù hợp hơn (tối đa ${maxTableCapacity} chỗ).`
+      );
+      return;
+    }
+    setSelectedTableIds(prev => [...prev, tableId]);
   };
 
   const totalSelectedCapacity = useMemo(
@@ -483,6 +580,42 @@ export default function NewReservationPage() {
           }, 0)
         : guests * 25000;
 
+  const getSafeIsoTime = useCallback((dateStr: string, timeStr: string) => {
+    if (!dateStr || !timeStr) return "";
+    const config = configFromApi || tenant?.metadata?.reservationConfig || {};
+    let openStr = config.opening_time ?? "10:00";
+    if (selectedDayKey) {
+      const meta = tenant?.metadata || {};
+      const operatingHours = meta.operatingHours || {};
+      const dayConfig = operatingHours[selectedDayKey];
+      if (dayConfig && dayConfig.isOpen) {
+        openStr = dayConfig.open || openStr;
+      }
+    }
+
+    const [h, m] = timeStr.split(":").map(Number);
+    const [opH, opM] = openStr.split(":").map(Number);
+    const openMin = opH * 60 + opM;
+    const currentMin = h * 60 + m;
+
+    let d = dayjs(dateStr);
+    if (currentMin < openMin) {
+      d = d.add(1, "day");
+    }
+    return d.hour(h).minute(m).second(0).millisecond(0).toISOString();
+  }, [configFromApi, tenant, selectedDayKey]);
+
+  const isSlotInPast = useCallback((slot: string) => {
+    if (!date) return false;
+    const todayStr = dayjs().format("YYYY-MM-DD");
+    if (date !== todayStr) return false;
+    
+    const [h, m] = slot.split(":").map(Number);
+    const slotTime = dayjs().hour(h).minute(m).second(0).millisecond(0);
+    const minBookingTime = dayjs().add(30, "minute");
+    return slotTime.isBefore(minBookingTime);
+  }, [date]);
+
   // ── Step 0 → 1: check available tables ──────────────────────────────────────
   const handleCheckTables = async () => {
     if (!date || !time || !restaurantId) {
@@ -490,7 +623,12 @@ export default function NewReservationPage() {
       return;
     }
 
-    const selectedDateTime = new Date(`${date}T${time}:00`);
+    // Reset previous selection when performing a new search
+    setSelectedTableIds([]);
+    setAssignmentMode("auto");
+
+    const isoTime = getSafeIsoTime(date, time);
+    const selectedDateTime = new Date(isoTime);
     const now = new Date();
     if (selectedDateTime.getTime() < now.getTime()) {
       showToast("error", "Thời gian không hợp lệ", "Thời gian đặt bàn không được ở trong quá khứ");
@@ -503,16 +641,19 @@ export default function NewReservationPage() {
 
     setLoading(true);
     try {
-      const isoTime = new Date(`${date}T${time}:00`).toISOString();
-      const dishesPayload = wantPreOrder
-        ? Object.entries(selectedDishes)
-            .filter(([_, item]) => item.quantity > 0)
-            .map(([dishId, item]) => ({
-              dishId,
-              quantity: item.quantity,
-              note: item.note || undefined,
-            }))
-        : undefined;
+      // Early conflict check for logged-in users
+      if (user) {
+        const conflictRes = await reservationService.checkConflict({
+          restaurantId,
+          time: isoTime,
+        });
+        if (conflictRes.conflict) {
+          showToast("error", "Lịch đặt trùng", "Bạn đã có một lịch đặt bàn khác trùng khung giờ này (hoặc đang ngồi ăn tại nhà hàng)");
+          setLoading(false);
+          return;
+        }
+      }
+
       const tables = await reservationService.checkTables({ restaurantId, time: isoTime, numberOfGuests: guests });
       setAllTables(tables);
       setStep(1);
@@ -520,6 +661,29 @@ export default function NewReservationPage() {
       showToast("error", "Lỗi", err?.response?.data?.message || err.message || "Không thể kiểm tra bàn trống");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleEmailBlur = async (emailVal: string) => {
+    if (!emailVal || !emailVal.trim() || !date || !time) return;
+    try {
+      setCheckingConflict(true);
+      const isoTime = getSafeIsoTime(date, time);
+      const res = await reservationService.checkConflict({
+        restaurantId,
+        time: isoTime,
+        email: emailVal.trim(),
+      });
+      if (res.conflict) {
+        setConflictError("Bạn đã có một lịch đặt bàn khác trùng khung giờ này.");
+        showToast("error", "Lịch đặt trùng", "Bạn đã có một lịch đặt bàn khác trùng khung giờ này");
+      } else {
+        setConflictError("");
+      }
+    } catch (e) {
+      // Ignore network errors
+    } finally {
+      setCheckingConflict(false);
     }
   };
 
@@ -539,7 +703,7 @@ export default function NewReservationPage() {
     }
     setLoading(true);
     try {
-      const isoTime = new Date(`${date}T${time}:00`).toISOString();
+      const isoTime = getSafeIsoTime(date, time);
       const dishesPayload = wantPreOrder
         ? Object.entries(selectedDishes)
             .filter(([_, item]) => item.quantity > 0)
@@ -590,7 +754,14 @@ export default function NewReservationPage() {
       setStep(3);
     } catch (err: any) {
       const msg = err?.response?.data?.message || err.message || "Không thể đặt bàn";
-      showToast("error", "Lỗi", msg);
+      if (msg.includes("đã có lượt đặt trước") || msg.includes("trùng khung giờ")) {
+        const match = msg.match(/Bàn\s+([A-Za-z0-9_\-]+)/i);
+        const code = match ? match[1] : "bạn chọn";
+        setConflictingTableCode(code);
+        setRaceConditionModalOpen(true);
+      } else {
+        showToast("error", "Lỗi", msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -686,19 +857,63 @@ export default function NewReservationPage() {
                   />
                 </div>
 
-                <div>
-                  <label className="text-xs font-semibold text-[var(--text-muted)] block mb-1.5 flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5" /> Giờ đến
-                  </label>
-                  <TimePicker 
-                    value={time ? dayjs(time, "HH:mm") : null}
-                    onChange={(val) => setTime(val ? val.format("HH:mm") : "")}
-                    format="HH:mm"
-                    minuteStep={15}
-                    className="w-full h-11 rounded-xl"
-                    placeholder="Chọn giờ đến"
-                    allowClear={false}
-                  />
+                 <div>
+                  <div className="flex justify-between items-center mb-1.5">
+                    <label className="text-xs font-semibold text-[var(--text-muted)] flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5" /> Giờ đến
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setIsManualTime(!isManualTime)}
+                      className="text-xs font-bold bg-transparent border-none cursor-pointer hover:underline transition-colors p-0"
+                      style={{ color: brandColor }}
+                    >
+                      {isManualTime ? "Chọn từ danh sách" : "Nhập giờ tự chọn"}
+                    </button>
+                  </div>
+                  
+                  {isManualTime ? (
+                    <TimePicker 
+                      value={time ? dayjs(time, "HH:mm") : null}
+                      onChange={(val) => setTime(val ? val.format("HH:mm") : "")}
+                      format="HH:mm"
+                      minuteStep={5}
+                      className="w-full h-11 rounded-xl"
+                      placeholder="Chọn giờ tự do (ví dụ: 18:15)"
+                      allowClear={false}
+                    />
+                  ) : (
+                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 max-h-[160px] overflow-y-auto p-2 border border-[var(--border)] rounded-2xl bg-[var(--surface)]">
+                      {timeSlots.length === 0 ? (
+                        <p className="col-span-full text-center text-xs text-[var(--text-muted)] py-4 m-0">
+                          Nhà hàng đóng cửa hoặc không nhận đặt bàn vào ngày này
+                        </p>
+                      ) : (
+                        timeSlots.map((slot) => {
+                          const isSelected = time === slot;
+                          const isPast = isSlotInPast(slot);
+                          return (
+                            <button
+                              key={slot}
+                              type="button"
+                              onClick={() => setTime(slot)}
+                              disabled={isPast}
+                              className={`py-2 px-1.5 rounded-xl text-xs font-bold transition-all duration-200 border text-center ${
+                                isPast
+                                  ? "bg-zinc-800/10 text-zinc-400 border-zinc-200/50 cursor-not-allowed opacity-40"
+                                  : isSelected
+                                    ? "text-white cursor-pointer"
+                                    : "bg-[var(--card)] text-[var(--text)] border-[var(--border)] hover:border-[var(--primary)] cursor-pointer"
+                              }`}
+                              style={isSelected && !isPast ? { background: brandColor, borderColor: brandColor } : {}}
+                            >
+                              {slot}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -922,7 +1137,7 @@ export default function NewReservationPage() {
                           <Button
                             type="primary"
                             onClick={() => setStep(2)}
-                            disabled={selectedTableIds.length === 0}
+                            disabled={selectedTableIds.length === 0 || totalSelectedCapacity < guests}
                             className="w-full rounded-xl h-10 font-bold border-none"
                             style={{ background: brandColor, color: "#fff" }}
                           >
@@ -946,28 +1161,69 @@ export default function NewReservationPage() {
               </div>
 
               <div className="space-y-4">
-                {[
-                  { label: "Họ và tên khách hàng", value: name, setter: setName, type: "text", placeholder: "Nguyễn Văn A", icon: <User className="w-4 h-4 text-zinc-400" /> },
-                  { label: "Số điện thoại liên lạc", value: phone, setter: setPhone, type: "tel", placeholder: "0905 123 456", icon: <Phone className="w-4 h-4 text-zinc-400" /> },
-                  { label: "Địa chỉ Email nhận mã xác nhận", value: email, setter: setEmail, type: "email", placeholder: "example@gmail.com", disabled: !!user, icon: <Mail className="w-4 h-4 text-zinc-400" /> },
-                ].map((f) => (
-                  <div key={f.label}>
-                    <label className="text-xs font-semibold text-[var(--text-muted)] block mb-1.5">{f.label}</label>
-                    <div className="relative">
-                      <div className="absolute left-3.5 top-1/2 -translate-y-1/2">
-                        {f.icon}
-                      </div>
-                      <input 
-                        type={f.type} 
-                        value={f.value} 
-                        placeholder={f.placeholder} 
-                        onChange={(e) => f.setter(e.target.value)} 
-                        disabled={f.disabled}
-                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] text-sm focus:outline-none focus:border-[var(--primary)] transition-colors disabled:opacity-60" 
-                      />
+                {/* Họ tên */}
+                <div>
+                  <label className="text-xs font-semibold text-[var(--text-muted)] block mb-1.5">Họ và tên khách hàng</label>
+                  <div className="relative">
+                    <div className="absolute left-3.5 top-1/2 -translate-y-1/2">
+                      <User className="w-4 h-4 text-zinc-400" />
                     </div>
+                    <input 
+                      type="text" 
+                      value={name} 
+                      placeholder="Nguyễn Văn A" 
+                      onChange={(e) => setName(e.target.value)} 
+                      className="w-full pl-10 pr-4 py-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] text-sm focus:outline-none focus:border-[var(--primary)] transition-colors" 
+                    />
                   </div>
-                ))}
+                </div>
+
+                {/* Số điện thoại */}
+                <div>
+                  <label className="text-xs font-semibold text-[var(--text-muted)] block mb-1.5">Số điện thoại liên lạc</label>
+                  <div className="relative">
+                    <div className="absolute left-3.5 top-1/2 -translate-y-1/2">
+                      <Phone className="w-4 h-4 text-zinc-400" />
+                    </div>
+                    <input 
+                      type="tel" 
+                      value={phone} 
+                      placeholder="0905 123 456" 
+                      onChange={(e) => setPhone(e.target.value)} 
+                      className="w-full pl-10 pr-4 py-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text)] text-sm focus:outline-none focus:border-[var(--primary)] transition-colors" 
+                    />
+                  </div>
+                </div>
+
+                {/* Email */}
+                <div>
+                  <label className="text-xs font-semibold text-[var(--text-muted)] block mb-1.5">Địa chỉ Email nhận mã xác nhận</label>
+                  <div className="relative">
+                    <div className="absolute left-3.5 top-1/2 -translate-y-1/2">
+                      <Mail className="w-4 h-4 text-zinc-400" />
+                    </div>
+                    <input 
+                      type="email" 
+                      value={email} 
+                      placeholder="example@gmail.com" 
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        if (conflictError) setConflictError("");
+                      }}
+                      onBlur={(e) => handleEmailBlur(e.target.value)}
+                      disabled={!!user}
+                      className={`w-full pl-10 pr-4 py-3 rounded-xl border bg-[var(--surface)] text-[var(--text)] text-sm focus:outline-none transition-colors disabled:opacity-60 ${
+                        conflictError ? "border-red-500 focus:border-red-500" : "border-[var(--border)] focus:border-[var(--primary)]"
+                      }`}
+                    />
+                  </div>
+                  {checkingConflict && (
+                    <p className="text-[11px] text-[var(--text-muted)] mt-1 animate-pulse">Đang kiểm tra lịch trùng...</p>
+                  )}
+                  {conflictError && (
+                    <p className="text-[11px] text-red-500 mt-1 font-semibold">⚠️ {conflictError}</p>
+                  )}
+                </div>
 
                 <div>
                   <label className="text-xs font-semibold text-[var(--text-muted)] block mb-1.5">Yêu cầu bổ sung (không bắt buộc)</label>
@@ -1385,7 +1641,7 @@ export default function NewReservationPage() {
                   type="primary" 
                   loading={loading} 
                   onClick={handleSubmit} 
-                  disabled={!name || !phone || !email}
+                  disabled={!name || !phone || !email || checkingConflict || !!conflictError}
                   className="flex-[2] rounded-xl h-11 font-bold border-none"
                   style={{ background: brandColor, color: "#fff" }}
                 >
@@ -1486,44 +1742,122 @@ export default function NewReservationPage() {
       </div>
 
       {/* Soft Conflict Confirmation Modal */}
+      {/* Table Conflict/Reservation Warning Modal */}
       {pendingConflictTable && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 max-w-sm w-full shadow-xl text-left">
-            <div className="text-amber-500 text-3xl mb-3">⚠️</div>
-            <h3 className="text-base font-bold text-[var(--text)] mb-2">Thông báo thời gian bàn bận</h3>
+            {pendingConflictTable.isAvailable === false ? (
+              <>
+                <div className="text-amber-500 text-3xl mb-3">⚠️</div>
+                <h3 className="text-base font-bold text-[var(--text)] mb-2">Bàn đã được đặt trước</h3>
+                <p className="text-xs text-[var(--text-muted)] mb-5 leading-relaxed">
+                  Bàn <strong className="text-[var(--text)] font-semibold">{pendingConflictTable.code}</strong> đã có khách khác đặt trước trùng với khung giờ của bạn ({time}).
+                  <br />
+                  <br />
+                  Vì không thể chắc chắn thời gian khách trước trả bàn, bạn có muốn chuyển sang chế độ <strong className="text-[var(--text)] font-semibold">"Tự động xếp bàn"</strong> để nhà hàng chủ động bố trí bàn trống phù hợp khác cho bạn khi bạn đến không?
+                </p>
+                <div className="flex gap-3">
+                  <Button
+                    onClick={() => setPendingConflictTable(null)}
+                    className="flex-1 rounded-xl h-10 border-[var(--border)] text-[var(--text)] bg-transparent font-semibold text-xs"
+                  >
+                    Tự chọn bàn khác
+                  </Button>
+                  <Button
+                    type="primary"
+                    onClick={() => {
+                      setAssignmentMode("auto");
+                      setSelectedTableIds([]);
+                      setPendingConflictTable(null);
+                    }}
+                    className="flex-1 rounded-xl h-10 font-bold border-none text-xs"
+                    style={{ background: brandColor, color: "#fff" }}
+                  >
+                    Tự động xếp bàn
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-amber-500 text-3xl mb-3">⚠️</div>
+                <h3 className="text-base font-bold text-[var(--text)] mb-2">Thông báo thời gian bàn bận</h3>
+                <p className="text-xs text-[var(--text-muted)] mb-5 leading-relaxed">
+                  Bàn <strong className="text-[var(--text)] font-semibold">{pendingConflictTable.code}</strong> hiện đang có một lượt khách đặt lúc{" "}
+                  <strong className="text-[var(--text)] font-semibold">
+                    {new Date(pendingConflictTable.conflictTime!).toLocaleTimeString("vi-VN", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </strong>
+                  .
+                  <br />
+                  <br />
+                  Trong trường hợp khách trước dùng bữa lâu hơn dự kiến, nhà hàng sẽ chủ động sắp xếp một bàn trống khác tương đương cho bạn khi bạn đến nhận bàn.
+                  <br />
+                  <br />
+                  Bạn có đồng ý với sắp xếp này không?
+                </p>
+                <div className="flex gap-3">
+                  <Button
+                    onClick={() => setPendingConflictTable(null)}
+                    className="flex-1 rounded-xl h-10 border-[var(--border)] text-[var(--text)] bg-transparent font-semibold text-xs"
+                  >
+                    Hủy
+                  </Button>
+                  <Button
+                    type="primary"
+                    onClick={() => {
+                      setSelectedTableIds((prev) => [...prev, pendingConflictTable.id]);
+                      setPendingConflictTable(null);
+                    }}
+                    className="flex-1 rounded-xl h-10 font-bold border-none text-xs"
+                    style={{ background: brandColor, color: "#fff" }}
+                  >
+                    Đồng ý
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Race Condition Conflict Modal */}
+      {raceConditionModalOpen && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 max-w-sm w-full shadow-xl text-left">
+            <div className="text-red-500 text-3xl mb-3">🚨</div>
+            <h3 className="text-base font-bold text-[var(--text)] mb-2">Bàn vừa được đặt chỗ</h3>
             <p className="text-xs text-[var(--text-muted)] mb-5 leading-relaxed">
-              Bàn <strong className="text-[var(--text)] font-semibold">{pendingConflictTable.code}</strong> hiện đang có một lượt khách đặt lúc{" "}
-              <strong className="text-[var(--text)] font-semibold">
-                {new Date(pendingConflictTable.conflictTime!).toLocaleTimeString("vi-VN", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </strong>
-              .
+              Bàn bạn chọn (<strong className="text-[var(--text)] font-semibold">Bàn {conflictingTableCode}</strong>) vừa được một khách hàng khác đặt thành công trước đó vài giây trong lúc bạn đang điền thông tin.
               <br />
               <br />
-              Trong trường hợp khách trước dùng bữa lâu hơn dự kiến, nhà hàng sẽ chủ động sắp xếp một bàn trống khác tương đương cho bạn khi bạn đến nhận bàn.
-              <br />
-              <br />
-              Bạn có đồng ý với sắp xếp này không?
+              Bạn có muốn hệ thống tự động tìm và xếp một bàn trống tương đương khác cho bạn không?
             </p>
             <div className="flex gap-3">
               <Button
-                onClick={() => setPendingConflictTable(null)}
-                className="flex-1 rounded-xl h-10 border-[var(--border)] text-[var(--text)] bg-transparent font-semibold"
+                onClick={() => {
+                  setRaceConditionModalOpen(false);
+                  setStep(1); // Go back to floor plan
+                }}
+                className="flex-1 rounded-xl h-10 border-[var(--border)] text-[var(--text)] bg-transparent font-semibold text-xs"
               >
-                Hủy
+                Quay lại tự chọn
               </Button>
               <Button
                 type="primary"
-                onClick={() => {
-                  setSelectedTableIds((prev) => [...prev, pendingConflictTable.id]);
-                  setPendingConflictTable(null);
+                onClick={async () => {
+                  setRaceConditionModalOpen(false);
+                  setAssignmentMode("auto");
+                  setSelectedTableIds([]); // clear specific tables
+                  setTimeout(() => {
+                    handleSubmit();
+                  }, 100);
                 }}
-                className="flex-1 rounded-xl h-10 font-bold border-none"
+                className="flex-1 rounded-xl h-10 font-bold border-none text-xs"
                 style={{ background: brandColor, color: "#fff" }}
               >
-                Đồng ý
+                Tự động xếp bàn
               </Button>
             </div>
           </div>

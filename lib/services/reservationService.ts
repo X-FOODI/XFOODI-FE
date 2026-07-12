@@ -219,6 +219,15 @@ const reservationService = {
     return unwrap<AvailableTable[]>(res.data);
   },
 
+  async checkConflict(params: {
+    restaurantId: string;
+    time: string;
+    email?: string;
+  }): Promise<{ conflict: boolean }> {
+    const res = await axiosInstance.get('/reservations/check-conflict', { params });
+    return unwrap<{ conflict: boolean }>(res.data);
+  },
+
   async updateStatus(id: string, status: string, reason?: string): Promise<Reservation> {
     const res = await axiosInstance.patch(API_ROUTES.RESERVATIONS.UPDATE_STATUS(id), { status, ...(reason ? { reason } : {}) });
     return unwrap<Reservation>(res.data);
