@@ -47,7 +47,7 @@ export default function Home() {
     <PageTransition minimumLoadingTime={2000}>
       <div style={{ minHeight: "100vh" }}>
         <Header />
-        <SystemAnnouncementBanner variant="floating-bottom" />
+        <SystemAnnouncementBanner variant="floating-top" />
         <main>
           {/* 1. Hero Section (Includes Trusted By Partners bar) */}
           <section id="hero" style={{ scrollMarginTop: 120 }}>

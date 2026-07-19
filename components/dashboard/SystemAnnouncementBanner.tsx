@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { X, Info, AlertTriangle, AlertOctagon } from "lucide-react";
 import axiosInstance from "@/lib/services/axiosInstance";
 
@@ -31,7 +31,7 @@ function getDismissed(): string[] {
 export default function SystemAnnouncementBanner({
   variant = "inline",
 }: {
-  variant?: "inline" | "floating-bottom";
+  variant?: "inline" | "floating-top" | "floating-bottom";
 }) {
   const [items, setItems] = useState<Announcement[]>([]);
 
@@ -61,56 +61,85 @@ export default function SystemAnnouncementBanner({
     setItems((prev) => prev.filter((a) => a.id !== id));
   };
 
+  const dismissAll = () => {
+    const next = [...getDismissed(), ...items.map((a) => a.id)];
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      /* ignore */
+    }
+    setItems([]);
+  };
+
   if (items.length === 0) return null;
 
-  const floating = variant === "floating-bottom";
+  const floatingStyle: CSSProperties | undefined =
+    variant === "floating-top"
+      ? { position: "fixed", top: 0, left: 0, right: 0, zIndex: 60, background: "var(--card)", boxShadow: "0 4px 16px rgba(0,0,0,0.12)" }
+      : variant === "floating-bottom"
+        ? { position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 60, background: "var(--card)", boxShadow: "0 -4px 16px rgba(0,0,0,0.12)" }
+        : undefined;
+
+  // Màu nền theo mức độ cao nhất
+  const topLevel = items.some((i) => i.level === "CRITICAL")
+    ? "CRITICAL"
+    : items.some((i) => i.level === "WARNING")
+      ? "WARNING"
+      : "INFO";
+  const s = LEVEL_STYLE[topLevel];
+  const Icon = s.Icon;
+
+  // Một "đoạn" chứa toàn bộ thông báo — nhân đôi để chạy vòng liền mạch
+  const segment = (dup: number) => (
+    <span key={dup} style={{ display: "inline-flex", alignItems: "center", flexShrink: 0 }}>
+      {items.map((a) => (
+        <span key={a.id + "-" + dup} style={{ display: "inline-flex", alignItems: "center", paddingRight: 48 }}>
+          <span
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: "50%",
+              background: LEVEL_STYLE[a.level]?.color || s.color,
+              marginRight: 10,
+            }}
+          />
+          <strong style={{ color: "var(--text)" }}>{a.title}</strong>
+          <span style={{ color: "var(--text-muted)", marginLeft: 8 }}>{a.content}</span>
+        </span>
+      ))}
+    </span>
+  );
 
   return (
-    <div
-      className="w-full"
-      style={
-        floating
-          ? {
-              position: "fixed",
-              bottom: 0,
-              left: 0,
-              right: 0,
-              zIndex: 60,
-              background: "var(--card)",
-              boxShadow: "0 -4px 16px rgba(0,0,0,0.12)",
-            }
-          : undefined
-      }
-    >
-      {items.map((a) => {
-        const s = LEVEL_STYLE[a.level] || LEVEL_STYLE.INFO;
-        const Icon = s.Icon;
-        return (
+    <div className="w-full" style={floatingStyle}>
+      <div
+        className="flex items-center gap-3 border-b"
+        style={{ background: s.bg, borderColor: s.border, overflow: "hidden", padding: "9px 12px" }}
+      >
+        <Icon size={18} style={{ color: s.color, flexShrink: 0 }} />
+        <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
           <div
-            key={a.id}
-            className="flex items-start gap-3 px-4 sm:px-6 py-2.5 border-b"
-            style={{ background: s.bg, borderColor: s.border }}
+            className="ann-marquee-track"
+            style={{ display: "inline-flex", whiteSpace: "nowrap", willChange: "transform", fontSize: 14 }}
           >
-            <Icon size={18} style={{ color: s.color, marginTop: 1, flexShrink: 0 }} />
-            <div className="flex-1 min-w-0">
-              <span className="text-sm font-bold" style={{ color: "var(--text)" }}>
-                {a.title}
-              </span>
-              <span className="text-sm ml-2" style={{ color: "var(--text-muted)" }}>
-                {a.content}
-              </span>
-            </div>
-            <button
-              onClick={() => dismiss(a.id)}
-              className="flex-shrink-0 rounded-md p-1 transition-colors hover:bg-black/10"
-              style={{ color: "var(--text-muted)" }}
-              aria-label="Đóng"
-            >
-              <X size={16} />
-            </button>
+            {segment(0)}
+            {segment(1)}
           </div>
-        );
-      })}
+        </div>
+        <button
+          onClick={dismissAll}
+          className="flex-shrink-0 rounded-md p-1 transition-colors hover:bg-black/10"
+          style={{ color: "var(--text-muted)" }}
+          aria-label="Đóng"
+        >
+          <X size={16} />
+        </button>
+      </div>
+      <style>{`
+        @keyframes annMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+        .ann-marquee-track { animation: annMarquee 22s linear infinite; }
+        .ann-marquee-track:hover { animation-play-state: paused; }
+      `}</style>
     </div>
   );
 }
