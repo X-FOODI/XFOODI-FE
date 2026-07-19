@@ -172,10 +172,11 @@ export default function AdminAnnouncementsPage() {
             />
             <DatePicker
               showTime
-              placeholder="Hết hạn (tùy chọn)"
+              placeholder="Hết hạn (để trống = không hết hạn)"
               value={expiresAt}
               onChange={setExpiresAt}
               format="DD/MM/YYYY HH:mm"
+              disabledDate={(d) => !!d && d.isBefore(dayjs().startOf("day"))}
             />
           </Space>
         </div>
