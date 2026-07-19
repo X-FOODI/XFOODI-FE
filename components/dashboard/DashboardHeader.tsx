@@ -8,6 +8,7 @@ import axiosInstance from "../../lib/services/axiosInstance";
 import { useTenant } from "@/lib/contexts/TenantContext";
 import { Home, User, Settings, Moon, Sun, Bell, ChevronDown, LogOut, Utensils } from "lucide-react";
 import { useThemeMode } from "@/app/theme/AntdProvider";
+import SystemAnnouncementBanner from "./SystemAnnouncementBanner";
 
 interface DashboardHeaderProps {
   role: "admin" | "restaurant";
@@ -178,6 +179,7 @@ export default function DashboardHeader({
   ];
 
   return (
+    <>
     <header
       style={{
         position: "sticky",
@@ -703,5 +705,7 @@ export default function DashboardHeader({
         </div>
       </div>
     </header>
+    <SystemAnnouncementBanner />
+    </>
   );
 }
