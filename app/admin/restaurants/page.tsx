@@ -15,7 +15,8 @@ interface RestaurantTenant {
   phone: string | null;
   email: string | null;
   logoUrl: string | null;
-  isActive: boolean;
+  status: 'ACTIVE' | 'DISABLED';
+  disabledReason: string | null;
   createdAt: string;
   owner: {
     id: string;
@@ -37,13 +38,13 @@ export default function AdminTenantsPage() {
   const [confirmModal, setConfirmModal] = useState<{
     visible: boolean;
     restaurant: RestaurantTenant | null;
-    nextState: boolean;
     loading: boolean;
+    reason: string;
   }>({
     visible: false,
     restaurant: null,
-    nextState: false,
     loading: false,
+    reason: "",
   });
 
   useEffect(() => {
@@ -76,34 +77,44 @@ export default function AdminTenantsPage() {
   };
 
   const handleToggleClick = (checked: boolean, restaurant: RestaurantTenant) => {
-    // If we are disabling the restaurant, show a confirmation modal
     if (!checked) {
       setConfirmModal({
         visible: true,
         restaurant,
-        nextState: false,
         loading: false,
+        reason: "",
       });
     } else {
-      // If enabling, just do it directly or show modal too. Let's do it directly.
-      updateStatus(restaurant.id, true);
+      enableRestaurant(restaurant.id);
     }
   };
 
-  const updateStatus = async (id: string, isActive: boolean) => {
+  const disableRestaurant = async (id: string, reason: string) => {
     try {
-      if (!isActive) setConfirmModal(prev => ({ ...prev, loading: true }));
-      
-      const res = await axiosInstance.patch(`/tenants/${id}/status`, { isActive });
+      setConfirmModal(prev => ({ ...prev, loading: true }));
+      const res = await axiosInstance.patch(`/admin/restaurants/${id}/disable`, { reason });
       if (res.data?.success) {
         message.success(res.data.message);
-        setRestaurants(prev => prev.map(r => r.id === id ? { ...r, isActive } : r));
-        setConfirmModal({ visible: false, restaurant: null, nextState: false, loading: false });
+        setRestaurants(prev => prev.map(r => r.id === id ? { ...r, status: 'DISABLED', disabledReason: reason } : r));
+        setConfirmModal({ visible: false, restaurant: null, loading: false, reason: "" });
       }
     } catch (err: any) {
       console.error(err);
-      message.error(err.response?.data?.message || "Lỗi khi cập nhật trạng thái");
-      if (!isActive) setConfirmModal(prev => ({ ...prev, loading: false }));
+      message.error(err.response?.data?.message || "Lỗi khi vô hiệu hóa");
+      setConfirmModal(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  const enableRestaurant = async (id: string) => {
+    try {
+      const res = await axiosInstance.patch(`/admin/restaurants/${id}/enable`);
+      if (res.data?.success) {
+        message.success(res.data.message);
+        setRestaurants(prev => prev.map(r => r.id === id ? { ...r, status: 'ACTIVE', disabledReason: null } : r));
+      }
+    } catch (err: any) {
+      console.error(err);
+      message.error(err.response?.data?.message || "Lỗi khi kích hoạt lại");
     }
   };
 
@@ -190,10 +201,15 @@ export default function AdminTenantsPage() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <Switch
-                        checked={r.isActive}
+                        checked={r.status === 'ACTIVE'}
                         onChange={(checked) => handleToggleClick(checked, r)}
-                        style={{ background: r.isActive ? "var(--primary)" : "var(--border)" }}
+                        style={{ background: r.status === 'ACTIVE' ? "var(--primary)" : "var(--border)" }}
                       />
+                      {r.status === 'DISABLED' && r.disabledReason && (
+                        <div className="text-xs text-red-500 mt-1 max-w-[150px] truncate ml-auto" title={r.disabledReason}>
+                          {r.disabledReason}
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -230,10 +246,19 @@ export default function AdminTenantsPage() {
           </div>
         }
         open={confirmModal.visible}
-        onCancel={() => !confirmModal.loading && setConfirmModal({ visible: false, restaurant: null, nextState: false, loading: false })}
+        onCancel={() => !confirmModal.loading && setConfirmModal({ visible: false, restaurant: null, loading: false, reason: "" })}
         onOk={() => {
           if (confirmModal.restaurant) {
-            updateStatus(confirmModal.restaurant.id, false);
+            const reason = confirmModal.reason.trim();
+            if (!reason) {
+              message.error("Vui lòng nhập lý do khóa");
+              return;
+            }
+            if (reason.length < 10 || reason.length > 500) {
+              message.error("Lý do khóa phải từ 10 đến 500 ký tự");
+              return;
+            }
+            disableRestaurant(confirmModal.restaurant.id, reason);
           }
         }}
         okText="Vô hiệu hóa"
@@ -242,8 +267,17 @@ export default function AdminTenantsPage() {
         cancelButtonProps={{ disabled: confirmModal.loading }}
       >
         <p>Bạn có chắc chắn muốn vô hiệu hóa nhà hàng <strong>{confirmModal.restaurant?.name}</strong>?</p>
-        <p className="text-sm text-gray-500 mt-2">
-          Khi bị vô hiệu hóa, nhà hàng và toàn bộ nhân viên sẽ không thể đăng nhập. Subdomain <code>{confirmModal.restaurant?.slug}.xfoodi.website</code> cũng sẽ bị khóa tạm thời cho đến khi bạn kích hoạt lại.
+        <div className="mt-4">
+          <label className="block text-sm font-medium mb-1">Lý do vô hiệu hóa <span className="text-red-500">*</span></label>
+          <Input.TextArea
+            rows={3}
+            value={confirmModal.reason}
+            onChange={(e) => setConfirmModal(prev => ({ ...prev, reason: e.target.value }))}
+            placeholder="Nhập lý do để thông báo qua email..."
+          />
+        </div>
+        <p className="text-sm text-gray-500 mt-4">
+          Khi bị vô hiệu hóa, nhà hàng và toàn bộ nhân viên sẽ không thể đăng nhập. Subdomain <code>{confirmModal.restaurant?.slug}.xfoodi.website</code> cũng sẽ bị khóa tạm thời.
         </p>
       </Modal>
     </div>

@@ -133,6 +133,19 @@ axiosInstance.interceptors.response.use(
         return Promise.reject(refreshError);
       }
     }
+    
+    // Check for Global Ban
+    if (error.response?.status === 403) {
+      const message = error.response?.data?.message?.toLowerCase() || '';
+      if (message.includes('disabled')) {
+        const reason = error.response?.data?.reason || 'No reason provided';
+        if (typeof window !== 'undefined') {
+          const event = new CustomEvent('globalBan', { detail: { message: error.response?.data?.message, reason } });
+          window.dispatchEvent(event);
+        }
+      }
+    }
+
     return Promise.reject(error);
   }
 );
