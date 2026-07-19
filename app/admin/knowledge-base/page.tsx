@@ -718,7 +718,12 @@ export default function SuperAdminKnowledgeBasePage() {
         message.success(response.data.message || `Đã lưu ${validFiles.length} tài liệu vào bucket. Vào tab Properties để bắt đầu xử lý AI.`);
         fetchDocuments(selectedRestaurantId, false);
       }
-    } catch (err: any) { message.error(err.response?.data?.message || "Tải lên thất bại."); }
+    } catch (err: any) {
+      console.error("[KB Upload Error]", err);
+      const serverMsg = err.response?.data?.message || err.response?.data?.error || err.message;
+      const statusCode = err.response?.status ? `(${err.response.status}) ` : "";
+      message.error(`Tải lên thất bại ${statusCode}: ${serverMsg || "Không thể gửi tệp tới máy chủ."}`);
+    }
     finally { setUploading(false); if (fileInputRef.current) fileInputRef.current.value = ""; }
   };
 

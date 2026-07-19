@@ -558,7 +558,10 @@ export default function RestaurantKnowledgeBasePage() {
         fetchDocuments(false);
       }
     } catch (err: any) {
-      messageApi.error(err.response?.data?.message || "Tải lên thất bại.");
+      console.error("[KB Upload Error]", err);
+      const serverMsg = err.response?.data?.message || err.response?.data?.error || err.message;
+      const statusCode = err.response?.status ? `(${err.response.status}) ` : "";
+      messageApi.error(`Tải lên thất bại ${statusCode}: ${serverMsg || "Không thể gửi tệp tới máy chủ."}`);
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
