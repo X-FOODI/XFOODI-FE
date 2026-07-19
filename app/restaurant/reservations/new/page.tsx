@@ -15,6 +15,7 @@ import dayjs from "dayjs";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { io as socketIO } from "socket.io-client";
 import { 
   Calendar, 
   Users, 
@@ -336,6 +337,45 @@ export default function NewReservationPage() {
   const [createdReservation, setCreatedReservation] = useState<any>(null);
   const [transferInfo, setTransferInfo] = useState<TransferInfo | null>(null);
   const [depositPaid, setDepositPaid] = useState(false);
+
+  // Listen for real-time status changes in Step 3
+  useEffect(() => {
+    if (step !== 3 || !createdId) return;
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL ||
+      process.env.NEXT_PUBLIC_API_URL ||
+      "https://api.xfoodi.website";
+    const socket = socketIO(socketUrl, {
+      transports: ["polling"],
+      withCredentials: true,
+    });
+
+    socket.on("connect", () => {
+      socket.emit("join_reservation", createdId);
+    });
+
+    socket.on("RESERVATION_STATUS_CHANGED", (data: {
+      reservationId: string;
+      status: string;
+      statusName: string;
+    }) => {
+      if (data.reservationId !== createdId) return;
+      setCreatedReservation((prev: any) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          statusValue: {
+            ...prev.statusValue,
+            code: data.status,
+            name: data.statusName || data.status,
+          },
+        };
+      });
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [step, createdId]);
 
   // Step 2 — pre-order dishes state
   const [wantPreOrder, setWantPreOrder] = useState(false);
@@ -1600,23 +1640,36 @@ export default function NewReservationPage() {
                             </div>
                           )}
 
-                          {/* AI Recommendations for Pre-order */}
-                          {restaurantId && Object.keys(selectedDishes).length > 0 && (
+                          {/* AI Recommendations for Pre-order — luôn hiện khi toggle bật */}
+                          {restaurantId && (
                             <div className="pt-4 border-t border-dashed border-[var(--border)] space-y-4">
+                              {/* Bán chạy & thói quen — luôn hiện */}
                               <Recommendations
-                                variant="frequently-bought"
+                                variant="top-sellers"
                                 restaurantId={restaurantId}
-                                dishId={Object.keys(selectedDishes)[0]}
                                 excludeIds={Object.keys(selectedDishes)}
                                 onAdd={addRecommendedDish}
                               />
-                              <Recommendations
-                                variant="for-cart"
-                                restaurantId={restaurantId}
-                                cartDishIds={Object.keys(selectedDishes)}
-                                excludeIds={Object.keys(selectedDishes)}
-                                onAdd={addRecommendedDish}
-                              />
+                              {/* Thường được gọi kèm — hiện khi đã có món */}
+                              {Object.keys(selectedDishes).length > 0 && (
+                                <Recommendations
+                                  variant="frequently-bought"
+                                  restaurantId={restaurantId}
+                                  dishId={Object.keys(selectedDishes)[0]}
+                                  excludeIds={Object.keys(selectedDishes)}
+                                  onAdd={addRecommendedDish}
+                                />
+                              )}
+                              {/* AI gợi ý theo giỏ — hiện khi đã có món */}
+                              {Object.keys(selectedDishes).length > 0 && (
+                                <Recommendations
+                                  variant="for-cart"
+                                  restaurantId={restaurantId}
+                                  cartDishIds={Object.keys(selectedDishes)}
+                                  excludeIds={Object.keys(selectedDishes)}
+                                  onAdd={addRecommendedDish}
+                                />
+                              )}
                             </div>
                           )}
                         </>

@@ -300,7 +300,7 @@ export default function SuperAdminKnowledgeBasePage() {
 
   /* ── Search / Filter ── */
   const [searchQuery, setSearchQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState<"ALL" | "PDF" | "TXT" | "MD">("ALL");
+  const [typeFilter, setTypeFilter] = useState<"ALL" | "PDF" | "TXT" | "MD" | "DOCX">("ALL");
 
   /* ── File Preview Panel ── */
   const [selectedDoc, setSelectedDoc] = useState<DocumentItem | null>(null);
@@ -697,29 +697,51 @@ export default function SuperAdminKnowledgeBasePage() {
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const ext = file.name.split(".").pop()?.toLowerCase();
-      if (ext !== "pdf" && ext !== "txt" && ext !== "md") { message.error(`${file.name}: Không hỗ trợ (Chỉ PDF, TXT, MD)`); continue; }
+      if (ext !== "pdf" && ext !== "txt" && ext !== "md" && ext !== "docx" && ext !== "doc") { message.error(`${file.name}: Không hỗ trợ (Chỉ PDF, TXT, MD, DOCX)`); continue; }
       if (file.size > 10 * 1024 * 1024) { message.error(`${file.name}: Vượt quá 10MB`); continue; }
       validFiles.push(file);
     }
     if (validFiles.length === 0) return;
     setUploading(true);
-    const formData = new FormData();
-    validFiles.forEach(file => {
-      formData.append("files", file, file.webkitRelativePath || file.name);
-      formData.append("paths", file.webkitRelativePath || file.name);
-    });
-    if (selectedBucketId !== "all" && selectedBucketId !== "unassigned") formData.append("bucketId", selectedBucketId);
-    formData.append("restaurantId", selectedRestaurantId);
-    /* skipProcessing=true → backend chỉ lưu file, không chunking */
-    formData.append("skipProcessing", "true");
+    let successCount = 0;
+    const BATCH_SIZE = 3;
+
     try {
-      const response = await axiosInstance.post("/ai/kb/upload", formData);
-      if (response.data.success) {
-        message.success(response.data.message || `Đã lưu ${validFiles.length} tài liệu vào bucket. Vào tab Properties để bắt đầu xử lý AI.`);
-        fetchDocuments(selectedRestaurantId, false);
+      for (let i = 0; i < validFiles.length; i += BATCH_SIZE) {
+        const batch = validFiles.slice(i, i + BATCH_SIZE);
+        const formData = new FormData();
+        batch.forEach(file => {
+          formData.append("files", file, file.webkitRelativePath || file.name);
+          formData.append("paths", file.webkitRelativePath || file.name);
+        });
+        if (selectedBucketId !== "all" && selectedBucketId !== "unassigned") formData.append("bucketId", selectedBucketId);
+        formData.append("restaurantId", selectedRestaurantId);
+        /* skipProcessing=true → backend chỉ lưu file, không chunking */
+        formData.append("skipProcessing", "true");
+
+        try {
+          const response = await axiosInstance.post("/ai/kb/upload", formData);
+          if (response.data.success) {
+            successCount += batch.length;
+          }
+        } catch (err: any) {
+          console.error(`[KB Upload Error Batch ${Math.floor(i / BATCH_SIZE) + 1}]`, err);
+        }
       }
-    } catch (err: any) { message.error(err.response?.data?.message || "Tải lên thất bại."); }
-    finally { setUploading(false); if (fileInputRef.current) fileInputRef.current.value = ""; }
+
+      if (successCount > 0) {
+        message.success(`Đã lưu thành công ${successCount}/${validFiles.length} tài liệu vào bucket!`);
+        fetchDocuments(selectedRestaurantId, false);
+      } else {
+        message.error("Tải lên thất bại. Máy chủ quá tải hoặc gặp sự cố kết nối.");
+      }
+    } catch (err: any) {
+      console.error("[KB Upload Outer Error]", err);
+      message.error("Đã xảy ra lỗi trong quá trình tải lên.");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   const handleDrag = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); };
@@ -1281,7 +1303,7 @@ export default function SuperAdminKnowledgeBasePage() {
                         )}
                       </div>
 
-                      <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".pdf,.txt,.md" multiple className="hidden" />
+                      <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".pdf,.txt,.md,.docx,.doc" multiple className="hidden" />
                       <input type="file" ref={folderInputRef} onChange={handleFolderChange} {...{ webkitdirectory: "", directory: "" } as any} multiple className="hidden" />
 
                       {/* Info banner */}
@@ -1339,7 +1361,7 @@ export default function SuperAdminKnowledgeBasePage() {
                         </div>
 
                         <div className="flex gap-1">
-                          {(["ALL", "PDF", "TXT", "MD"] as const).map(f => (
+                          {(["ALL", "PDF", "TXT", "MD", "DOCX"] as const).map(f => (
                             <button key={f} onClick={() => setTypeFilter(f)} className="px-2.5 py-1.5 rounded-lg text-[10px] font-semibold border transition-all" style={{ background: typeFilter === f ? "var(--primary)" : "var(--bg-base)", color: typeFilter === f ? "#fff" : "var(--text)", borderColor: typeFilter === f ? "var(--primary)" : "var(--border)" }}>
                               {f === "ALL" ? "All" : f}
                             </button>
