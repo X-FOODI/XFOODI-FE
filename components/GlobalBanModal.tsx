@@ -26,6 +26,9 @@ export default function GlobalBanModal() {
 
   if (!isVisible) return null;
 
+  const isRestaurant = banInfo?.message?.toLowerCase().includes('nhà hàng')
+    || banInfo?.message?.toLowerCase().includes('restaurant');
+
   return (
     <Modal
       open={isVisible}
@@ -43,7 +46,7 @@ export default function GlobalBanModal() {
         icon={<StopOutlined style={{ color: '#ff4d4f' }} />}
         title={
           <span style={{ fontSize: '24px', fontWeight: 600 }}>
-            {banInfo?.message?.toLowerCase().includes('restaurant') ? 'Restaurant Disabled' : 'Account Disabled'}
+            {isRestaurant ? 'Nhà hàng đã bị khóa' : 'Tài khoản đã bị khóa'}
           </span>
         }
         subTitle={
@@ -58,15 +61,15 @@ export default function GlobalBanModal() {
                 borderRadius: '8px',
                 borderLeft: '4px solid #ff4d4f',
                 textAlign: 'left',
-                marginBottom: '24px'
+                marginBottom: '24px',
               }}
             >
               <Text style={{ color: '#a8071a' }}>
-                <strong>Reason:</strong> {banInfo?.reason}
+                <strong>Lý do:</strong> {banInfo?.reason}
               </Text>
             </div>
             <Paragraph type="secondary">
-              Please contact our support team if you believe this is a mistake.
+              Nếu bạn cho rằng đây là nhầm lẫn, vui lòng liên hệ đội ngũ hỗ trợ XFoodi.
             </Paragraph>
           </div>
         }
@@ -77,11 +80,10 @@ export default function GlobalBanModal() {
             block
             style={{ marginBottom: '8px' }}
             onClick={() => {
-              // Return to root main domain
               window.location.href = `http://${process.env.NEXT_PUBLIC_BASE_DOMAIN || 'xfoodi.website'}`;
             }}
           >
-            Return to Homepage
+            Về trang chủ
           </Button>,
           <Button
             key="logout"
@@ -94,8 +96,8 @@ export default function GlobalBanModal() {
               logout();
             }}
           >
-            Logout
-          </Button>
+            Đăng xuất
+          </Button>,
         ]}
       />
     </Modal>

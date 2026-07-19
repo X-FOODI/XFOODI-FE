@@ -134,13 +134,20 @@ axiosInstance.interceptors.response.use(
       }
     }
     
-    // Check for Global Ban
+    // Check for Global Ban (account or restaurant disabled)
     if (error.response?.status === 403) {
       const message = error.response?.data?.message?.toLowerCase() || '';
-      if (message.includes('disabled')) {
-        const reason = error.response?.data?.reason || 'No reason provided';
+      const isBan = message.includes('disabled') || message.includes('khóa') || message.includes('khoa');
+      if (isBan) {
+        const rawReason = error.response?.data?.reason;
+        const reason =
+          typeof rawReason === 'string' && rawReason.trim()
+            ? rawReason.trim()
+            : 'Không có lý do được cung cấp';
         if (typeof window !== 'undefined') {
-          const event = new CustomEvent('globalBan', { detail: { message: error.response?.data?.message, reason } });
+          const event = new CustomEvent('globalBan', {
+            detail: { message: error.response?.data?.message, reason },
+          });
           window.dispatchEvent(event);
         }
       }

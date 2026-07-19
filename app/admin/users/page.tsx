@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/contexts/AuthContext";
 import axiosInstance from "@/lib/services/axiosInstance";
-import { Modal, Switch, message, Spin, Input, Tag } from "antd";
+import { App, Modal, Switch, Spin, Input, Tag } from "antd";
 import { ExclamationCircleOutlined, SearchOutlined } from "@ant-design/icons";
 
 interface SystemUser {
@@ -19,6 +19,7 @@ interface SystemUser {
 }
 
 export default function AdminUsersPage() {
+  const { message } = App.useApp();
   const { user } = useAuth();
   const [users, setUsers] = useState<SystemUser[]>([]);
   const [total, setTotal] = useState(0);
@@ -88,6 +89,9 @@ export default function AdminUsersPage() {
       const res = await axiosInstance.patch(`/admin/users/${id}/disable`, { reason });
       if (res.data?.success) {
         message.success(res.data.message);
+        if (res.data.data?.emailSent === false && res.data.data?.emailWarning) {
+          message.warning(res.data.data.emailWarning, 8);
+        }
         setUsers(prev => prev.map(u => u.id === id ? { ...u, status: 'DISABLED', disabledReason: reason } : u));
         setConfirmModal({ visible: false, sysUser: null, loading: false, reason: "" });
       }

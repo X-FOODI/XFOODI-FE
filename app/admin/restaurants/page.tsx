@@ -95,6 +95,9 @@ export default function AdminTenantsPage() {
       const res = await axiosInstance.patch(`/admin/restaurants/${id}/disable`, { reason });
       if (res.data?.success) {
         message.success(res.data.message);
+        if (res.data.data?.emailSent === false && res.data.data?.emailWarning) {
+          message.warning(res.data.data.emailWarning, 8);
+        }
         setRestaurants(prev => prev.map(r => r.id === id ? { ...r, status: 'DISABLED', disabledReason: reason } : r));
         setConfirmModal({ visible: false, restaurant: null, loading: false, reason: "" });
       }
