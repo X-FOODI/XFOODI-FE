@@ -2,19 +2,32 @@
 
 /**
  * VoucherFormModal — Component riêng biệt để tránh re-mount khi page re-render.
- *
- * Lý do tách file: nếu component được định nghĩa BÊN TRONG hàm render của page
- * (ví dụ: `const Field = ...` trong `OwnerVouchersPage`), React sẽ coi đó là
- * kiểu component MỚI mỗi lần render → unmount + remount toàn bộ DOM của form
- * → input bị reset, mất focus sau mỗi lần gõ.
- *
- * Đặt component ra file riêng (module-level) đảm bảo React giữ nguyên identity
- * của component qua các lần render.
  */
 
 import React, { useEffect, useRef } from 'react';
 import { X, RefreshCw } from 'lucide-react';
+import { useThemeMode } from '@/app/theme/AntdProvider';
 import type { CreateOwnerVoucherPayload } from '@/lib/services/voucherService';
+
+// ── Date helper: tính ngày hôm nay theo local timezone (YYYY-MM-DD) ──────────
+// KHÔNG dùng toISOString() vì nó trả về UTC — ở múi giờ +7 sẽ bị lệch 1 ngày.
+function todayStr(): string {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+// Kiểm tra xem một chuỗi YYYY-MM-DD có phải ngày trong quá khứ không
+function isPastDate(dateStr: string): boolean {
+  if (!dateStr) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(dateStr);
+  target.setHours(0, 0, 0, 0);
+  return target < today;
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -42,7 +55,7 @@ export interface VoucherFormModalProps {
 // ── Shared style ──────────────────────────────────────────────────────────────
 
 const inputCls =
-  'w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white ' +
+  'w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-neutral-900 dark:text-white ' +
   'focus:outline-none focus:border-orange-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed';
 
 // ── Field wrapper — defined at MODULE LEVEL (critical!) ────────────────────────
@@ -50,7 +63,7 @@ const inputCls =
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1">
-      <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
+      <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
         {label}
       </label>
       {children}
@@ -70,15 +83,18 @@ export default function VoucherFormModal({
   restaurants,
   codeLocked = false,
 }: VoucherFormModalProps) {
-  // Local form state — tách hoàn toàn khỏi parent để tránh cascade re-render
+  const { mode } = useThemeMode();
+  // Local form state
   const [form, setForm] = React.useState<VoucherFormData>(initialData);
+  // Lỗi validation ngày
+  const [dateError, setDateError] = React.useState<string>('');
 
   // Sync khi initialData thay đổi (mở modal mới / mở edit)
   const prevOpenRef = useRef(false);
   useEffect(() => {
-    // Chỉ reset khi modal vừa được mở (transition false → true)
     if (isOpen && !prevOpenRef.current) {
       setForm(initialData);
+      setDateError('');
     }
     prevOpenRef.current = isOpen;
   }, [isOpen, initialData]);
@@ -93,7 +109,23 @@ export default function VoucherFormModal({
 
   if (!isOpen) return null;
 
-  const handleSubmit = () => onSubmit(form);
+  const handleSubmit = () => {
+    // ── Validate ngày hết hạn ──────────────────────────────────────────────────
+    if (!form.endDate) {
+      setDateError('Vui lòng chọn ngày kết thúc.');
+      return;
+    }
+    if (isPastDate(form.endDate)) {
+      setDateError('Ngày hết hạn không được là ngày trong quá khứ.');
+      return;
+    }
+    if (form.startDate && form.endDate < form.startDate) {
+      setDateError('Ngày kết thúc phải sau ngày bắt đầu.');
+      return;
+    }
+    setDateError('');
+    onSubmit(form);
+  };
 
   const set = <K extends keyof VoucherFormData>(key: K, value: VoucherFormData[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -104,18 +136,18 @@ export default function VoucherFormModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg bg-[#111620] rounded-3xl border border-white/10 shadow-2xl overflow-hidden flex flex-col"
+        className="w-full max-w-lg bg-white dark:bg-[#111620] rounded-3xl border border-zinc-200 dark:border-white/10 shadow-2xl overflow-hidden flex flex-col transition-colors duration-200"
         style={{ maxHeight: '90vh' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* ── Header ── */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 flex-shrink-0">
-          <h2 className="font-black text-white text-base">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 dark:border-white/10 flex-shrink-0">
+          <h2 className="font-black text-neutral-900 dark:text-white text-base">
             {isEditing ? 'Chỉnh sửa Voucher' : 'Tạo Mã Ưu Đãi Mới'}
           </h2>
           <button
             onClick={onClose}
-            className="text-zinc-500 hover:text-white transition-colors"
+            className="text-zinc-400 dark:text-zinc-500 hover:text-neutral-900 dark:hover:text-white transition-colors"
           >
             <X size={18} />
           </button>
@@ -168,8 +200,8 @@ export default function VoucherFormModal({
                 onChange={(e) => set('discountType', e.target.value as any)}
                 className={inputCls}
               >
-                <option value="percentage">Phần trăm (%)</option>
-                <option value="fixed">Cố định (điểm)</option>
+                <option value="percentage" className="bg-white dark:bg-zinc-900 text-neutral-900 dark:text-white">Phần trăm (%)</option>
+                <option value="fixed" className="bg-white dark:bg-zinc-900 text-neutral-900 dark:text-white">Cố định (điểm)</option>
               </select>
             </Field>
             <Field label="Mức giảm *">
@@ -219,7 +251,7 @@ export default function VoucherFormModal({
                     onChange={() => set('distributionMode', m)}
                     className="accent-orange-500"
                   />
-                  <span className="text-sm text-zinc-300">
+                  <span className="text-sm text-zinc-700 dark:text-zinc-300">
                     {m === 'public' ? 'Công khai' : 'Riêng tư (nhập mã)'}
                   </span>
                 </label>
@@ -238,7 +270,7 @@ export default function VoucherFormModal({
                     onChange={() => setForm((prev) => ({ ...prev, venueScope: s, venueId: '' }))}
                     className="accent-orange-500"
                   />
-                  <span className="text-sm text-zinc-300">
+                  <span className="text-sm text-zinc-700 dark:text-zinc-300">
                     {s === 'all' ? 'Toàn bộ nhà hàng / cơ sở của tôi' : 'Một nhà hàng / cơ sở cụ thể'}
                   </span>
                 </label>
@@ -250,16 +282,16 @@ export default function VoucherFormModal({
                 onChange={(e) => set('venueId', e.target.value)}
                 className={inputCls}
               >
-                <option value="">-- Chọn nhà hàng / cơ sở --</option>
+                <option value="" className="bg-white dark:bg-zinc-900 text-neutral-900 dark:text-white">-- Chọn nhà hàng / cơ sở --</option>
                 {restaurants.map((vn) => (
-                  <option key={vn._id} value={vn._id}>
+                  <option key={vn._id} value={vn._id} className="bg-white dark:bg-zinc-900 text-neutral-900 dark:text-white">
                     {vn.name}
                   </option>
                 ))}
               </select>
             )}
             {form.venueScope === 'all' && restaurants.length === 0 && (
-              <p className="text-[11px] text-red-400 mt-1">
+              <p className="text-[11px] text-red-500 dark:text-red-400 mt-1">
                 Bạn chưa có nhà hàng / cơ sở nào được đăng ký.
               </p>
             )}
@@ -272,9 +304,9 @@ export default function VoucherFormModal({
               onChange={(e) => set('applicableService', e.target.value as any)}
               className={inputCls}
             >
-              <option value="all">Tất cả (đặt bàn & cửa hàng)</option>
-              <option value="booking">Chỉ đặt bàn</option>
-              <option value="shop">Chỉ cửa hàng</option>
+              <option value="all" className="bg-white dark:bg-zinc-900 text-neutral-900 dark:text-white">Tất cả (đặt bàn & cửa hàng)</option>
+              <option value="booking" className="bg-white dark:bg-zinc-900 text-neutral-900 dark:text-white">Chỉ đặt bàn</option>
+              <option value="shop" className="bg-white dark:bg-zinc-900 text-neutral-900 dark:text-white">Chỉ cửa hàng</option>
             </select>
           </Field>
 
@@ -284,7 +316,11 @@ export default function VoucherFormModal({
               <input
                 type="date"
                 value={form.startDate ?? ''}
-                onChange={(e) => set('startDate', e.target.value)}
+                min={todayStr()}
+                onChange={(e) => {
+                  set('startDate', e.target.value);
+                  setDateError('');
+                }}
                 className={inputCls}
               />
             </Field>
@@ -292,26 +328,35 @@ export default function VoucherFormModal({
               <input
                 type="date"
                 value={form.endDate}
-                onChange={(e) => set('endDate', e.target.value)}
-                className={inputCls}
+                min={todayStr()}
+                onChange={(e) => {
+                  set('endDate', e.target.value);
+                  setDateError('');
+                }}
+                className={`${inputCls} ${dateError ? 'border-red-500 focus:border-red-500' : ''}`}
               />
+              {dateError && (
+                <p className="text-[11px] text-red-500 dark:text-red-400 mt-1 font-medium">
+                  ⚠ {dateError}
+                </p>
+              )}
             </Field>
           </div>
         </div>
 
         {/* ── Footer ── */}
-        <div className="flex gap-3 px-6 py-4 border-t border-white/10 flex-shrink-0">
+        <div className="flex gap-3 px-6 py-4 border-t border-zinc-200 dark:border-white/10 flex-shrink-0">
           <button
             onClick={onClose}
             disabled={saving}
-            className="flex-1 py-2.5 rounded-xl border border-zinc-700 text-zinc-400 font-bold hover:text-white transition-colors text-sm disabled:opacity-50"
+            className="flex-1 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 font-bold hover:text-neutral-950 dark:hover:text-white transition-colors text-sm disabled:opacity-50"
           >
             Hủy
           </button>
           <button
             onClick={handleSubmit}
             disabled={saving || !form.code.trim() || !form.discountValue || (form.venueScope === 'single' && !form.venueId)}
-            className="flex-1 py-2.5 rounded-xl bg-orange-500 text-gray-900 font-black text-sm hover:bg-orange-400 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            className="flex-1 py-2.5 rounded-xl bg-orange-500 text-white dark:text-gray-900 font-black text-sm hover:bg-orange-600 dark:hover:bg-orange-400 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {saving
               ? <RefreshCw size={14} className="animate-spin" />

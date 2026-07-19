@@ -14,6 +14,7 @@ import {
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/AuthContext';
+import { useThemeMode } from '@/app/theme/AntdProvider';
 import voucherService, { Voucher } from '@/lib/services/voucherService';
 import VoucherCard from '@/components/vouchers/VoucherCard';
 import Header from '../components/Header';
@@ -29,7 +30,10 @@ function sortByEnd(a: Voucher, b: Voucher) {
 // ── Page ─────────────────────────────────────────────────────────────────────────
 export default function CustomerVouchersPage() {
   const { user, isAuthReady } = useAuth();
+  const { mode } = useThemeMode();
   const router = useRouter();
+
+  const isDark = mode === 'dark';
 
   const [filter, setFilter] = useState<FilterTab>('all');
   const [loading, setLoading] = useState(true);
@@ -119,7 +123,6 @@ export default function CustomerVouchersPage() {
     setRedeemingId(voucher._id);
     setRedeemMsg(null);
     try {
-      // BE yêu cầu `voucherId` (database ID), không phải `code`
       const voucherId = (voucher as any).id || voucher._id;
       const res = await voucherService.redeemVoucher({ voucherId });
       setRedeemMsg({
@@ -142,8 +145,8 @@ export default function CustomerVouchersPage() {
   // ── Loading / guard ─────────────────────────────────────────────────────────
   if (!isAuthReady) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0A0E14]">
-        <RefreshCw className="w-8 h-8 animate-spin text-orange-400" />
+      <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-[#0A0E14] transition-colors duration-200">
+        <RefreshCw className="w-8 h-8 animate-spin text-orange-500" />
       </div>
     );
   }
@@ -155,8 +158,8 @@ export default function CustomerVouchersPage() {
       onClick={() => setFilter(value)}
       className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all border ${
         filter === value
-          ? 'bg-orange-500/20 border-orange-500/40 text-orange-300'
-          : 'bg-white/[0.04] border-white/10 text-zinc-400 hover:text-white hover:border-white/20'
+          ? 'bg-orange-500/10 dark:bg-orange-500/20 border-orange-500/30 dark:border-orange-500/40 text-orange-600 dark:text-orange-300'
+          : 'bg-zinc-100 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:border-zinc-300 dark:hover:border-zinc-700'
       }`}
     >
       {label}
@@ -167,7 +170,7 @@ export default function CustomerVouchersPage() {
     <div key={v._id} className="w-full transition-all hover:-translate-y-1 duration-200">
       <VoucherCard
         voucher={v}
-        surface="dark"
+        surface={isDark ? 'dark' : 'light'}
         onApply={() => handleRedeem(v)}
         selected={redeemMsg?.id === v._id && redeemMsg.ok}
       />
@@ -175,8 +178,8 @@ export default function CustomerVouchersPage() {
         <div
           className={`mt-2 px-3 py-2 rounded-xl text-xs font-semibold ${
             redeemMsg.ok
-              ? 'bg-green-500/15 border border-green-500/25 text-green-300'
-              : 'bg-red-500/15 border border-red-500/25 text-red-300'
+              ? 'bg-green-500/10 dark:bg-green-500/15 border border-green-500/20 dark:border-green-500/25 text-green-700 dark:text-green-300'
+              : 'bg-red-500/10 dark:bg-red-500/15 border border-red-500/20 dark:border-red-500/25 text-red-700 dark:text-red-300'
           }`}
         >
           {redeemMsg.msg}
@@ -186,7 +189,24 @@ export default function CustomerVouchersPage() {
   );
 
   return (
-    <div className="min-h-screen bg-[#0A0E14] text-white">
+    <div className="min-h-screen bg-zinc-50 dark:bg-[#0A0E14] text-neutral-900 dark:text-white transition-colors duration-200">
+      <style dangerouslySetInnerHTML={{ __html: `
+        .text-neutral-900 {
+          color: #171717 !important;
+        }
+        .text-neutral-500 {
+          color: #737373 !important;
+        }
+        .dark .dark\\:text-white {
+          color: #ffffff !important;
+        }
+        .dark .dark\\:text-neutral-400 {
+          color: #a3a3a3 !important;
+        }
+        .dark .dark\\:text-neutral-300 {
+          color: #d4d4d4 !important;
+        }
+      `}} />
       <Header />
 
       <main className="max-w-5xl mx-auto px-4 py-24 space-y-8">
@@ -194,27 +214,27 @@ export default function CustomerVouchersPage() {
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
           <Link
             href="/"
-            className="inline-flex items-center gap-1.5 text-sm text-zinc-400 hover:text-white transition-colors"
+            className="inline-flex items-center gap-1.5 text-sm text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors"
           >
             <ArrowLeft size={15} /> Trang chủ
           </Link>
 
           <div className="flex-1 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-5">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-400 flex items-center justify-center shadow-lg shadow-orange-500/30 flex-shrink-0">
-                <Tag size={24} className="text-gray-900" />
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-400 flex items-center justify-center shadow-lg shadow-orange-500/20 dark:shadow-orange-500/30 flex-shrink-0">
+                <Tag size={24} className="text-[#ffffff] dark:text-gray-900" />
               </div>
               <div>
-                <h1 className="text-2xl font-black leading-none">Voucher của bạn</h1>
-                <p className="text-xs text-zinc-400 mt-0.5">
-                  Mã <strong className="text-white">công khai</strong> đang hiệu lực · Mã{' '}
-                  <strong className="text-white">riêng</strong> tra ở cuối trang
+                <h1 className="text-2xl font-black leading-none text-neutral-900 dark:text-white">Voucher của bạn</h1>
+                <p className="text-xs text-neutral-600 dark:text-neutral-300 mt-0.5">
+                  Mã <strong className="text-neutral-900 dark:text-white">công khai</strong> đang hiệu lực · Mã{' '}
+                  <strong className="text-neutral-900 dark:text-white">riêng</strong> tra ở cuối trang
                 </p>
               </div>
             </div>
 
             {!loading && (
-              <span className="sm:ml-auto inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-orange-500/15 border border-orange-500/25 text-orange-300">
+              <span className="sm:ml-auto inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-orange-500/10 dark:bg-orange-500/15 border border-orange-500/20 dark:border-orange-500/25 text-orange-600 dark:text-orange-300">
                 <Gift size={13} />
                 {totalCount} mã đang mở
               </span>
@@ -224,8 +244,8 @@ export default function CustomerVouchersPage() {
 
         {/* ── Horizontal scroll preview ── */}
         {!loading && !error && filteredList.length > 0 && (
-          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
-            <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-3">
+          <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-100/50 dark:bg-zinc-900/50 p-4">
+            <p className="text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-3">
               Xem nhanh (cuộn ngang)
             </p>
             <div
@@ -246,9 +266,9 @@ export default function CustomerVouchersPage() {
         )}
 
         {/* ── Filter + grid ── */}
-        <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5 space-y-4">
+        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-100/50 dark:bg-zinc-900/50 p-5 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
-            <p className="font-bold text-sm">Lọc danh sách</p>
+            <p className="font-bold text-sm text-neutral-900 dark:text-white">Lọc danh sách</p>
             <div className="flex gap-2 flex-wrap">
               <FilterBtn value="all" label={`Tất cả (${totalCount})`} />
               <FilterBtn value="platform" label={`XFOODI (${platformVouchers.length})`} />
@@ -258,23 +278,23 @@ export default function CustomerVouchersPage() {
 
           {loading ? (
             <div className="flex justify-center py-16">
-              <RefreshCw className="w-7 h-7 animate-spin text-orange-400" />
+              <RefreshCw className="w-7 h-7 animate-spin text-orange-500" />
             </div>
           ) : error ? (
             <div className="text-center py-10 space-y-3">
-              <p className="text-red-400 text-sm">{error}</p>
+              <p className="text-red-500 dark:text-red-400 text-sm">{error}</p>
               <button
                 onClick={load}
-                className="px-5 py-2 rounded-xl border border-white/15 text-sm font-bold hover:border-white/30 transition-colors"
+                className="px-5 py-2 rounded-xl border border-zinc-300 dark:border-white/15 text-sm font-bold text-neutral-700 dark:text-neutral-300 hover:border-zinc-400 dark:hover:border-white/30 transition-colors"
               >
                 Thử lại
               </button>
             </div>
           ) : filteredList.length === 0 ? (
-            <div className="text-center py-12 rounded-xl bg-white/[0.02]">
-              <Ticket size={32} className="mx-auto mb-3 text-zinc-600" />
-              <p className="font-bold text-zinc-400">Chưa có mã công khai nào</p>
-              <p className="text-xs text-zinc-600 mt-1 max-w-xs mx-auto">
+            <div className="text-center py-12 rounded-xl bg-zinc-200/30 dark:bg-zinc-900/30">
+              <Ticket size={32} className="mx-auto mb-3 text-neutral-400 dark:text-neutral-600" />
+              <p className="font-bold text-neutral-600 dark:text-neutral-300">Chưa có mã công khai nào</p>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 max-w-xs mx-auto">
                 Khi admin hoặc đối tác phát hành voucher công khai, thẻ sẽ xuất hiện ở đây.
               </p>
             </div>
@@ -286,51 +306,51 @@ export default function CustomerVouchersPage() {
         </div>
 
         {/* ── Private code section ── */}
-        <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] overflow-hidden">
+        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-100/50 dark:bg-zinc-900/50 overflow-hidden">
           <button
             onClick={() => setPrivateOpen((o) => !o)}
-            className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/[0.03] transition-colors"
+            className="w-full flex items-center justify-between px-5 py-4 hover:bg-zinc-200/20 dark:hover:bg-zinc-900/30 transition-colors"
           >
             <div className="text-left">
-              <p className="font-bold text-sm">Mã riêng (Private)</p>
-              <p className="text-xs text-zinc-500 mt-0.5">
+              <p className="font-bold text-sm text-neutral-900 dark:text-white">Mã riêng (Private)</p>
+              <p className="text-xs text-neutral-600 dark:text-neutral-300 mt-0.5">
                 Nhập mã bạn được cấp để xem điều kiện & đổi thưởng
               </p>
             </div>
-            {privateOpen ? <ChevronUp size={16} className="text-zinc-400" /> : <ChevronDown size={16} className="text-zinc-400" />}
+            {privateOpen ? <ChevronUp size={16} className="text-zinc-500" /> : <ChevronDown size={16} className="text-zinc-500" />}
           </button>
 
           {privateOpen && (
-            <div className="px-5 pb-5 space-y-4 border-t border-white/[0.06]">
+            <div className="px-5 pb-5 space-y-4 border-t border-zinc-200 dark:border-zinc-800/80">
               <div className="flex gap-2 mt-4">
                 <div className="relative flex-1">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 dark:text-zinc-500" />
                   <input
                     type="text"
                     value={privateCode}
                     onChange={(e) => setPrivateCode(e.target.value.toUpperCase())}
                     onKeyDown={(e) => e.key === 'Enter' && handleResolvePrivate()}
                     placeholder="NHẬP MÃ VOUCHER"
-                    className="w-full bg-white/[0.06] border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-sm font-mono font-bold placeholder-zinc-600 focus:outline-none focus:border-orange-500/50 tracking-widest uppercase"
+                    className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-xl pl-9 pr-4 py-2.5 text-sm font-mono font-bold placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-orange-500/50 text-neutral-900 dark:text-white tracking-widest uppercase"
                     disabled={resolving}
                   />
                 </div>
                 <button
                   onClick={handleResolvePrivate}
                   disabled={resolving || !privateCode.trim()}
-                  className="px-5 py-2.5 rounded-xl bg-orange-500 text-gray-900 text-sm font-black hover:bg-orange-400 transition-colors disabled:opacity-50 flex items-center gap-2"
+                  className="px-5 py-2.5 rounded-xl bg-orange-500 text-[#ffffff] dark:text-gray-900 text-sm font-black hover:bg-orange-600 dark:hover:bg-orange-400 transition-colors disabled:opacity-50 flex items-center gap-2"
                 >
                   {resolving ? <RefreshCw size={14} className="animate-spin" /> : 'Tra mã'}
                 </button>
               </div>
 
               {privateError && (
-                <p className="text-red-400 text-xs font-semibold">{privateError}</p>
+                <p className="text-red-500 dark:text-red-400 text-xs font-semibold">{privateError}</p>
               )}
 
               {privateVouchers.length > 0 && (
                 <div className="space-y-3">
-                  <p className="text-xs text-zinc-500 font-bold uppercase tracking-wider">
+                  <p className="text-xs text-neutral-600 dark:text-neutral-300 font-bold uppercase tracking-wider">
                     Mã riêng đã tra ({privateVouchers.length})
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -342,7 +362,7 @@ export default function CustomerVouchersPage() {
           )}
         </div>
 
-        <p className="text-xs text-zinc-600 px-1">
+        <p className="text-xs text-neutral-500 dark:text-neutral-400 px-1">
           Dữ liệu lấy từ server — mã công khai còn hiệu lực. Nếu trống, liên hệ admin hoặc kiểm tra cài đặt API.
         </p>
       </main>

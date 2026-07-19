@@ -98,7 +98,7 @@ adminAxiosInstance.interceptors.response.use(
                 error.response.status === 404 &&
                 (error.config?.url?.includes("/payment-settings"));
 
-            if (!isExpected404) {
+            if (!isExpected404 && error.response.status !== 403) {
                 console.error('[adminAxios] Error response:', {
                     status: error.response.status,
                     url: error.config?.url,
@@ -106,6 +106,25 @@ adminAxiosInstance.interceptors.response.use(
                     data: error.response.data,
                     headers: error.response.headers,
                 });
+            }
+
+            // Check for Global Ban (account or restaurant disabled)
+            if (error.response?.status === 403) {
+                const message = error.response?.data?.message?.toLowerCase() || '';
+                const isBan = message.includes('disabled') || message.includes('khóa') || message.includes('khoa');
+                if (isBan) {
+                    const rawReason = error.response?.data?.reason;
+                    const reason =
+                        typeof rawReason === 'string' && rawReason.trim()
+                            ? rawReason.trim()
+                            : 'Không có lý do được cung cấp';
+                    if (typeof window !== 'undefined') {
+                        const event = new CustomEvent('globalBan', {
+                            detail: { message: error.response?.data?.message, reason },
+                        });
+                        window.dispatchEvent(event);
+                    }
+                }
             }
         }
         return Promise.reject(error);
