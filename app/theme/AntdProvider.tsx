@@ -403,6 +403,58 @@ export default function AntdProvider({
           color: var(--text) !important;
         }
 
+        /* Orders Table - force CSS variable colors in both light/dark modes */
+        .orders-table-wrap .ant-table {
+          background: var(--card) !important;
+        }
+        .orders-table-wrap .ant-table-container {
+          background: var(--card) !important;
+        }
+        .orders-table .ant-table-thead > tr > th {
+          background: var(--surface) !important;
+          color: var(--text) !important;
+          border-bottom: 1px solid var(--border) !important;
+          font-weight: 700 !important;
+        }
+        .orders-table .ant-table-tbody > tr > td {
+          background: var(--card) !important;
+          border-bottom: 1px solid var(--border) !important;
+          color: var(--text) !important;
+        }
+        .orders-table .ant-table-tbody > tr:hover > td {
+          background: var(--surface-subtle) !important;
+        }
+        .orders-table .ant-table-cell {
+          background: transparent !important;
+        }
+        .orders-table .ant-pagination {
+          color: var(--text) !important;
+        }
+        .orders-table .ant-pagination-item {
+          background: var(--card) !important;
+          border-color: var(--border) !important;
+        }
+        .orders-table .ant-pagination-item a {
+          color: var(--text) !important;
+        }
+        .orders-table .ant-pagination-prev button,
+        .orders-table .ant-pagination-next button {
+          color: var(--text) !important;
+          background: var(--card) !important;
+          border-color: var(--border) !important;
+        }
+        .orders-table .ant-select-selector {
+          background: var(--surface) !important;
+          border-color: var(--border) !important;
+          color: var(--text) !important;
+        }
+        .orders-table .ant-empty-description {
+          color: var(--text-muted) !important;
+        }
+        .orders-table-wrap .ant-spin-text {
+          color: var(--text) !important;
+        }
+
         /* Select dropdown - Match theme */
         .ant-select-dropdown {
           background: var(--card) !important;

@@ -27,7 +27,7 @@ interface Order {
   subTotal: number;
   totalAmount: number;
   createdAt: string;
-  status: "PENDING" | "CONFIRMED" | "COMPLETED" | "CANCELLED";
+  status: "PENDING" | "CONFIRMED" | "PREPARING" | "READY" | "COMPLETED" | "CANCELLED";
   isPaid: boolean;
   table: string;
   tableId: string | null;
@@ -119,6 +119,10 @@ export default function OrderHistoryPage() {
         return <Tag color="gold">Chờ xác nhận</Tag>;
       case "CONFIRMED":
         return <Tag color="blue">Đã xác nhận</Tag>;
+      case "PREPARING":
+        return <Tag color="orange">Đang chế biến</Tag>;
+      case "READY":
+        return <Tag color="purple">Sẵn sàng</Tag>;
       case "COMPLETED":
         return <Tag color="green">Hoàn thành</Tag>;
       case "CANCELLED":
@@ -144,7 +148,7 @@ export default function OrderHistoryPage() {
       dataIndex: "reference",
       key: "reference",
       render: (text: string, record: Order) => (
-        <span className="font-mono font-bold text-gray-900 dark:text-white">{text}</span>
+        <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{text}</span>
       ),
     },
     {
@@ -152,7 +156,7 @@ export default function OrderHistoryPage() {
       dataIndex: "table",
       key: "table",
       render: (text: string) => (
-        <span className="font-semibold text-gray-700 dark:text-zinc-300">{text}</span>
+        <span className="font-semibold text-slate-700 dark:text-slate-300">{text || "—"}</span>
       ),
     },
     {
@@ -160,7 +164,7 @@ export default function OrderHistoryPage() {
       dataIndex: "createdAt",
       key: "createdAt",
       render: (text: string) => (
-        <span className="text-xs text-gray-500 dark:text-zinc-400">
+        <span className="text-xs text-slate-500 dark:text-slate-400">
           {new Date(text).toLocaleString("vi-VN")}
         </span>
       ),
@@ -170,8 +174,8 @@ export default function OrderHistoryPage() {
       key: "customer",
       render: (_: any, record: Order) => (
         <div className="text-xs">
-          <p className="font-semibold text-gray-800 dark:text-zinc-200">{record.customerName || "Khách vãng lai"}</p>
-          {record.customerPhone && <p className="text-gray-500 dark:text-zinc-400">{record.customerPhone}</p>}
+          <p className="font-semibold text-slate-800 dark:text-slate-200">{record.customerName || "Khách vãng lai"}</p>
+          {record.customerPhone && <p className="text-slate-500 dark:text-slate-400">{record.customerPhone}</p>}
         </div>
       ),
     },
@@ -180,7 +184,7 @@ export default function OrderHistoryPage() {
       dataIndex: "totalAmount",
       key: "totalAmount",
       render: (amount: number) => (
-        <span className="font-extrabold text-gray-950 dark:text-white">
+        <span className="font-extrabold text-slate-900 dark:text-slate-100">
           {amount.toLocaleString("vi-VN")}đ
         </span>
       ),
@@ -268,12 +272,14 @@ export default function OrderHistoryPage() {
             </div>
 
             {/* Filter controls */}
-            <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl border bg-white dark:bg-[#1E293B]" style={{ borderColor: "var(--border)" }}>
+            <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl border" style={{ borderColor: "var(--border)", background: "var(--card)" }}>
               <div className="flex flex-wrap gap-2">
                 {[
                   { key: "ALL", label: "Tất cả" },
                   { key: "PENDING", label: "Chờ xác nhận" },
                   { key: "CONFIRMED", label: "Đã xác nhận" },
+                  { key: "PREPARING", label: "Đang chế biến" },
+                  { key: "READY", label: "Sẵn sàng" },
                   { key: "COMPLETED", label: "Hoàn thành" },
                   { key: "CANCELLED", label: "Đã hủy" },
                 ].map((t) => (
@@ -286,7 +292,7 @@ export default function OrderHistoryPage() {
                     className={`px-4 py-2 text-xs font-semibold rounded-lg transition-colors border ${
                       statusFilter === t.key
                         ? "bg-[#FF5A2C] border-[#FF5A2C] text-white"
-                        : "bg-transparent text-gray-500 dark:text-zinc-400 border-gray-200 dark:border-zinc-800 hover:border-gray-300 dark:hover:border-zinc-700"
+                        : "bg-transparent text-slate-600 dark:text-zinc-400 border-slate-300 dark:border-zinc-700 hover:border-slate-400 dark:hover:border-zinc-600"
                     }`}
                   >
                     {t.label}
@@ -298,7 +304,7 @@ export default function OrderHistoryPage() {
               <div className="relative w-full sm:max-w-xs">
                 <Input
                   placeholder="Tìm theo mã đơn, bàn..."
-                  prefix={<SearchOutlined className="text-gray-400" />}
+                  prefix={<SearchOutlined className="text-slate-400" />}
                   value={searchText}
                   onChange={(e) => setSearchText(e.target.value)}
                   className="rounded-lg"
@@ -307,7 +313,7 @@ export default function OrderHistoryPage() {
             </div>
 
             {/* Table list */}
-            <div className="rounded-xl border bg-white dark:bg-[#1E293B] overflow-hidden" style={{ borderColor: "var(--border)" }}>
+            <div className="rounded-xl border overflow-hidden orders-table-wrap" style={{ borderColor: "var(--border)", background: "var(--card)" }}>
               <Table
                 dataSource={filteredOrders}
                 columns={columns}
@@ -321,7 +327,7 @@ export default function OrderHistoryPage() {
                     if (l) setLimit(l);
                   },
                 }}
-                className="dark:text-white"
+                className="orders-table"
               />
             </div>
           </div>
@@ -331,11 +337,11 @@ export default function OrderHistoryPage() {
       {/* Order Detail Modal */}
       <Modal
         title={
-          <div className="pb-3 border-b border-gray-100 dark:border-zinc-800">
-            <h3 className="text-lg font-black text-gray-900 dark:text-white">
+          <div className="pb-3 border-b" style={{ borderColor: "var(--border)" }}>
+            <h3 className="text-lg font-black text-slate-900 dark:text-slate-100">
               Chi tiết đơn hàng {selectedOrder?.reference}
             </h3>
-            <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
               Thời gian: {selectedOrder ? new Date(selectedOrder.createdAt).toLocaleString("vi-VN") : ""}
             </p>
           </div>
@@ -344,28 +350,27 @@ export default function OrderHistoryPage() {
         onCancel={() => setIsDetailOpen(false)}
         footer={null}
         width={650}
-        className="dark:bg-[#1E293B]"
       >
         {selectedOrder && (
-          <div className="space-y-6 pt-4 dark:text-zinc-200">
+          <div className="space-y-6 pt-4">
             {/* Meta info */}
-            <div className="grid grid-cols-2 gap-4 p-4 rounded-xl bg-gray-50 dark:bg-zinc-950 border border-gray-100 dark:border-zinc-800">
+            <div className="grid grid-cols-2 gap-4 p-4 rounded-xl border" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
               <div>
-                <p className="text-xs text-gray-400">BÀN ĂN</p>
-                <p className="font-bold text-gray-800 dark:text-zinc-200 text-sm mt-0.5">{selectedOrder.table}</p>
+                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Bàn ăn</p>
+                <p className="font-bold text-slate-800 dark:text-slate-200 text-sm mt-0.5">{selectedOrder.table || "—"}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-400">TRẠNG THÁI ĐƠN</p>
+                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Trạng thái đơn</p>
                 <div className="mt-0.5">{getStatusTag(selectedOrder.status)}</div>
               </div>
               <div>
-                <p className="text-xs text-gray-400">KHÁCH HÀNG</p>
-                <p className="font-bold text-gray-800 dark:text-zinc-200 text-sm mt-0.5">
+                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Khách hàng</p>
+                <p className="font-bold text-slate-800 dark:text-slate-200 text-sm mt-0.5">
                   {selectedOrder.customerName || "Khách vãng lai"}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-gray-400">THANH TOÁN</p>
+                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Thanh toán</p>
                 <div className="mt-0.5">
                   {selectedOrder.isPaid ? (
                     <Tag color="success">Đã thanh toán</Tag>
@@ -378,15 +383,16 @@ export default function OrderHistoryPage() {
 
             {/* Order items list */}
             <div>
-              <h4 className="font-bold text-sm text-gray-800 dark:text-zinc-200 mb-3 uppercase tracking-wider">Danh sách món</h4>
+              <h4 className="font-bold text-sm text-slate-700 dark:text-slate-300 mb-3 uppercase tracking-wider">Danh sách món</h4>
               <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1">
                 {selectedOrder.items.map((item) => (
                   <div
                     key={item.id}
-                    className="flex justify-between items-start p-3 rounded-lg border border-gray-100 dark:border-zinc-800 bg-white dark:bg-[#1E293B]"
+                    className="flex justify-between items-start p-3 rounded-lg border"
+                    style={{ borderColor: "var(--border)", background: "var(--card)" }}
                   >
                     <div>
-                      <p className="font-bold text-gray-900 dark:text-white text-sm">
+                      <p className="font-bold text-slate-900 dark:text-slate-100 text-sm">
                         {item.name} <span className="text-xs text-amber-500 font-bold ml-1">x{item.quantity}</span>
                       </p>
                       {item.note && (
@@ -394,10 +400,10 @@ export default function OrderHistoryPage() {
                       )}
                     </div>
                     <div className="text-right">
-                      <p className="font-semibold text-gray-900 dark:text-white text-sm">
+                      <p className="font-semibold text-slate-900 dark:text-slate-100 text-sm">
                         {(item.price * item.quantity).toLocaleString("vi-VN")}đ
                       </p>
-                      <p className="text-xs text-gray-400 mt-0.5">Đơn giá: {item.price.toLocaleString("vi-VN")}đ</p>
+                      <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">Đơn giá: {item.price.toLocaleString("vi-VN")}đ</p>
                     </div>
                   </div>
                 ))}
@@ -405,24 +411,24 @@ export default function OrderHistoryPage() {
             </div>
 
             {/* Summary calculations */}
-            <div className="space-y-2 border-t border-gray-100 dark:border-zinc-800 pt-4">
+            <div className="space-y-2 border-t pt-4" style={{ borderColor: "var(--border)" }}>
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500 dark:text-zinc-400">Tạm tính:</span>
-                <span className="font-semibold">{selectedOrder.subTotal.toLocaleString("vi-VN")}đ</span>
+                <span className="text-slate-500 dark:text-slate-400">Tạm tính:</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200">{selectedOrder.subTotal.toLocaleString("vi-VN")}đ</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500 dark:text-zinc-400">Thuế GTGT (10%):</span>
-                <span className="font-semibold">{(selectedOrder.totalAmount - selectedOrder.subTotal).toLocaleString("vi-VN")}đ</span>
+                <span className="text-slate-500 dark:text-slate-400">Thuế GTGT (10%):</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200">{(selectedOrder.totalAmount - selectedOrder.subTotal).toLocaleString("vi-VN")}đ</span>
               </div>
-              <div className="flex justify-between text-base border-t border-dashed border-gray-100 dark:border-zinc-800 pt-2 font-black">
-                <span className="text-gray-900 dark:text-white">Tổng cộng:</span>
+              <div className="flex justify-between text-base border-t border-dashed pt-2 font-black" style={{ borderColor: "var(--border)" }}>
+                <span className="text-slate-900 dark:text-slate-100">Tổng cộng:</span>
                 <span className="text-[#FF5A2C]">{selectedOrder.totalAmount.toLocaleString("vi-VN")}đ</span>
               </div>
             </div>
 
             {/* Quick action buttons for status change */}
             {selectedOrder.status !== "COMPLETED" && selectedOrder.status !== "CANCELLED" && (
-              <div className="flex gap-2 pt-4 border-t border-gray-100 dark:border-zinc-800">
+              <div className="flex gap-2 pt-4 border-t" style={{ borderColor: "var(--border)" }}>
                 {selectedOrder.status === "PENDING" && (
                   <Button
                     type="primary"
@@ -435,6 +441,28 @@ export default function OrderHistoryPage() {
                   </Button>
                 )}
                 {selectedOrder.status === "CONFIRMED" && (
+                  <Button
+                    type="primary"
+                    icon={<CheckOutlined />}
+                    onClick={() => handleUpdateStatus(selectedOrder.id, "PREPARING")}
+                    disabled={actionLoading}
+                    className="flex-1 bg-orange-500 hover:bg-orange-600 border-none h-11"
+                  >
+                    Bắt đầu chế biến
+                  </Button>
+                )}
+                {selectedOrder.status === "PREPARING" && (
+                  <Button
+                    type="primary"
+                    icon={<CheckOutlined />}
+                    onClick={() => handleUpdateStatus(selectedOrder.id, "READY")}
+                    disabled={actionLoading}
+                    className="flex-1 bg-purple-500 hover:bg-purple-600 border-none h-11"
+                  >
+                    Món đã sẵn sàng
+                  </Button>
+                )}
+                {selectedOrder.status === "READY" && (
                   <Button
                     type="primary"
                     icon={<CheckOutlined />}
