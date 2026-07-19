@@ -1,17 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Star as StarIcon } from "@mui/icons-material";
 import KPICard from "@/components/dashboard/KPICard";
 import OrdersBarChart from "@/components/dashboard/OrdersBarChart";
 import RevenueChart from "@/components/dashboard/RevenueChart";
-import {
-  MOCK_ADMIN_ORDER_TREND,
-  MOCK_ADMIN_REVENUE_TREND,
-  MOCK_ADMIN_SUMMARY,
-  MOCK_TOP_RESTAURANTS,
-} from "@/lib/mock/dashboardMockData";
 import {
   dashboardService,
   AdminDashboardSummary,
@@ -45,9 +39,17 @@ const STATUS_BADGE: Record<string, { label: string; bg: string; color: string; b
   REJECTED: { label: "Từ chối", bg: "var(--danger-soft)", color: "var(--danger)", border: "var(--danger-border)" },
 };
 
+const ZERO_SUMMARY: AdminDashboardSummary = {
+  totalRevenue: { total: 0, changePercent: 0 },
+  totalOrders: { total: 0, changePercent: 0 },
+  totalUsers: { total: 0, changePercent: 0, newThisMonth: 0 },
+  totalRestaurants: { total: 0, changePercent: 0, active: 0 },
+  fromDate: "",
+  toDate: "",
+};
+
 export default function AdminDashboardPage() {
   const [filter, setFilter] = useState<FilterOption>("week");
-  const summary = MOCK_ADMIN_SUMMARY;
 
   // Real data: danh sách đơn đăng ký mới nhất
   const [recentApps, setRecentApps] = useState<RestaurantApplication[]>([]);
@@ -88,19 +90,11 @@ export default function AdminDashboardPage() {
     });
   }, [filter]);
 
-  const scale = filter === "day" ? 0.14 : filter === "week" ? 1 : filter === "month" ? 4.3 : 52;
-  const scaledSummary = useMemo(() => ({
-    ...summary,
-    totalRevenue: { ...summary.totalRevenue, total: Math.round(summary.totalRevenue.total * scale) },
-    totalOrders: { ...summary.totalOrders, total: Math.round(summary.totalOrders.total * scale) },
-    totalUsers: { ...summary.totalUsers, total: Math.round(summary.totalUsers.total * scale) },
-  }), [filter]);
-
-  // Combine real data and mock data as fallback
-  const finalSummary = summaryData || scaledSummary;
-  const finalRevenueTrend = trends?.revenueTrend || MOCK_ADMIN_REVENUE_TREND;
-  const finalOrderTrend = trends?.orderTrend || MOCK_ADMIN_ORDER_TREND;
-  const finalTopRestaurants = topRestaurants.length > 0 ? topRestaurants : MOCK_TOP_RESTAURANTS;
+  // Dữ liệu thật từ API (rỗng/0 khi chưa có, không dùng dữ liệu giả)
+  const finalSummary = summaryData || ZERO_SUMMARY;
+  const finalRevenueTrend = trends?.revenueTrend || [];
+  const finalOrderTrend = trends?.orderTrend || [];
+  const finalTopRestaurants = topRestaurants;
 
   const totalRevenue = finalRevenueTrend.reduce((s, p) => s + p.value, 0);
   const totalOrders = finalOrderTrend.reduce((s, p) => s + p.total, 0);

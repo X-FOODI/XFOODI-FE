@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/contexts/AuthContext";
 import axiosInstance from "@/lib/services/axiosInstance";
-import { App, Modal, Switch, Spin, Input, Tag } from "antd";
+import { App, Modal, Switch, Spin, Input, Tag, Button, Popconfirm } from "antd";
 import { ExclamationCircleOutlined, SearchOutlined } from "@ant-design/icons";
 
 interface SystemUser {
@@ -115,6 +115,21 @@ export default function AdminUsersPage() {
     }
   };
 
+  const toggleAdminRole = async (u: SystemUser) => {
+    const isAdmin = u.roles.includes("Admin");
+    try {
+      const res = await axiosInstance.patch(`/admin/users/${u.id}/admin-role`, { grant: !isAdmin });
+      if (res.data?.success) {
+        message.success(res.data.message);
+        setUsers(prev => prev.map(x => x.id === u.id
+          ? { ...x, roles: isAdmin ? x.roles.filter(r => r !== "Admin") : [...x.roles, "Admin"] }
+          : x));
+      }
+    } catch (err: any) {
+      message.error(err.response?.data?.message || "Lỗi khi cập nhật quyền");
+    }
+  };
+
   const getRoleColor = (role: string) => {
     switch (role) {
       case "System Admin": return "red";
@@ -198,10 +213,27 @@ export default function AdminUsersPage() {
                       <p className="text-sm" style={{ color: "var(--text)" }}>{u.phoneNumber || "—"}</p>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-1">
+                      <div className="flex flex-wrap items-center gap-1">
                         {u.roles.length > 0 ? u.roles.map(role => (
                           <Tag color={getRoleColor(role)} key={role}>{role}</Tag>
                         )) : <span className="text-xs text-gray-400">Không có</span>}
+                        <Popconfirm
+                          title={u.roles.includes("Admin") ? "Thu hồi quyền Admin?" : "Cấp quyền Admin cho người dùng này?"}
+                          okText="Xác nhận"
+                          cancelText="Hủy"
+                          onConfirm={() => toggleAdminRole(u)}
+                          disabled={u.id === user?.id && u.roles.includes("Admin")}
+                        >
+                          <Button
+                            size="small"
+                            type="link"
+                            danger={u.roles.includes("Admin")}
+                            disabled={u.id === user?.id && u.roles.includes("Admin")}
+                            style={{ padding: "0 4px", fontSize: 12 }}
+                          >
+                            {u.roles.includes("Admin") ? "− Admin" : "+ Admin"}
+                          </Button>
+                        </Popconfirm>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-center text-sm" style={{ color: "var(--text-muted)" }}>
