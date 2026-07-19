@@ -16,7 +16,10 @@ import {
   Bell,
   Sparkles,
   Utensils,
-  Receipt
+  Receipt,
+  FileText,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { io } from "socket.io-client";
@@ -40,6 +43,8 @@ interface ActiveOrder {
   reference: string;
   totalAmount: number;
   createdAt: string;
+  status?: string;
+  isPaid?: boolean;
   reservationId?: string | null;
   depositPaid?: number; // tổng tiền cọc đã thanh toán
   items: Array<{
@@ -72,10 +77,20 @@ export default function CustomerCheckoutPage() {
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [polling, setPolling] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [qrError, setQrError] = useState<string | null>(null);
 
   // Staff calling states
   const [callingStaff, setCallingStaff] = useState(false);
   const [staffCalled, setStaffCalled] = useState(false);
+
+  // VAT Invoice states
+  const [wantVatInvoice, setWantVatInvoice] = useState(false);
+  const [vatCompanyName, setVatCompanyName] = useState("Công ty TNHH Xeko Demo");
+  const [vatTaxId, setVatTaxId] = useState("0312345678");
+  const [vatAddress, setVatAddress] = useState("123 Nguyễn Văn Linh, Quận 7, TP.HCM");
+  const [vatEmail, setVatEmail] = useState("ketoan@xeko.com");
+  const [vatSubmitting, setVatSubmitting] = useState(false);
+  const [vatResult, setVatResult] = useState<{ status: string; lookupCode?: string } | null>(null);
 
   // Load data
   const loadData = useCallback(async () => {
@@ -91,7 +106,12 @@ export default function CustomerCheckoutPage() {
         // 2. Get active orders for current session
         const orderRes = await axiosInstance.get("/orders", { params: { tableId } });
         if (orderRes.data?.success && orderRes.data.data.length > 0) {
-          const order = orderRes.data.data[0];
+          const orders = orderRes.data.data as ActiveOrder[];
+          // Ưu tiên đơn chờ thanh toán (COMPLETED chưa trả tiền)
+          const order =
+            orders.find((o) => o.status === "COMPLETED" && !o.isPaid) ||
+            orders.find((o) => !o.isPaid) ||
+            orders[0];
 
           // Nếu order có reservation, fetch thêm tiền cọc đã thanh toán
           if (order.reservationId) {
@@ -126,78 +146,149 @@ export default function CustomerCheckoutPage() {
     if (!activeOrder || !table) return;
     try {
       setGeneratingQR(true);
+      setQrError(null);
       const depositPaid = activeOrder.depositPaid ?? 0;
-      const amountDue = Math.max(0, activeOrder.totalAmount - depositPaid);
+      const amountDue = Math.max(0, Number(activeOrder.totalAmount) - depositPaid);
+      if (amountDue <= 0) {
+        setQrError("Số tiền thanh toán không hợp lệ");
+        return;
+      }
       const res = await paymentService.getTransferInfo({
         orderId: activeOrder.id,
         amount: amountDue,
         restaurantId: table.restaurant.id,
       });
 
-      if (res) {
+      if (res?.qrUrl) {
         setQrUrl(res.qrUrl);
         setTransferContent(res.transferContent);
         setBankInfo(res.bankInfo);
         setPaymentId(res.paymentId);
         setPolling(true);
+      } else {
+        setQrError("Nhà hàng chưa cấu hình tài khoản nhận chuyển khoản. Vui lòng chọn thanh toán tiền mặt.");
       }
     } catch (err: any) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Không thể tạo mã QR chuyển khoản";
       console.error("Lỗi tạo mã QR chuyển khoản:", err);
+      setQrError(msg);
     } finally {
       setGeneratingQR(false);
     }
   }, [activeOrder, table]);
 
-  // Auto-generate QR if bank method is active and order is loaded
+  // Auto-generate QR once when bank method is selected (do not retry endlessly on error)
   useEffect(() => {
-    if (activeOrder && table && paymentMethod === "bank" && !qrUrl && !generatingQR) {
+    if (
+      activeOrder &&
+      table &&
+      paymentMethod === "bank" &&
+      !qrUrl &&
+      !generatingQR &&
+      !qrError
+    ) {
       generateQRCode();
     }
-  }, [activeOrder, table, paymentMethod, qrUrl, generatingQR, generateQRCode]);
+  }, [activeOrder, table, paymentMethod, qrUrl, generatingQR, qrError, generateQRCode]);
+
+  // Reset QR state when switching payment method
+  useEffect(() => {
+    if (paymentMethod !== "bank") {
+      setPolling(false);
+      return;
+    }
+    // Allow a fresh attempt when user switches back to bank
+    if (!qrUrl) {
+      setQrError(null);
+    }
+  }, [paymentMethod]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Real-time socket updates & polling status check
   useEffect(() => {
     if (!paymentId || !polling) return;
 
+    const markPaid = () => {
+      setPaymentSuccess(true);
+      setPolling(false);
+      if (wantVatInvoice && paymentId) submitVatInvoice(paymentId);
+      setTimeout(() => setShowFeedback(true), 1500);
+    };
+
     // 1. Socket connection for instant webhook detection
     const socketUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/?$/, "") || "http://localhost:5000";
     const socket = io(socketUrl, {
-      transports: ["websocket"],
+      transports: ["polling", "websocket"],
+      withCredentials: true,
     });
 
     if (table?.restaurant.id) {
       socket.emit("join_restaurant", table.restaurant.id);
     }
 
-    socket.on("ORDER_STATUS_CHANGED", (data: any) => {
-      if (data.orderId === activeOrder?.id && data.status === "COMPLETED") {
-        setPaymentSuccess(true);
-        setPolling(false);
-        // Hiện feedback sau 1.5s để animation success kịp chạy
-        setTimeout(() => setShowFeedback(true), 1500);
+    socket.on("PAYMENT_COMPLETED", (data: any) => {
+      if (data?.paymentId === paymentId || data?.orderId === activeOrder?.id) {
+        markPaid();
       }
     });
 
-    // 2. Backup polling
+    socket.on("ORDER_STATUS_CHANGED", (data: any) => {
+      if (data?.orderId === activeOrder?.id && data?.isPaid === true) {
+        markPaid();
+      }
+    });
+
+    // 2. Backup polling (public endpoint — guest không cần đăng nhập)
     const interval = setInterval(async () => {
       try {
-        const check = await paymentService.pollStatus(paymentId);
+        const check = await paymentService.pollStatus(paymentId, activeOrder?.id);
         if (check.status === PaymentStatus.COMPLETED) {
-          setPaymentSuccess(true);
-          setPolling(false);
+          markPaid();
           clearInterval(interval);
-          setTimeout(() => setShowFeedback(true), 1500);
         }
       } catch (err) {
         console.error("Lỗi kiểm tra trạng thái thanh toán:", err);
       }
-    }, 4000);
+    }, 3000);
 
     return () => {
       socket.disconnect();
       clearInterval(interval);
     };
-  }, [paymentId, polling, activeOrder, table]);
+  }, [paymentId, polling, activeOrder, table, wantVatInvoice]);
+
+  // Cash payment socket listener — always active so staff can trigger success from live-orders
+  useEffect(() => {
+    if (!activeOrder || !table) return;
+
+    const socketUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/?$/, "") || "http://localhost:5000";
+    const socket = io(socketUrl, {
+      transports: ["polling", "websocket"],
+      withCredentials: true,
+    });
+
+    socket.emit("join_restaurant", table.restaurant.id);
+
+    socket.on("PAYMENT_COMPLETED", (data: any) => {
+      if (data?.orderId === activeOrder?.id) {
+        setPaymentSuccess(true);
+        setPolling(false);
+        if (wantVatInvoice && data?.paymentId) submitVatInvoice(data.paymentId);
+        setTimeout(() => setShowFeedback(true), 1500);
+      }
+    });
+
+    socket.on("ORDER_STATUS_CHANGED", (data: any) => {
+      if (data?.orderId === activeOrder?.id && data?.isPaid === true) {
+        setPaymentSuccess(true);
+        setTimeout(() => setShowFeedback(true), 1500);
+      }
+    });
+
+    return () => { socket.disconnect(); };
+  }, [activeOrder?.id, table?.restaurant.id]);
 
   // Call Staff
   const handleCallStaff = async () => {
@@ -243,6 +334,34 @@ export default function CustomerCheckoutPage() {
     } catch (err) {
       console.error("Lỗi yêu cầu nhân viên:", err);
       setCallingStaff(false);
+    }
+  };
+
+  // Submit VAT invoice after payment success
+  const submitVatInvoice = async (completedPaymentId: string) => {
+    if (!wantVatInvoice || !table) return;
+    if (!vatCompanyName || !vatTaxId || !vatAddress || !vatEmail) return;
+    try {
+      setVatSubmitting(true);
+      const res = await axiosInstance.post("/vat-invoices", {
+        paymentId: completedPaymentId,
+        restaurantId: table.restaurant.id,
+        companyName: vatCompanyName,
+        taxId: vatTaxId,
+        address: vatAddress,
+        email: vatEmail,
+      });
+      if (res.data?.success) {
+        setVatResult({
+          status: res.data.data?.status || "COMPLETED",
+          lookupCode: res.data.data?.misaLookupCode,
+        });
+      }
+    } catch (err: any) {
+      console.error("Lỗi tạo hóa đơn VAT:", err);
+      setVatResult({ status: "FAILED" });
+    } finally {
+      setVatSubmitting(false);
     }
   };
 
@@ -429,6 +548,129 @@ export default function CustomerCheckoutPage() {
             </div>
           </div>
 
+          {/* ─── VAT INVOICE REQUEST SECTION ─── */}
+          <div className="space-y-3">
+            <button
+              onClick={() => setWantVatInvoice(!wantVatInvoice)}
+              className="w-full p-3 rounded-xl bg-zinc-900/60 border border-zinc-800 hover:border-zinc-700 transition-all flex items-center justify-between group"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${
+                  wantVatInvoice ? "bg-amber-500 border-amber-500" : "border-zinc-700"
+                }`}>
+                  {wantVatInvoice && <CheckCircle2 className="w-3 h-3 text-black" />}
+                </div>
+                <div className="text-left">
+                  <p className="text-xs font-bold text-white">Xuất hóa đơn VAT</p>
+                  <p className="text-[10px] text-zinc-500">Nhập thông tin công ty để nhận hóa đơn điện tử</p>
+                </div>
+              </div>
+              {wantVatInvoice ? (
+                <ChevronUp className="w-4 h-4 text-zinc-500 group-hover:text-zinc-400" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-zinc-500 group-hover:text-zinc-400" />
+              )}
+            </button>
+
+            <AnimatePresence>
+              {wantVatInvoice && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="p-4 rounded-xl bg-zinc-900/80 border border-zinc-800 space-y-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <FileText className="w-3.5 h-3.5 text-amber-500" />
+                      <span className="text-xs font-bold text-white">Thông tin xuất hóa đơn</span>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block">
+                        <span className="text-[10px] text-zinc-500 uppercase font-bold mb-1 block">Tên công ty *</span>
+                        <input
+                          type="text"
+                          value={vatCompanyName}
+                          onChange={(e) => setVatCompanyName(e.target.value)}
+                          placeholder="VD: Công ty TNHH ABC"
+                          className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-white placeholder-zinc-600 focus:border-amber-500 focus:outline-none transition-colors"
+                        />
+                      </label>
+
+                      <label className="block">
+                        <span className="text-[10px] text-zinc-500 uppercase font-bold mb-1 block">Mã số thuế *</span>
+                        <input
+                          type="text"
+                          value={vatTaxId}
+                          onChange={(e) => setVatTaxId(e.target.value.replace(/[^0-9]/g, ""))}
+                          placeholder="VD: 0123456789"
+                          maxLength={13}
+                          className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-white placeholder-zinc-600 focus:border-amber-500 focus:outline-none transition-colors font-mono"
+                        />
+                      </label>
+
+                      <label className="block">
+                        <span className="text-[10px] text-zinc-500 uppercase font-bold mb-1 block">Địa chỉ công ty *</span>
+                        <input
+                          type="text"
+                          value={vatAddress}
+                          onChange={(e) => setVatAddress(e.target.value)}
+                          placeholder="VD: 123 Đường ABC, Quận 1, TP.HCM"
+                          className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-white placeholder-zinc-600 focus:border-amber-500 focus:outline-none transition-colors"
+                        />
+                      </label>
+
+                      <label className="block">
+                        <span className="text-[10px] text-zinc-500 uppercase font-bold mb-1 block">Email nhận hóa đơn *</span>
+                        <input
+                          type="email"
+                          value={vatEmail}
+                          onChange={(e) => setVatEmail(e.target.value)}
+                          placeholder="VD: ketoan@abc.com"
+                          className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-white placeholder-zinc-600 focus:border-amber-500 focus:outline-none transition-colors"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="pt-2 border-t border-zinc-850">
+                      <p className="text-[10px] text-zinc-500 leading-relaxed">
+                        <span className="text-amber-500">ℹ️</span> Hóa đơn VAT sẽ được xuất tự động sau khi thanh toán thành công và gửi qua email trong vòng 5 phút.
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {vatResult && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`p-3 rounded-xl border text-xs ${
+                  vatResult.status === "COMPLETED"
+                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                    : "bg-rose-500/10 border-rose-500/30 text-rose-400"
+                }`}
+              >
+                {vatResult.status === "COMPLETED" ? (
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span className="font-semibold">
+                      ✓ Hóa đơn VAT đã được xuất thành công
+                      {vatResult.lookupCode && ` (Mã: ${vatResult.lookupCode})`}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4" />
+                    <span className="font-semibold">Xuất hóa đơn VAT không thành công, vui lòng liên hệ nhà hàng</span>
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </div>
+
           {/* ─── PAYMENT METHOD CHOICE ─── */}
           <div className="space-y-2.5">
             <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-500 ml-1">Phương thức thanh toán</h3>
@@ -510,9 +752,17 @@ export default function CustomerCheckoutPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="py-8 text-zinc-500 space-y-2">
-                    <AlertCircle className="w-8 h-8 mx-auto opacity-30 text-rose-500" />
-                    <p className="text-xs max-w-xs mx-auto">Nhà hàng chưa cấu hình thông tin tài khoản nhận chuyển khoản. Vui lòng chọn phương thức Tiền mặt.</p>
+                  <div className="py-8 text-zinc-500 space-y-3">
+                    <AlertCircle className="w-8 h-8 mx-auto opacity-40 text-rose-500" />
+                    <p className="text-xs max-w-xs mx-auto text-rose-300/90">
+                      {qrError || "Nhà hàng chưa cấu hình thông tin tài khoản nhận chuyển khoản. Vui lòng chọn phương thức Tiền mặt."}
+                    </p>
+                    <button
+                      onClick={() => generateQRCode()}
+                      className="mx-auto px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-semibold border border-zinc-700 transition-all active:scale-95"
+                    >
+                      Thử tạo lại mã QR
+                    </button>
                   </div>
                 )}
               </div>

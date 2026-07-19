@@ -148,6 +148,48 @@ export default function LiveOrdersPage() {
     }
   };
 
+  /** Chuông khẩn cấp riêng cho yêu cầu thanh toán tiền mặt — khác với chuông đơn mới */
+  const playUrgentChime = () => {
+    try {
+      let ctx = audioCtxRef.current;
+      if (!ctx) {
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioContextClass) {
+          ctx = new AudioContextClass();
+          audioCtxRef.current = ctx;
+        }
+      }
+      if (!ctx) return;
+      if (ctx.state === "suspended") ctx.resume();
+
+      const playTone = (freq: number, startTime: number, duration: number, vol = 0.3) => {
+        if (!ctx) return;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = "square";
+        osc.frequency.setValueAtTime(freq, startTime);
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(vol, startTime + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+      };
+
+      const now = ctx.currentTime;
+      // 3 nốt đôi — to hơn, khẩn cấp hơn tiếng đơn mới
+      playTone(880, now, 0.15);        // A5
+      playTone(880, now + 0.18, 0.15);
+      playTone(1046.5, now + 0.36, 0.25); // C6
+      playTone(880, now + 0.65, 0.15);
+      playTone(880, now + 0.83, 0.15);
+      playTone(1046.5, now + 1.01, 0.3);
+    } catch (e) {
+      console.log("Lỗi phát chuông khẩn:", e);
+    }
+  };
+
   // Sync selectedOrder with latest orders data to show live updates of items status
   useEffect(() => {
     if (selectedOrder) {
@@ -233,16 +275,23 @@ export default function LiveOrdersPage() {
 
       newSocket.on("CALL_STAFF", (callData: any) => {
         console.log("Nhận yêu cầu gọi nhân viên:", callData);
-        playNotificationSound();
+
+        // Dùng chuông khẩn cấp riêng cho thanh toán tiền mặt, chuông thường cho các loại khác
+        if (callData.type === "CASH_CHECKOUT") {
+          playUrgentChime();
+        } else {
+          playNotificationSound();
+        }
         
-        // If cash checkout request, register in state to glow the card on KDS board
+        // Nếu là yêu cầu thu tiền mặt, đánh dấu thẻ đơn trên KDS phát sáng
         if (callData.type === "CASH_CHECKOUT" && callData.orderId) {
           setPendingPayments(prev => ({ ...prev, [callData.orderId]: true }));
         }
 
+        const notifId = Math.random().toString();
         setNotifications(prev => [
           {
-            id: Math.random().toString(),
+            id: notifId,
             tableCode: callData.tableCode,
             floorName: callData.floorName,
             type: callData.type,
@@ -253,6 +302,13 @@ export default function LiveOrdersPage() {
           },
           ...prev
         ]);
+
+        // Tự động dismiss notification CASH_CHECKOUT sau 15 giây nếu nhân viên không tương tác
+        if (callData.type === "CASH_CHECKOUT") {
+          setTimeout(() => {
+            setNotifications(prev => prev.filter(n => n.id !== notifId));
+          }, 15000);
+        }
       });
 
       newSocket.on("ORDER_STATUS_CHANGED", ({ orderId, status, isPaid }: { orderId: string, status: string, isPaid?: boolean }) => {
@@ -351,13 +407,37 @@ export default function LiveOrdersPage() {
   /** Staff xác nhận đã thu tiền mặt → gọi /payments/cash → backend tự hoàn thành đơn + trả bàn */
   const handleCashPayment = async () => {
     if (!cashModalOrder || confirmingPayment) return;
+    
+    // Pre-flight check: verify token exists
+    const token = localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken');
+    console.log('[Cash Payment] 🔍 Pre-flight check:');
+    console.log('  - Order ID:', cashModalOrder.id);
+    console.log('  - Order Ref:', cashModalOrder.reference);
+    console.log('  - Cash received:', cashReceived);
+    console.log('  - Token exists:', token ? 'YES' : '❌ NO');
+    console.log('  - Token preview:', token ? token.substring(0, 20) + '...' : 'MISSING');
+    
+    if (!token) {
+      alert('⚠️ Không tìm thấy phiên đăng nhập!\n\nVui lòng:\n1. Đăng xuất (góc trên bên phải)\n2. Đăng nhập lại\n\nSau đó thử thu tiền lại.');
+      return;
+    }
+    
+    if (!cashReceived || cashReceived <= 0) {
+      alert('❌ Số tiền thu phải lớn hơn 0');
+      return;
+    }
+    
     try {
       setConfirmingPayment(true);
-      await paymentService.payCash({
+      
+      console.log('[Cash Payment] 📞 Calling POST /api/payments/cash...');
+      const result = await paymentService.payCash({
         orderId: cashModalOrder.id,
         cashReceive: cashReceived,
         purpose: PaymentPurpose.ORDER,
       });
+      console.log('[Cash Payment] ✅ API Response:', result);
+      
       // Payment done → remove order from KDS immediately
       setOrders(prev => prev.filter(o => o.id !== cashModalOrder.id));
       setPendingPayments(prev => {
@@ -370,9 +450,26 @@ export default function LiveOrdersPage() {
       }
       setIsCashModalOpen(false);
       setCashModalOrder(null);
+      
+      console.log('[Cash Payment] ✅ Payment completed successfully - order removed from KDS');
     } catch (error: any) {
-      console.error("Lỗi xác nhận thanh toán tiền mặt:", error);
-      alert(error?.response?.data?.message || "Không thể xác nhận thanh toán tiền mặt");
+      console.error("[Cash Payment] ❌ ERROR:", error);
+      console.error("[Cash Payment] ❌ Response:", error?.response);
+      console.error("[Cash Payment] ❌ Status:", error?.response?.status);
+      console.error("[Cash Payment] ❌ Message:", error?.response?.data);
+      
+      // Check if authentication error
+      if (error?.response?.status === 401) {
+        alert("⚠️ Phiên đăng nhập đã hết hạn hoặc không hợp lệ!\n\nVui lòng:\n1. Đăng xuất (góc trên bên phải)\n2. Đăng nhập lại\n\nSau đó thử thu tiền lại.");
+        return;
+      }
+      
+      if (error?.response?.status === 400) {
+        alert("❌ Dữ liệu không hợp lệ:\n" + (error?.response?.data?.message || "Vui lòng kiểm tra lại thông tin"));
+        return;
+      }
+      
+      alert("❌ Lỗi thanh toán:\n" + (error?.response?.data?.message || error.message || "Không thể xác nhận thanh toán tiền mặt"));
     } finally {
       setConfirmingPayment(false);
     }
@@ -671,34 +768,58 @@ export default function LiveOrdersPage() {
         </main>
       </div>
 
-      {/* Floating Notifications */}
+      {/* ─── Floating Notifications ─── */}
       {notifications.length > 0 && (
-        <div className="fixed bottom-6 right-6 z-50 w-80 space-y-3">
+        <div className="fixed bottom-6 right-6 z-[9999] w-96 space-y-3 pointer-events-none">
           {notifications.map(notif => (
-            <div key={notif.id} className="bg-white dark:bg-[#21262D] p-4 rounded-xl border-l-4 border-yellow-500 shadow-xl border border-gray-200 dark:border-gray-700 flex items-start justify-between gap-3 animate-slide-in-right">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
-                  <span className="font-bold text-xs text-gray-900 dark:text-white uppercase tracking-wider">
-                    {notif.type === "CASH_CHECKOUT" ? "💰 Thanh toán tiền mặt" : "Gọi nhân viên"}
-                  </span>
-                  <span className="text-[10px] text-gray-400 dark:text-gray-500 ml-auto">{notif.time}</span>
-                </div>
-                <p className="text-sm text-gray-800 dark:text-gray-200 font-semibold">{notif.message}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{notif.floorName}</p>
-                {/* Nút thu tiền nếu là yêu cầu thanh toán */}
-                {notif.type === "CASH_CHECKOUT" && notif.orderId && (
-                  <button
-                    onClick={() => handlePayFromNotification(notif)}
-                    className="mt-2 w-full py-1.5 rounded-lg text-xs font-black text-black bg-amber-500 hover:bg-amber-400 transition-all active:scale-95 flex items-center justify-center gap-1"
-                  >
-                    💵 Thu tiền mặt {notif.orderReference ? `(${notif.orderReference})` : ""}
-                  </button>
+            <div
+              key={notif.id}
+              className={`pointer-events-auto rounded-2xl shadow-2xl flex items-start justify-between gap-3 animate-slide-in-right border ${
+                notif.type === "CASH_CHECKOUT"
+                  ? "bg-amber-950 border-amber-500 shadow-amber-500/30 p-5"
+                  : "bg-white dark:bg-[#21262D] border-yellow-500/60 p-4"
+              }`}
+              style={notif.type === "CASH_CHECKOUT" ? { boxShadow: "0 0 30px rgba(245,158,11,0.4)" } : {}}
+            >
+              <div className="flex-1 min-w-0">
+                {notif.type === "CASH_CHECKOUT" ? (
+                  <>
+                    {/* Badge khẩn cấp cho thu tiền mặt */}
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="flex items-center gap-1.5 bg-amber-500 text-black text-xs font-black px-2.5 py-1 rounded-full uppercase tracking-wide animate-pulse">
+                        <span className="text-base leading-none">💰</span>
+                        Yêu cầu thu tiền mặt
+                      </span>
+                      <span className="text-[10px] text-amber-400/70 ml-auto whitespace-nowrap">{notif.time}</span>
+                    </div>
+                    <p className="text-sm text-amber-100 font-bold leading-snug">{notif.message}</p>
+                    <p className="text-xs text-amber-400/80 mt-0.5">{notif.floorName}</p>
+                    <button
+                      onClick={() => handlePayFromNotification(notif)}
+                      className="mt-3 w-full py-2.5 rounded-xl text-sm font-black text-black bg-amber-400 hover:bg-amber-300 active:scale-95 transition-all shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2"
+                    >
+                      💵 Thu tiền mặt ngay {notif.orderReference ? `— Đơn ${notif.orderReference}` : ""}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
+                      <span className="font-bold text-xs text-gray-900 dark:text-white uppercase tracking-wider">Gọi nhân viên</span>
+                      <span className="text-[10px] text-gray-400 dark:text-gray-500 ml-auto">{notif.time}</span>
+                    </div>
+                    <p className="text-sm text-gray-800 dark:text-gray-200 font-semibold">{notif.message}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{notif.floorName}</p>
+                  </>
                 )}
               </div>
-              <button 
+              <button
                 onClick={() => setNotifications(prev => prev.filter(n => n.id !== notif.id))}
-                className="text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors flex-shrink-0"
+                className={`flex-shrink-0 transition-colors ${
+                  notif.type === "CASH_CHECKOUT"
+                    ? "text-amber-400 hover:text-white"
+                    : "text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                }`}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
