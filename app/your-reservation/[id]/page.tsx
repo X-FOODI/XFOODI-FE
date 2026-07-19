@@ -11,6 +11,7 @@ import { useToast } from "@/lib/contexts/ToastContext";
 import { useAuth } from "@/lib/contexts/AuthContext";
 import reservationService, { Reservation } from "@/lib/services/reservationService";
 import paymentService, { TransferInfo } from "@/lib/services/paymentService";
+import ReservationTimeline from "@/components/reservations/ReservationTimeline";
 
 export default function CustomerReservationDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -261,6 +262,9 @@ export default function CustomerReservationDetailPage() {
             </div>
 
             <p className="text-xs text-[var(--text-muted)] leading-relaxed">{statusInfo.desc}</p>
+
+            <Divider className="my-6 border-neutral-800" />
+            <ReservationTimeline currentStatus={res.statusValue?.code || "PENDING"} />
 
             {/* Check-in QR code block (Strictly visible ONLY if confirmed/checked_in/completed) */}
             {(isConfirmed || isCheckedIn || isCompleted) && res.metadata?.qrCodeUrl && (

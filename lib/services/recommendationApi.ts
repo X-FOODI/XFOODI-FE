@@ -8,6 +8,12 @@ export interface RecommendedDish {
   categoryName?: string | null;
   reason?: string;
   coOccurrenceCount?: number;
+  flavors?: {
+    sweet: number;
+    spicy: number;
+    savory: number;
+    alcohol: number;
+  };
 }
 
 /** "Thường được gọi kèm" — data-driven, không cần đăng nhập. */
