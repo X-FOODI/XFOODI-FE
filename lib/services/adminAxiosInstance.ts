@@ -98,7 +98,7 @@ adminAxiosInstance.interceptors.response.use(
                 error.response.status === 404 &&
                 (error.config?.url?.includes("/payment-settings"));
 
-            if (!isExpected404) {
+            if (!isExpected404 && error.response.status !== 403) {
                 console.error('[adminAxios] Error response:', {
                     status: error.response.status,
                     url: error.config?.url,
@@ -106,6 +106,18 @@ adminAxiosInstance.interceptors.response.use(
                     data: error.response.data,
                     headers: error.response.headers,
                 });
+            }
+
+            // Check for Global Ban
+            if (error.response?.status === 403) {
+                const message = error.response?.data?.message?.toLowerCase() || '';
+                if (message.includes('disabled')) {
+                    const reason = error.response?.data?.reason || 'No reason provided';
+                    if (typeof window !== 'undefined') {
+                        const event = new CustomEvent('globalBan', { detail: { message: error.response?.data?.message, reason } });
+                        window.dispatchEvent(event);
+                    }
+                }
             }
         }
         return Promise.reject(error);
