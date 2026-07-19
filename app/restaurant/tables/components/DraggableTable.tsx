@@ -1,7 +1,7 @@
 import React, { useEffect, useCallback, useRef } from "react";
 import { Tooltip } from "antd";
 
-type TableStatus = "AVAILABLE" | "OCCUPIED" | "DISABLED" | "SELECTED" | "RESERVED";
+type TableStatus = "AVAILABLE" | "OCCUPIED" | "DISABLED" | "SELECTED" | "RESERVED" | "UNAVAILABLE";
 
 export interface TableData {
   id: string;
@@ -55,6 +55,11 @@ const STATUS_CONFIG = {
     stroke: "var(--primary)",
     fill: "var(--primary-soft, rgba(255, 90, 44, 0.10))",
     text: "var(--primary)",
+  },
+  UNAVAILABLE: {
+    stroke: "#bfbfbf",
+    fill: "rgba(150, 150, 150, 0.06)",
+    text: "#8c8c8c",
   },
 };
 
@@ -219,6 +224,7 @@ export const DraggableTable: React.FC<DraggableTableProps> = ({
     RESERVED: "Đặt trước",
     DISABLED: "Không sử dụng",
     SELECTED: "Đã chọn",
+    UNAVAILABLE: "Bàn quá lớn",
   };
 
   const tooltipTitle = !draggable && !isDeco ? (
@@ -226,7 +232,14 @@ export const DraggableTable: React.FC<DraggableTableProps> = ({
       <div><strong>Bàn {table.name}</strong></div>
       <div style={{ color: "rgba(255,255,255,0.75)" }}>{table.seats} chỗ ngồi</div>
       <div style={{ color: statusStyle.stroke }}>● {STATUS_LABEL[table.status] ?? table.status}</div>
-      <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 10, marginTop: 2 }}>Click để xem chi tiết</div>
+      {table.status === "UNAVAILABLE" && (
+        <div style={{ color: "rgba(255,220,100,0.9)", fontSize: 10, marginTop: 2 }}>
+          Bàn này dành cho nhóm khách đông hơn
+        </div>
+      )}
+      {table.status !== "UNAVAILABLE" && (
+        <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 10, marginTop: 2 }}>Click để xem chi tiết</div>
+      )}
     </div>
   ) : undefined;
 

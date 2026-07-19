@@ -17,6 +17,10 @@ import {
 import { message } from "antd";
 import * as XLSX from "xlsx";
 import axiosInstance from "@/lib/services/axiosInstance";
+import DashboardHeader from "@/components/dashboard/DashboardHeader";
+import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
+import { useAuth } from "@/lib/contexts/AuthContext";
+import { useTenant } from "@/lib/contexts/TenantContext";
 
 interface Customer {
   id: string;
@@ -30,10 +34,29 @@ interface Customer {
   totalSpent: number;
 }
 
+interface RestaurantInfo {
+  id: string;
+  name: string;
+  slug: string;
+  logoUrl: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  description: string | null;
+  primaryColor: string;
+  owner: {
+    fullName: string;
+    email: string;
+  };
+}
+
 export default function CustomerManagementPage() {
   const router = useRouter();
+  const { user, isAuthReady } = useAuth();
+  const { loading: tenantLoading } = useTenant();
   
   // State variables
+  const [restaurantInfo, setRestaurantInfo] = useState<RestaurantInfo | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [search, setSearch] = useState<string>("");
@@ -44,6 +67,23 @@ export default function CustomerManagementPage() {
   const [totalPages, setTotalPages] = useState<number>(1);
   const [totalItems, setTotalItems] = useState<number>(0);
   const limit = 10;
+
+  useEffect(() => {
+    if (!isAuthReady || tenantLoading) return;
+    if (!user) {
+      router.replace("/login-email?redirect=/restaurant/customers");
+      return;
+    }
+    
+    axiosInstance
+      .get<{ success: boolean; data: any }>("/restaurants/me")
+      .then((res) => {
+        setRestaurantInfo(res.data.data);
+      })
+      .catch((err) => {
+        console.error(err);
+      });
+  }, [isAuthReady, user, router, tenantLoading]);
 
   // Fetch customers from backend API
   const fetchCustomers = async () => {
@@ -147,266 +187,291 @@ export default function CustomerManagementPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0d0907] text-white p-6 md:p-10">
-      {/* Background Ambient Orbs */}
-      <div className="absolute top-0 right-0 w-[450px] h-[450px] bg-[var(--primary)]/5 rounded-full blur-[100px] pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-[350px] h-[350px] bg-red-600/5 rounded-full blur-[80px] pointer-events-none" />
+    <div className="flex flex-col h-screen overflow-hidden" style={{ background: "var(--bg-base)" }}>
+      <DashboardHeader
+        role="restaurant"
+        restaurantName={restaurantInfo?.name ?? ""}
+        userName={restaurantInfo?.owner?.fullName ?? user?.name ?? ""}
+      />
 
-      <div className="max-w-7xl mx-auto relative z-10">
-        
-        {/* Header Title */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
-          <div>
-            <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent">
-              Quản Lý Khách Hàng
-            </h1>
-            <p className="text-zinc-400 text-sm mt-1.5">
-              Xem danh sách, kiểm tra chi tiết giao dịch, đặt bàn và quản lý trạng thái tài khoản khách hàng.
-            </p>
-          </div>
-          
-          <button
-            onClick={handleExportExcel}
-            className="flex items-center justify-center gap-2 px-5 py-3 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-white rounded-xl font-bold transition-all duration-300 shadow-[0_4px_12px_rgba(0,0,0,0.2)]"
-          >
-            <DownloadOutlined />
-            Xuất Excel
-          </button>
-        </div>
+      <div className="flex flex-1 overflow-hidden">
+        <DashboardSidebar
+          role="restaurant"
+          restaurantName={restaurantInfo?.name ?? user?.name ?? "đang tải..."}
+          userName={restaurantInfo?.owner?.fullName ?? user?.name ?? ""}
+          userEmail={restaurantInfo?.owner?.email ?? user?.email ?? ""}
+        />
 
-        {/* Filter and Search Bar */}
-        <div className="bg-zinc-900/40 backdrop-blur-md border border-zinc-800/80 rounded-2xl p-5 mb-6">
-          <form onSubmit={handleSearchSubmit} className="flex flex-col md:flex-row gap-4 items-center justify-between">
+        {/* Main content */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8" style={{ background: "var(--bg-base)" }}>
+          <div className="max-w-7xl mx-auto space-y-6">
             
-            {/* Search Input */}
-            <div className="relative w-full md:max-w-md">
-              <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-zinc-500">
-                <SearchOutlined />
-              </span>
-              <input
-                type="text"
-                placeholder="Tìm tên, email hoặc số điện thoại..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full bg-zinc-950/60 border border-zinc-800 focus:border-[var(--primary)]/60 focus:ring-1 focus:ring-[var(--primary)]/20 rounded-xl py-3 pl-10 pr-4 text-sm text-zinc-100 placeholder-zinc-500 outline-none transition-all duration-200"
-              />
-            </div>
-
-            {/* Filter Dropdown & Control Buttons */}
-            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
-              
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Trạng thái:</span>
-                <select
-                  value={status}
-                  onChange={(e) => {
-                    setStatus(e.target.value);
-                    setPage(1);
-                  }}
-                  className="bg-zinc-950/60 border border-zinc-800 focus:border-[var(--primary)]/60 rounded-xl px-4 py-2.5 text-sm text-zinc-200 outline-none transition-colors duration-200"
-                >
-                  <option value="all">Tất cả</option>
-                  <option value="active">Hoạt động</option>
-                  <option value="inactive">Đang khóa</option>
-                </select>
+            {/* Header Title */}
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <h1 className="text-2xl font-bold" style={{ color: "var(--text)" }}>
+                  Quản Lý Khách Hàng
+                </h1>
+                <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
+                  Xem danh sách, kiểm tra chi tiết giao dịch, đặt bàn và quản lý trạng thái tài khoản khách hàng.
+                </p>
               </div>
-
+              
               <button
-                type="submit"
-                className="px-5 py-2.5 bg-[var(--primary)] hover:bg-[#ff5722] text-white rounded-xl font-bold transition-all duration-200 shadow-[0_3px_10px_rgba(255,56,11,0.2)] text-sm"
+                onClick={handleExportExcel}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-all duration-200 shadow-sm border"
+                style={{ background: "var(--card)", borderColor: "var(--border)", color: "var(--text)" }}
               >
-                Tìm kiếm
-              </button>
-
-              <button
-                type="button"
-                onClick={handleResetFilters}
-                className="p-2.5 bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white rounded-xl transition-all duration-200 text-sm"
-                title="Làm mới bộ lọc"
-              >
-                <ReloadOutlined />
+                <DownloadOutlined />
+                Xuất Excel
               </button>
             </div>
-          </form>
-        </div>
 
-        {/* Customer Table Container */}
-        <div className="bg-zinc-900/20 border border-zinc-800/80 rounded-2xl overflow-hidden shadow-xl">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              
-              {/* Table Headers */}
-              <thead>
-                <tr className="bg-zinc-900/60 border-b border-zinc-800 text-zinc-400 text-xs font-bold uppercase tracking-wider">
-                  <th className="py-4 px-6">Avatar</th>
-                  
-                  {/* Sortable Header Name */}
-                  <th 
-                    onClick={() => handleSort("fullName")}
-                    className="py-4 px-6 cursor-pointer hover:text-white transition-colors duration-200"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      Khách hàng
-                      {sortBy === "fullName" && (
-                        sortOrder === "asc" ? <ArrowUpOutlined className="text-[10px]" /> : <ArrowDownOutlined className="text-[10px]" />
-                      )}
-                    </div>
-                  </th>
-                  
-                  <th className="py-4 px-6">Email</th>
-                  <th className="py-4 px-6">Số điện thoại</th>
-                  
-                  {/* Sortable Header Total Orders */}
-                  <th 
-                    onClick={() => handleSort("totalOrders")}
-                    className="py-4 px-6 cursor-pointer hover:text-white transition-colors duration-200 text-right"
-                  >
-                    <div className="flex items-center justify-end gap-1.5">
-                      Đơn hàng
-                      {sortBy === "totalOrders" && (
-                        sortOrder === "asc" ? <ArrowUpOutlined className="text-[10px]" /> : <ArrowDownOutlined className="text-[10px]" />
-                      )}
-                    </div>
-                  </th>
-                  
-                  {/* Sortable Header Total Spent */}
-                  <th 
-                    onClick={() => handleSort("totalSpent")}
-                    className="py-4 px-6 cursor-pointer hover:text-white transition-colors duration-200 text-right"
-                  >
-                    <div className="flex items-center justify-end gap-1.5">
-                      Chi tiêu
-                      {sortBy === "totalSpent" && (
-                        sortOrder === "asc" ? <ArrowUpOutlined className="text-[10px]" /> : <ArrowDownOutlined className="text-[10px]" />
-                      )}
-                    </div>
-                  </th>
-                  
-                  <th className="py-4 px-6 text-center">Trạng thái</th>
-                  <th className="py-4 px-6">Ngày đăng ký</th>
-                </tr>
-              </thead>
-              
-              {/* Table Body */}
-              <tbody className="divide-y divide-zinc-800/50">
-                {loading ? (
-                  // Skeleton Rows
-                  Array.from({ length: 5 }).map((_, idx) => (
-                    <tr key={idx} className="animate-pulse">
-                      <td className="py-5 px-6"><div className="w-10 h-10 bg-zinc-800 rounded-full" /></td>
-                      <td className="py-5 px-6"><div className="h-4 bg-zinc-800 rounded w-28" /></td>
-                      <td className="py-5 px-6"><div className="h-4 bg-zinc-800 rounded w-36" /></td>
-                      <td className="py-5 px-6"><div className="h-4 bg-zinc-800 rounded w-24" /></td>
-                      <td className="py-5 px-6"><div className="h-4 bg-zinc-800 rounded w-12 ml-auto" /></td>
-                      <td className="py-5 px-6"><div className="h-4 bg-zinc-800 rounded w-16 ml-auto" /></td>
-                      <td className="py-5 px-6 text-center"><div className="h-6 bg-zinc-800 rounded-full w-20 mx-auto" /></td>
-                      <td className="py-5 px-6"><div className="h-4 bg-zinc-800 rounded w-20" /></td>
-                    </tr>
-                  ))
-                ) : customers.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="py-12 text-center text-zinc-500 font-medium">
-                      Không tìm thấy dữ liệu khách hàng phù hợp.
-                    </td>
-                  </tr>
-                ) : (
-                  customers.map((customer) => (
-                    <tr 
-                      key={customer.id} 
-                      onClick={() => router.push(`/restaurant/customers/${customer.id}`)}
-                      className="hover:bg-zinc-800/30 cursor-pointer transition-all duration-150 border-b border-zinc-800/30"
-                    >
-                      {/* Avatar */}
-                      <td className="py-4 px-6">
-                        {customer.avatarUrl ? (
-                          <img 
-                            src={customer.avatarUrl} 
-                            alt={customer.fullName} 
-                            className="w-10 h-10 rounded-full object-cover border border-zinc-800 shadow-md"
-                          />
-                        ) : (
-                          <div className="w-10 h-10 bg-zinc-800 rounded-full flex items-center justify-center text-zinc-400 border border-zinc-700 shadow-md">
-                            <UserOutlined />
-                          </div>
-                        )}
-                      </td>
-                      
-                      {/* Name */}
-                      <td className="py-4 px-6 font-semibold text-zinc-100 hover:text-[var(--primary)] transition-colors">
-                        {customer.fullName}
-                      </td>
-                      
-                      {/* Email */}
-                      <td className="py-4 px-6 text-zinc-400 text-sm">{customer.email}</td>
-                      
-                      {/* Phone */}
-                      <td className="py-4 px-6 text-zinc-400 text-sm font-mono">{customer.phoneNumber}</td>
-                      
-                      {/* Total Orders */}
-                      <td className="py-4 px-6 text-right font-mono text-zinc-300 font-semibold">{customer.totalOrders}</td>
-                      
-                      {/* Total Spent */}
-                      <td className="py-4 px-6 text-right font-mono text-[var(--primary)] font-bold">
-                        ${customer.totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </td>
-                      
-                      {/* Status Badge */}
-                      <td className="py-4 px-6 text-center">
-                        {customer.isActive ? (
-                          <span className="inline-flex items-center gap-1 px-3 py-1 bg-green-500/10 text-green-400 border border-green-500/20 text-xs font-bold rounded-full">
-                            <CheckCircleOutlined className="text-[10px]" />
-                            Hoạt động
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-3 py-1 bg-red-500/10 text-red-400 border border-red-500/20 text-xs font-bold rounded-full">
-                            <CloseCircleOutlined className="text-[10px]" />
-                            Bị khóa
-                          </span>
-                        )}
-                      </td>
-                      
-                      {/* Created Date */}
-                      <td className="py-4 px-6 text-zinc-500 text-xs font-mono">
-                        {new Date(customer.createdDate).toLocaleDateString("vi-VN")}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination Controls */}
-          {totalPages > 1 && (
-            <div className="bg-zinc-900/40 border-t border-zinc-800 px-6 py-4 flex items-center justify-between gap-4">
-              <span className="text-sm text-zinc-400">
-                Hiển thị <span className="font-semibold text-white">{customers.length}</span> trên <span className="font-semibold text-white">{totalItems}</span> khách hàng
-              </span>
-              
-              <div className="flex items-center gap-2">
-                <button
-                  disabled={page === 1 || loading}
-                  onClick={() => setPage(page - 1)}
-                  className="p-2 bg-zinc-950 border border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-white rounded-lg disabled:opacity-40 disabled:hover:border-zinc-800 disabled:cursor-not-allowed transition-all duration-200"
-                >
-                  <LeftOutlined />
-                </button>
+            {/* Filter and Search Bar */}
+            <div className="rounded-xl p-4 shadow-sm border" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+              <form onSubmit={handleSearchSubmit} className="flex flex-col md:flex-row gap-4 items-center justify-between">
                 
-                <span className="text-sm text-zinc-300 font-bold px-3">
-                  Trang {page} / {totalPages}
-                </span>
+                {/* Search Input */}
+                <div className="relative w-full md:max-w-md">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3" style={{ color: "var(--text-muted)" }}>
+                    <SearchOutlined />
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Tìm tên, email hoặc số điện thoại..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="w-full rounded-lg py-2 pl-9 pr-4 text-sm outline-none transition-all duration-200 border"
+                    style={{ background: "var(--surface)", borderColor: "var(--border)", color: "var(--text)" }}
+                  />
+                </div>
 
-                <button
-                  disabled={page === totalPages || loading}
-                  onClick={() => setPage(page + 1)}
-                  className="p-2 bg-zinc-950 border border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-white rounded-lg disabled:opacity-40 disabled:hover:border-zinc-800 disabled:cursor-not-allowed transition-all duration-200"
-                >
-                  <RightOutlined />
-                </button>
-              </div>
+                {/* Filter Dropdown & Control Buttons */}
+                <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
+                  
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Trạng thái:</span>
+                    <select
+                      value={status}
+                      onChange={(e) => {
+                        setStatus(e.target.value);
+                        setPage(1);
+                      }}
+                      className="rounded-lg px-3 py-2 text-sm outline-none transition-colors duration-200 border"
+                      style={{ background: "var(--surface)", borderColor: "var(--border)", color: "var(--text)" }}
+                    >
+                      <option value="all">Tất cả</option>
+                      <option value="active">Hoạt động</option>
+                      <option value="inactive">Đang khóa</option>
+                    </select>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-lg font-medium transition-all duration-200 shadow-sm text-sm"
+                    style={{ background: "var(--primary)", color: "var(--on-primary)" }}
+                  >
+                    Tìm kiếm
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleResetFilters}
+                    className="p-2 rounded-lg transition-all duration-200 text-sm border"
+                    style={{ background: "var(--surface)", borderColor: "var(--border)", color: "var(--text-muted)" }}
+                    title="Làm mới bộ lọc"
+                  >
+                    <ReloadOutlined />
+                  </button>
+                </div>
+              </form>
             </div>
-          )}
-        </div>
+
+            {/* Customer Table Container */}
+            <div className="rounded-xl overflow-hidden shadow-sm border" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  
+                  {/* Table Headers */}
+                  <thead>
+                    <tr className="text-xs font-bold uppercase tracking-wider border-b" style={{ background: "var(--surface)", borderColor: "var(--border)", color: "var(--text-muted)" }}>
+                      <th className="py-3.5 px-6">Avatar</th>
+                      
+                      {/* Sortable Header Name */}
+                      <th 
+                        onClick={() => handleSort("fullName")}
+                        className="py-3.5 px-6 cursor-pointer transition-colors duration-200"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          Khách hàng
+                          {sortBy === "fullName" && (
+                            sortOrder === "asc" ? <ArrowUpOutlined className="text-[10px]" /> : <ArrowDownOutlined className="text-[10px]" />
+                          )}
+                        </div>
+                      </th>
+                      
+                      <th className="py-3.5 px-6">Email</th>
+                      <th className="py-3.5 px-6">Số điện thoại</th>
+                      
+                      {/* Sortable Header Total Orders */}
+                      <th 
+                        onClick={() => handleSort("totalOrders")}
+                        className="py-3.5 px-6 cursor-pointer transition-colors duration-200 text-right"
+                      >
+                        <div className="flex items-center justify-end gap-1.5">
+                          Đơn hàng
+                          {sortBy === "totalOrders" && (
+                            sortOrder === "asc" ? <ArrowUpOutlined className="text-[10px]" /> : <ArrowDownOutlined className="text-[10px]" />
+                          )}
+                        </div>
+                      </th>
+                      
+                      {/* Sortable Header Total Spent */}
+                      <th 
+                        onClick={() => handleSort("totalSpent")}
+                        className="py-3.5 px-6 cursor-pointer transition-colors duration-200 text-right"
+                      >
+                        <div className="flex items-center justify-end gap-1.5">
+                          Chi tiêu
+                          {sortBy === "totalSpent" && (
+                            sortOrder === "asc" ? <ArrowUpOutlined className="text-[10px]" /> : <ArrowDownOutlined className="text-[10px]" />
+                          )}
+                        </div>
+                      </th>
+                      
+                      <th className="py-3.5 px-6 text-center">Trạng thái</th>
+                      <th className="py-3.5 px-6">Ngày đăng ký</th>
+                    </tr>
+                  </thead>
+                  
+                  {/* Table Body */}
+                  <tbody>
+                    {loading ? (
+                      // Skeleton Rows
+                      Array.from({ length: 5 }).map((_, idx) => (
+                        <tr key={idx} className="animate-pulse border-b" style={{ borderColor: "var(--border)" }}>
+                          <td className="py-4 px-6"><div className="w-9 h-9 rounded-full" style={{ background: "var(--surface)" }} /></td>
+                          <td className="py-4 px-6"><div className="h-4 rounded w-28" style={{ background: "var(--surface)" }} /></td>
+                          <td className="py-4 px-6"><div className="h-4 rounded w-36" style={{ background: "var(--surface)" }} /></td>
+                          <td className="py-4 px-6"><div className="h-4 rounded w-24" style={{ background: "var(--surface)" }} /></td>
+                          <td className="py-4 px-6"><div className="h-4 rounded w-12 ml-auto" style={{ background: "var(--surface)" }} /></td>
+                          <td className="py-4 px-6"><div className="h-4 rounded w-16 ml-auto" style={{ background: "var(--surface)" }} /></td>
+                          <td className="py-4 px-6 text-center"><div className="h-6 rounded-full w-20 mx-auto" style={{ background: "var(--surface)" }} /></td>
+                          <td className="py-4 px-6"><div className="h-4 rounded w-20" style={{ background: "var(--surface)" }} /></td>
+                        </tr>
+                      ))
+                    ) : customers.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="py-10 text-center font-medium" style={{ color: "var(--text-muted)" }}>
+                          Không tìm thấy dữ liệu khách hàng phù hợp.
+                        </td>
+                      </tr>
+                    ) : (
+                      customers.map((customer) => (
+                        <tr 
+                          key={customer.id} 
+                          onClick={() => router.push(`/restaurant/customers/${customer.id}`)}
+                          className="cursor-pointer transition-all border-b"
+                          style={{ borderColor: "var(--border)" }}
+                          onMouseEnter={e => (e.currentTarget.style.background = "var(--surface)")}
+                          onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                        >
+                          {/* Avatar */}
+                          <td className="py-3.5 px-6">
+                            {customer.avatarUrl ? (
+                              <img 
+                                src={customer.avatarUrl} 
+                                alt={customer.fullName} 
+                                className="w-9 h-9 rounded-full object-cover border shadow-sm"
+                                style={{ borderColor: "var(--border)" }}
+                              />
+                            ) : (
+                              <div className="w-9 h-9 rounded-full flex items-center justify-center border shadow-sm" style={{ background: "var(--surface)", borderColor: "var(--border)", color: "var(--text-muted)" }}>
+                                <UserOutlined />
+                              </div>
+                            )}
+                          </td>
+                          
+                          {/* Name */}
+                          <td className="py-3.5 px-6 font-semibold" style={{ color: "var(--text)" }}>
+                            {customer.fullName || <span style={{ color: "var(--text-muted)" }} className="italic">Chưa có tên</span>}
+                          </td>
+                          
+                          {/* Email */}
+                          <td className="py-3.5 px-6 text-sm" style={{ color: "var(--text-muted)" }}>{customer.email}</td>
+                          
+                          {/* Phone */}
+                          <td className="py-3.5 px-6 text-sm font-mono" style={{ color: "var(--text-muted)" }}>{customer.phoneNumber}</td>
+                          
+                          {/* Total Orders */}
+                          <td className="py-3.5 px-6 text-right font-mono font-semibold" style={{ color: "var(--text)" }}>{customer.totalOrders}</td>
+                          
+                          {/* Total Spent */}
+                          <td className="py-3.5 px-6 text-right font-mono font-bold" style={{ color: "var(--primary)" }}>
+                            ${customer.totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                          
+                          {/* Status Badge */}
+                          <td className="py-3.5 px-6 text-center">
+                            {customer.isActive ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-green-500/10 text-green-600 border border-green-500/20 text-xs font-bold rounded-full">
+                                <CheckCircleOutlined className="text-[10px]" />
+                                Hoạt động
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-red-500/10 text-red-600 border border-red-500/20 text-xs font-bold rounded-full">
+                                <CloseCircleOutlined className="text-[10px]" />
+                                Bị khóa
+                              </span>
+                            )}
+                          </td>
+                          
+                          {/* Created Date */}
+                          <td className="py-3.5 px-6 text-xs font-mono" style={{ color: "var(--text-muted)" }}>
+                            {new Date(customer.createdDate).toLocaleDateString("vi-VN")}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="border-t px-6 py-3.5 flex items-center justify-between gap-4" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
+                  <span className="text-sm" style={{ color: "var(--text-muted)" }}>
+                    Hiển thị <span className="font-semibold" style={{ color: "var(--text)" }}>{customers.length}</span> trên <span className="font-semibold" style={{ color: "var(--text)" }}>{totalItems}</span> khách hàng
+                  </span>
+                  
+                  <div className="flex items-center gap-2">
+                    <button
+                      disabled={page === 1 || loading}
+                      onClick={() => setPage(page - 1)}
+                      className="p-1.5 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 border"
+                      style={{ background: "var(--card)", borderColor: "var(--border)", color: "var(--text-muted)" }}
+                    >
+                      <LeftOutlined />
+                    </button>
+                    
+                    <span className="text-sm font-bold px-2" style={{ color: "var(--text)" }}>
+                      Trang {page} / {totalPages}
+                    </span>
+
+                    <button
+                      disabled={page === totalPages || loading}
+                      onClick={() => setPage(page + 1)}
+                      className="p-1.5 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 border"
+                      style={{ background: "var(--card)", borderColor: "var(--border)", color: "var(--text-muted)" }}
+                    >
+                      <RightOutlined />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </main>
       </div>
     </div>
   );

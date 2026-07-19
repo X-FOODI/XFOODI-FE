@@ -64,8 +64,26 @@ export default function DashboardSidebar({
 
   const [activeOrdersCount, setActiveOrdersCount] = useState(0);
   const [pendingReservationsCount, setPendingReservationsCount] = useState(0);
+  const [pendingApplicationsCount, setPendingApplicationsCount] = useState(0);
 
   useEffect(() => {
+    if (role === "admin") {
+      const fetchAdminCounts = async () => {
+        try {
+          const appsRes = await axiosInstance.get("/restaurant-applications", { params: { limit: 1, status: "PENDING" } });
+          if (appsRes.data?.success) {
+            setPendingApplicationsCount(appsRes.data.data.total || 0);
+          }
+        } catch (e) {
+          console.error("Sidebar failed to fetch pending applications:", e);
+        }
+      };
+
+      fetchAdminCounts();
+      const interval = setInterval(fetchAdminCounts, 15000); // Poll every 15 seconds
+      return () => clearInterval(interval);
+    }
+
     if (role !== "restaurant") return;
 
     const fetchCounts = async () => {
@@ -128,7 +146,7 @@ export default function DashboardSidebar({
           id: "tenant-requests",
           label: "Yêu cầu đăng ký",
           path: "/admin/applications",
-          badge: 2,
+          badge: pendingApplicationsCount > 0 ? pendingApplicationsCount : undefined,
           icon: <ClipboardList className="dashboard-sidebar-item-icon" size={20} strokeWidth={2} />,
         },
         {
