@@ -6,6 +6,7 @@ import Link from "next/link";
 import axiosInstance from "@/lib/services/axiosInstance";
 import { useAuth } from "@/lib/contexts/AuthContext";
 import { formatVND } from "@/lib/utils/currency";
+import OrderTimeline, { computeEta } from "@/components/order/OrderTimeline";
 
 interface OrderDish {
   id: string;
@@ -38,6 +39,8 @@ interface MyOrder {
 const STATUS_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   PENDING:   { bg: "rgba(241,196,15,0.12)",  text: "#d4a017", border: "rgba(241,196,15,0.3)" },
   CONFIRMED: { bg: "rgba(52,152,219,0.12)",  text: "#2980b9", border: "rgba(52,152,219,0.3)" },
+  PREPARING: { bg: "rgba(230,126,34,0.12)",  text: "#e67e22", border: "rgba(230,126,34,0.3)" },
+  READY:     { bg: "rgba(155,89,182,0.12)",  text: "#9b59b6", border: "rgba(155,89,182,0.3)" },
   COMPLETED: { bg: "rgba(46,204,113,0.12)",  text: "#27ae60", border: "rgba(46,204,113,0.3)" },
   CANCELLED: { bg: "rgba(149,165,166,0.12)", text: "#7f8c8d", border: "rgba(149,165,166,0.3)" },
 };
@@ -198,6 +201,15 @@ export default function MyOrdersPage() {
                   {/* Expandable dish list */}
                   {isExpanded && (
                     <div className="border-t" style={{ borderColor: "var(--border)" }}>
+                      {/* Order tracking timeline (Grab-style) */}
+                      {status?.code !== "CANCELLED" && (
+                        <div className="px-5 py-4 border-b" style={{ borderColor: "var(--border)" }}>
+                          <OrderTimeline
+                            currentStatus={status?.code || "PENDING"}
+                            estimatedReadyAt={computeEta(order.createdAt, order.orderDetails.length, status?.code || "PENDING")}
+                          />
+                        </div>
+                      )}
                       <div className="px-5 py-3 space-y-3">
                         {order.orderDetails.map((detail) => {
                           const dStatus = detail.statusValue;
