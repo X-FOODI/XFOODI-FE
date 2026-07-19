@@ -54,7 +54,9 @@ function LoginEmailPageContent() {
   const [passwordTouched, setPasswordTouched] = useState(false);
   const [emailError, setEmailError] = useState("");
   const [emailTouched, setEmailTouched] = useState(false);
-  const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState(
+    process.env.NODE_ENV === 'development' ? "dummy-dev-token" : ""
+  );
   const turnstileRef = useRef<TurnstileInstance | null>(null);
 
   // 2FA States

@@ -223,17 +223,17 @@ export default function WalletPage() {
                 {/* Header */}
                 <div className="flex items-center justify-between">
                   <div>
-                    <h1 className="text-2xl font-black text-white flex items-center gap-2">
-                      <Wallet className="w-6 h-6 text-amber-400" />
+                    <h1 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+                      <Wallet className="w-6 h-6 text-amber-500" />
                       Ví doanh thu
                     </h1>
-                    <p className="text-sm text-zinc-400 mt-0.5">
+                    <p className="text-sm text-slate-500 dark:text-zinc-400 mt-0.5">
                       Theo dõi doanh thu tiền mặt tại bàn và tiền chuyển khoản tích lũy qua cổng hệ thống.
                     </p>
                   </div>
                   <button
                     onClick={fetchWallet}
-                    className="p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white transition-colors"
+                    className="p-2 rounded-lg bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-white transition-colors"
                   >
                     <RefreshCw className="w-4 h-4" />
                   </button>
@@ -245,14 +245,14 @@ export default function WalletPage() {
                   <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-500/10 to-orange-500/5 border border-amber-500/20">
                     <div className="flex items-center gap-2 mb-3">
                       <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
-                        <Wallet className="w-4 h-4 text-amber-400" />
+                        <Wallet className="w-4 h-4 text-amber-500" />
                       </div>
-                      <span className="text-xs font-bold uppercase tracking-wider text-amber-400/70">Số dư khả dụng</span>
+                      <span className="text-xs font-bold uppercase tracking-wider text-amber-500/80">Số dư khả dụng</span>
                     </div>
-                    <p className="text-2xl font-black text-white">{fmt(available)}</p>
-                    <p className="text-xs text-zinc-500 mt-1 flex items-center gap-1">
+                    <p className="text-2xl font-black text-slate-900 dark:text-white">{fmt(available)}</p>
+                    <p className="text-xs text-slate-500 dark:text-zinc-500 mt-1 flex items-center gap-1">
                       {locked > 0 ? (
-                        <><Clock className="w-3 h-3 text-amber-400" /> {fmt(locked)} đang rút</>
+                        <><Clock className="w-3 h-3 text-amber-500" /> {fmt(locked)} đang rút</>
                       ) : (
                         'Tiền chuyển khoản có thể rút'
                       )}
@@ -260,27 +260,27 @@ export default function WalletPage() {
                   </div>
 
                   {/* Cash Balance */}
-                  <div className="p-5 rounded-2xl bg-zinc-900/80 border border-zinc-800">
+                  <div className="p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-sm">
                     <div className="flex items-center gap-2 mb-3">
-                      <div className="w-8 h-8 rounded-lg bg-zinc-500/20 flex items-center justify-center">
-                        <Building2 className="w-4 h-4 text-zinc-400" />
+                      <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-zinc-800 flex items-center justify-center">
+                        <Building2 className="w-4 h-4 text-slate-500 dark:text-zinc-400" />
                       </div>
-                      <span className="text-xs font-bold uppercase tracking-wider text-zinc-500">Tiền mặt thu trực tiếp</span>
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">Tiền mặt thu trực tiếp</span>
                     </div>
-                    <p className="text-2xl font-black text-white">{fmt(cash)}</p>
-                    <p className="text-xs text-zinc-500 mt-1">Không rút qua hệ thống</p>
+                    <p className="text-2xl font-black text-slate-900 dark:text-white">{fmt(cash)}</p>
+                    <p className="text-xs text-slate-500 dark:text-zinc-500 mt-1">Không rút qua hệ thống</p>
                   </div>
 
                   {/* Lifetime */}
-                  <div className="p-5 rounded-2xl bg-zinc-900/80 border border-zinc-800">
+                  <div className="p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-sm">
                     <div className="flex items-center gap-2 mb-3">
-                      <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-                        <TrendingUp className="w-4 h-4 text-emerald-400" />
+                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 dark:bg-emerald-500/20 flex items-center justify-center">
+                        <TrendingUp className="w-4 h-4 text-emerald-550 dark:text-emerald-400" />
                       </div>
-                      <span className="text-xs font-bold uppercase tracking-wider text-zinc-500">Tổng doanh thu</span>
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">Tổng doanh thu</span>
                     </div>
-                    <p className="text-2xl font-black text-white">{fmt(lifetime)}</p>
-                    <p className="text-xs text-zinc-500 mt-1">Cộng dồn tất cả</p>
+                    <p className="text-2xl font-black text-slate-900 dark:text-white">{fmt(lifetime)}</p>
+                    <p className="text-xs text-slate-500 dark:text-zinc-500 mt-1">Cộng dồn tất cả</p>
                   </div>
 
                   {/* Withdraw CTA */}
@@ -289,34 +289,34 @@ export default function WalletPage() {
                     className={`p-5 rounded-2xl border flex flex-col justify-between cursor-pointer transition-all ${
                       available >= 10000
                         ? 'bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/20'
-                        : 'bg-zinc-900/40 border-zinc-800 opacity-50 cursor-not-allowed'
+                        : 'bg-slate-100/40 dark:bg-zinc-900/40 border-slate-200 dark:border-zinc-800/80 opacity-50 cursor-not-allowed'
                     }`}
                   >
                     <div className="flex items-center gap-2 mb-3">
                       <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
-                        <ArrowDownToLine className="w-4 h-4 text-amber-400" />
+                        <ArrowDownToLine className="w-4 h-4 text-amber-500" />
                       </div>
-                      <span className="text-xs font-bold uppercase tracking-wider text-amber-400/70">Yêu cầu rút</span>
+                      <span className="text-xs font-bold uppercase tracking-wider text-amber-500/80">Yêu cầu rút</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <p className="text-sm font-bold text-white">
+                      <p className="text-sm font-bold text-slate-800 dark:text-white">
                         {available >= 10000 ? 'Rút về tài khoản' : 'Tối thiểu 10.000đ'}
                       </p>
-                      <ChevronRight className="w-4 h-4 text-amber-400" />
+                      <ChevronRight className="w-4 h-4 text-amber-500" />
                     </div>
                   </div>
                 </div>
 
                 {/* Tabs */}
-                <div className="flex gap-1 p-1 bg-zinc-900/80 rounded-xl border border-zinc-800 w-fit">
+                <div className="flex gap-1 p-1 bg-slate-100 dark:bg-zinc-900/80 rounded-xl border border-slate-200 dark:border-zinc-800 w-fit">
                   {(['transactions', 'withdrawals'] as const).map((tab) => (
                     <button
                       key={tab}
                       onClick={() => setActiveTab(tab)}
                       className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
                         activeTab === tab
-                          ? 'bg-amber-500 text-zinc-950'
-                          : 'text-zinc-400 hover:text-white'
+                          ? 'bg-amber-500 text-zinc-950 shadow-sm'
+                          : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-white'
                       }`}
                     >
                       {tab === 'transactions' ? 'Lịch sử giao dịch' : 'Yêu cầu rút tiền'}
@@ -326,31 +326,31 @@ export default function WalletPage() {
 
                 {/* Transaction List */}
                 {activeTab === 'transactions' && (
-                  <div className="rounded-2xl bg-zinc-900/80 border border-zinc-800 overflow-hidden">
+                  <div className="rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 overflow-hidden shadow-sm">
                     {(!data?.transactions || data.transactions.length === 0) ? (
-                      <div className="py-16 flex flex-col items-center gap-3 text-zinc-500">
+                      <div className="py-16 flex flex-col items-center gap-3 text-slate-400 dark:text-zinc-550">
                         <TrendingUp className="w-8 h-8 opacity-30" />
-                        <p className="text-sm">Chưa có giao dịch nào</p>
+                        <p className="text-sm font-semibold">Chưa có giao dịch nào</p>
                         <p className="text-xs">Khi khách hàng thanh toán QR, doanh thu sẽ xuất hiện ở đây</p>
                       </div>
                     ) : (
                       <table className="w-full text-sm">
                         <thead>
-                          <tr className="border-b border-zinc-800">
-                            <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-zinc-500">Loại</th>
-                            <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-zinc-500">Mô tả</th>
-                            <th className="text-right px-4 py-3 text-xs font-bold uppercase tracking-wider text-zinc-500">Số tiền</th>
-                            <th className="text-right px-4 py-3 text-xs font-bold uppercase tracking-wider text-zinc-500">Thời gian</th>
+                          <tr className="border-b border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-850">
+                            <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">Loại</th>
+                            <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">Mô tả</th>
+                            <th className="text-right px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">Số tiền</th>
+                            <th className="text-right px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">Thời gian</th>
                           </tr>
                         </thead>
-                        <tbody>
+                        <tbody className="divide-y divide-slate-100 dark:divide-zinc-850">
                           {data.transactions.map((tx) => (
-                            <tr key={tx.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors">
+                            <tr key={tx.id} className="hover:bg-slate-50/50 dark:hover:bg-zinc-800/30 transition-colors">
                               <td className="px-4 py-3">
                                 <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2 py-0.5 rounded-md border ${
                                   tx.type === 'ORDER_REVENUE'
-                                    ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20'
-                                    : 'text-red-400 bg-red-400/10 border-red-400/20'
+                                    ? 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20'
+                                    : 'text-red-500 bg-red-500/10 border-red-500/20'
                                 }`}>
                                   {tx.type === 'ORDER_REVENUE' ? (
                                     <><CheckCircle2 className="w-3 h-3" /> Doanh thu</>
@@ -359,13 +359,13 @@ export default function WalletPage() {
                                   )}
                                 </span>
                               </td>
-                              <td className="px-4 py-3 text-zinc-300">{tx.description}</td>
+                              <td className="px-4 py-3 text-slate-700 dark:text-zinc-300">{tx.description}</td>
                               <td className={`px-4 py-3 text-right font-bold font-mono ${
-                                tx.type === 'ORDER_REVENUE' ? 'text-emerald-400' : 'text-red-400'
+                                tx.type === 'ORDER_REVENUE' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-650 dark:text-red-400'
                               }`}>
                                 {tx.type === 'ORDER_REVENUE' ? '+' : '-'}{fmt(tx.amount)}
                               </td>
-                              <td className="px-4 py-3 text-right text-zinc-500 text-xs">
+                              <td className="px-4 py-3 text-right text-slate-400 dark:text-zinc-500 text-xs">
                                 {new Date(tx.createdAt).toLocaleString('vi-VN')}
                               </td>
                             </tr>
@@ -378,41 +378,41 @@ export default function WalletPage() {
 
                 {/* Withdrawal History */}
                 {activeTab === 'withdrawals' && (
-                  <div className="rounded-2xl bg-zinc-900/80 border border-zinc-800 overflow-hidden">
+                  <div className="rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 overflow-hidden shadow-sm">
                     {(!data?.pendingWithdrawals || data.pendingWithdrawals.length === 0) ? (
-                      <div className="py-16 flex flex-col items-center gap-3 text-zinc-500">
+                      <div className="py-16 flex flex-col items-center gap-3 text-slate-400 dark:text-zinc-550">
                         <ArrowDownToLine className="w-8 h-8 opacity-30" />
-                        <p className="text-sm">Chưa có yêu cầu rút tiền nào</p>
+                        <p className="text-sm font-semibold">Chưa có yêu cầu rút tiền nào</p>
                       </div>
                     ) : (
                       <table className="w-full text-sm">
                         <thead>
-                          <tr className="border-b border-zinc-800">
-                            <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-zinc-500">Tài khoản</th>
-                            <th className="text-right px-4 py-3 text-xs font-bold uppercase tracking-wider text-zinc-500">Số tiền</th>
-                            <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-zinc-500">Trạng thái</th>
-                            <th className="text-right px-4 py-3 text-xs font-bold uppercase tracking-wider text-zinc-500">Ngày tạo</th>
+                          <tr className="border-b border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-850">
+                            <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">Tài khoản</th>
+                            <th className="text-right px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">Số tiền</th>
+                            <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">Trạng thái</th>
+                            <th className="text-right px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">Ngày tạo</th>
                           </tr>
                         </thead>
-                        <tbody>
+                        <tbody className="divide-y divide-slate-100 dark:divide-zinc-850">
                           {data.pendingWithdrawals.map((w) => (
-                            <tr key={w.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
+                            <tr key={w.id} className="hover:bg-slate-50/50 dark:hover:bg-zinc-800/30 transition-colors">
                               <td className="px-4 py-3">
                                 <div className="flex items-center gap-2">
-                                  <Building2 className="w-4 h-4 text-zinc-500" />
+                                  <Building2 className="w-4 h-4 text-slate-400 dark:text-zinc-500" />
                                   <div>
-                                    <p className="font-bold text-white">{w.accountNumber}</p>
-                                    <p className="text-xs text-zinc-400">{w.bankCode} · {w.accountName}</p>
+                                    <p className="font-bold text-slate-800 dark:text-white">{w.accountNumber}</p>
+                                    <p className="text-xs text-slate-500 dark:text-zinc-400">{w.bankCode} · {w.accountName}</p>
                                   </div>
                                 </div>
                               </td>
-                              <td className="px-4 py-3 text-right font-black text-white font-mono">{fmt(w.amount)}</td>
+                              <td className="px-4 py-3 text-right font-black text-slate-800 dark:text-white font-mono">{fmt(w.amount)}</td>
                               <td className="px-4 py-3">
                                 <span className={`text-xs font-bold px-2 py-0.5 rounded-md border ${statusConfig[w.status]?.color}`}>
                                   {statusConfig[w.status]?.label}
                                 </span>
                               </td>
-                              <td className="px-4 py-3 text-right text-zinc-500 text-xs">
+                              <td className="px-4 py-3 text-right text-slate-400 dark:text-zinc-500 text-xs">
                                 {new Date(w.createdAt).toLocaleDateString('vi-VN')}
                               </td>
                             </tr>
