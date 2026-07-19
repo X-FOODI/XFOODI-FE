@@ -28,7 +28,9 @@ import {
   Wallet,
   Palette,
   Play,
-  ChevronLeft
+  ChevronLeft,
+  Ticket,
+  TicketPercent
 } from "lucide-react";
 
 interface NavItem {
@@ -156,6 +158,12 @@ export default function DashboardSidebar({
           icon: <CreditCard className="dashboard-sidebar-item-icon" size={20} strokeWidth={2} />,
         },
         {
+          id: "vouchers",
+          label: "Quản lý Voucher",
+          path: "/admin/vouchers",
+          icon: <TicketPercent className="dashboard-sidebar-item-icon" size={20} strokeWidth={2} />,
+        },
+        {
           id: "knowledge-base",
           label: "Cài đặt AI chatbox",
           path: "/admin/knowledge-base",
@@ -268,6 +276,12 @@ export default function DashboardSidebar({
           label: "Nguyên liệu",
           path: "/restaurant/ingredients",
           icon: <Package className="dashboard-sidebar-item-icon" size={20} strokeWidth={2} />,
+        },
+        {
+          id: "vouchers",
+          label: "Voucher",
+          path: "/restaurant/vouchers",
+          icon: <Ticket className="dashboard-sidebar-item-icon" size={20} strokeWidth={2} />,
         },
       ],
     },
