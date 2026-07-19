@@ -192,6 +192,12 @@ export default function DashboardSidebar({
           path: "/admin/security",
           icon: <ShieldCheck className="dashboard-sidebar-item-icon" size={20} strokeWidth={2} />,
         },
+        {
+          id: "audit-logs",
+          label: "Nhật ký hệ thống",
+          path: "/admin/audit-logs",
+          icon: <History className="dashboard-sidebar-item-icon" size={20} strokeWidth={2} />,
+        },
       ],
     },
   ];
