@@ -76,7 +76,7 @@ export function middleware(req: NextRequest) {
   // ── Auth token check (read cookie set by authService on login) ──
   const accessToken = req.cookies.get('accessToken')?.value;
   const hasAuthToken = !!accessToken;
-  
+
   const adminAccessToken = req.cookies.get('adminAccessToken')?.value;
   const hasAdminAuthToken = !!adminAccessToken;
 
@@ -121,7 +121,7 @@ export function middleware(req: NextRequest) {
     if (pathname === '/') {
       return NextResponse.redirect(new URL('/admin/dashboard', req.url));
     }
-    
+
     return NextResponse.next();
   }
 
@@ -143,7 +143,8 @@ export function middleware(req: NextRequest) {
       !LANDING_DOMAINS.has(host) &&
       host !== ADMIN_DOMAIN) ||
     (host.includes('.localhost') &&
-      hostWithoutPort !== 'admin.localhost');
+      hostWithoutPort !== 'admin.localhost' &&
+      hostWithoutPort !== 'localhost');
 
   if (isTenantDomain) {
     // Block admin tenants routes on tenant domains

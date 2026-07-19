@@ -1,16 +1,17 @@
 "use client";
 
 import React from "react";
-import { Plus, Sparkles, Flame, Loader2 } from "lucide-react";
+import { Plus, Sparkles, Flame } from "lucide-react";
 import { formatVND } from "@/lib/utils/currency";
 import {
   fetchFrequentlyBought,
   fetchMenuRecommendations,
+  fetchTopSellers,
   type RecommendedDish,
 } from "@/lib/services/recommendationApi";
 
 interface RecommendationsProps {
-  variant: "frequently-bought" | "for-cart";
+  variant: "frequently-bought" | "for-cart" | "top-sellers";
   restaurantId: string;
   dishId?: string;
   cartDishIds?: string[];
@@ -47,12 +48,10 @@ export default function Recommendations({
             return;
           }
           data = await fetchFrequentlyBought(restaurantId, dishId);
+        } else if (variant === "top-sellers") {
+          data = await fetchTopSellers(restaurantId);
         } else {
-          if (!cartDishIds || cartDishIds.length === 0) {
-            setItems([]);
-            return;
-          }
-          data = await fetchMenuRecommendations(restaurantId, cartDishIds);
+          data = await fetchMenuRecommendations(restaurantId, cartDishIds ?? []);
         }
         const exclude = new Set(excludeIds ?? []);
         if (!cancelled) setItems(data.filter((d) => !exclude.has(d.id)));
@@ -82,17 +81,31 @@ export default function Recommendations({
   if (!loading && items.length === 0) return null;
 
   const isCart = variant === "for-cart";
-  const title = isCart ? "Gợi ý cho bạn" : "Thường được gọi kèm";
-  const Icon = isCart ? Sparkles : Flame;
+  const isTopSellers = variant === "top-sellers";
+  const title = isCart
+    ? "Gợi ý cho bạn"
+    : isTopSellers
+    ? "Bán chạy & Dành cho bạn"
+    : "Thường được gọi kèm";
+  const Icon = isCart || isTopSellers ? Sparkles : Flame;
+  const iconColor = isCart
+    ? "text-amber-500"
+    : isTopSellers
+    ? "text-purple-500"
+    : "text-orange-500";
+  const badge = isCart ? "AI" : isTopSellers ? "AI" : null;
+  const badgeClass = isTopSellers
+    ? "text-purple-600 bg-purple-100 dark:text-purple-300 dark:bg-purple-500/20"
+    : "text-amber-600 bg-amber-100 dark:text-amber-300 dark:bg-amber-500/20";
 
   return (
     <div className="space-y-2.5">
       <div className="flex items-center gap-2">
-        <Icon className={`w-4 h-4 ${isCart ? "text-amber-400" : "text-orange-500"}`} />
-        <h3 className="text-sm font-bold text-white">{title}</h3>
-        {isCart && (
-          <span className="text-[9px] uppercase font-bold tracking-wider text-amber-400 px-1.5 py-0.5 bg-amber-500/10 rounded">
-            AI
+        <Icon className={`w-4 h-4 ${iconColor}`} />
+        <h3 className="text-sm font-bold text-[var(--text)]">{title}</h3>
+        {badge && (
+          <span className={`text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded ${badgeClass}`}>
+            {badge}
           </span>
         )}
       </div>
@@ -102,7 +115,7 @@ export default function Recommendations({
           {[0, 1, 2].map((i) => (
             <div
               key={i}
-              className="w-36 h-40 rounded-2xl bg-zinc-900/60 border border-zinc-850 animate-pulse shrink-0"
+              className="w-36 h-44 rounded-2xl bg-[var(--surface)] border border-[var(--border)] animate-pulse shrink-0"
             />
           ))}
         </div>
@@ -111,9 +124,10 @@ export default function Recommendations({
           {items.map((dish) => (
             <div
               key={dish.id}
-              className="w-36 shrink-0 snap-start rounded-2xl bg-zinc-900/70 border border-zinc-850 overflow-hidden flex flex-col"
+              className="w-36 shrink-0 snap-start rounded-2xl bg-[var(--card)] border border-[var(--border)] overflow-hidden flex flex-col shadow-sm hover:shadow-md transition-shadow"
             >
-              <div className="h-20 bg-zinc-950 relative">
+              {/* Ảnh món */}
+              <div className="h-20 bg-[var(--surface)] relative">
                 {dish.imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={dish.imageUrl} alt={dish.name} className="w-full h-full object-cover" />
@@ -121,50 +135,56 @@ export default function Recommendations({
                   <div className="w-full h-full flex items-center justify-center text-2xl">🍽️</div>
                 )}
               </div>
+
+              {/* Nội dung */}
               <div className="p-2.5 flex flex-col flex-1 gap-1">
-                <p className="text-xs font-semibold text-zinc-100 leading-tight line-clamp-2">
+                <p className="text-xs font-semibold text-[var(--text)] leading-tight line-clamp-2">
                   {dish.name}
                 </p>
                 {dish.reason && (
-                  <p className="text-[10px] text-amber-400/80 italic leading-tight line-clamp-2">
+                  <p className="text-[10px] text-amber-500 italic leading-tight line-clamp-2">
                     {dish.reason}
                   </p>
                 )}
+
+                {/* Flavor Match Matrix */}
                 {dish.flavors && (
-                  <div className="py-1 mt-1 border-t border-zinc-800/60 space-y-1">
-                    <div className="grid grid-cols-2 gap-x-1.5 gap-y-1 text-[8px] text-zinc-400 font-medium">
+                  <div className="py-1 mt-1 border-t border-[var(--border)] space-y-1">
+                    <div className="grid grid-cols-2 gap-x-1.5 gap-y-1 text-[8px] text-[var(--text-muted)] font-medium">
                       <div className="flex items-center gap-1">
                         <span title="Ngọt">🍭</span>
-                        <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                        <div className="flex-1 h-1 bg-[var(--border)] rounded-full overflow-hidden">
                           <div className="h-full bg-pink-500 rounded-full" style={{ width: `${(dish.flavors.sweet / 5) * 100}%` }} />
                         </div>
                       </div>
                       <div className="flex items-center gap-1">
                         <span title="Cay">🔥</span>
-                        <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                        <div className="flex-1 h-1 bg-[var(--border)] rounded-full overflow-hidden">
                           <div className="h-full bg-red-500 rounded-full" style={{ width: `${(dish.flavors.spicy / 5) * 100}%` }} />
                         </div>
                       </div>
                       <div className="flex items-center gap-1">
                         <span title="Đậm đà">🍲</span>
-                        <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                        <div className="flex-1 h-1 bg-[var(--border)] rounded-full overflow-hidden">
                           <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${(dish.flavors.savory / 5) * 100}%` }} />
                         </div>
                       </div>
                       <div className="flex items-center gap-1">
                         <span title="Cồn">🍺</span>
-                        <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                        <div className="flex-1 h-1 bg-[var(--border)] rounded-full overflow-hidden">
                           <div className="h-full bg-amber-500 rounded-full" style={{ width: `${(dish.flavors.alcohol / 5) * 100}%` }} />
                         </div>
                       </div>
                     </div>
                   </div>
                 )}
-                <div className="mt-auto flex items-center justify-between gap-1 pt-1.5 border-t border-zinc-800/20">
-                  <span className="text-xs font-bold text-amber-400">{formatVND(dish.price)}</span>
+
+                {/* Giá & Nút thêm */}
+                <div className="mt-auto flex items-center justify-between gap-1 pt-1.5 border-t border-[var(--border)]">
+                  <span className="text-xs font-bold text-[var(--primary)]">{formatVND(dish.price)}</span>
                   <button
                     onClick={() => onAdd(dish.id)}
-                    className="w-6 h-6 rounded-lg bg-amber-500 text-black flex items-center justify-center hover:bg-amber-400 active:scale-90 transition-all shrink-0"
+                    className="w-6 h-6 rounded-lg bg-[var(--primary)] text-white flex items-center justify-center hover:opacity-80 active:scale-90 transition-all shrink-0"
                     aria-label="Thêm vào giỏ"
                   >
                     <Plus className="w-3.5 h-3.5" strokeWidth={3} />

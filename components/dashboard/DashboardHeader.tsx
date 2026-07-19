@@ -8,6 +8,7 @@ import axiosInstance from "../../lib/services/axiosInstance";
 import { useTenant } from "@/lib/contexts/TenantContext";
 import { Home, User, Settings, Moon, Sun, Bell, ChevronDown, LogOut, Utensils } from "lucide-react";
 import { useThemeMode } from "@/app/theme/AntdProvider";
+import SystemAnnouncementBanner from "./SystemAnnouncementBanner";
 
 interface DashboardHeaderProps {
   role: "admin" | "restaurant";
@@ -34,6 +35,17 @@ export default function DashboardHeader({
   const [pendingReservationsCount, setPendingReservationsCount] = useState(0);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
+
+  // Thông báo hệ thống (broadcast) hiển thị trong dropdown chuông
+  const [announcements, setAnnouncements] = useState<Array<{ id: string; title: string; content: string; level: string; createdAt: string }>>([]);
+  useEffect(() => {
+    let cancelled = false;
+    axiosInstance
+      .get("/announcements/active")
+      .then((res) => { if (!cancelled) setAnnouncements(res.data?.data || []); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   // Resolve user from auth if props not passed (with hydration-safe state)
   const [resolvedName, setResolvedName] = useState(userName || "User");
@@ -178,6 +190,7 @@ export default function DashboardHeader({
   ];
 
   return (
+    <>
     <header
       style={{
         position: "sticky",
@@ -354,7 +367,7 @@ export default function DashboardHeader({
             }}
           >
             <Bell size={17} />
-            {(activeOrdersCount > 0 || pendingReservationsCount > 0) && (
+            {(activeOrdersCount > 0 || pendingReservationsCount > 0 || announcements.length > 0) && (
               <span
                 style={{
                   position: "absolute",
@@ -373,7 +386,7 @@ export default function DashboardHeader({
                   boxShadow: "0 0 4px rgba(239,68,68,0.5)",
                 }}
               >
-                {(activeOrdersCount > 0 ? 1 : 0) + (pendingReservationsCount > 0 ? 1 : 0)}
+                {(activeOrdersCount > 0 ? 1 : 0) + (pendingReservationsCount > 0 ? 1 : 0) + announcements.length}
               </span>
             )}
           </button>
@@ -407,12 +420,32 @@ export default function DashboardHeader({
                 Thông báo mới
               </div>
               <div style={{ padding: "8px" }}>
-                {activeOrdersCount === 0 && pendingReservationsCount === 0 ? (
+                {activeOrdersCount === 0 && pendingReservationsCount === 0 && announcements.length === 0 ? (
                   <div style={{ padding: "16px 12px", textAlign: "center", color: "var(--text-muted)", fontSize: "13px" }}>
                     Không có thông báo mới nào
                   </div>
                 ) : (
                   <>
+                    {announcements.map((a) => {
+                      const dot = a.level === "CRITICAL" ? "#dc2626" : a.level === "WARNING" ? "#ea580c" : "#2563eb";
+                      return (
+                        <div
+                          key={a.id}
+                          style={{
+                            display: "flex", flexDirection: "column", gap: "4px",
+                            padding: "10px 12px", borderRadius: "10px", fontSize: "13px",
+                            borderBottom: "1px solid var(--border)",
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: dot }}></span>
+                            <strong style={{ color: "var(--text)" }}>{a.title}</strong>
+                          </div>
+                          <span style={{ color: "var(--text-muted)", paddingLeft: "14px" }}>{a.content}</span>
+                        </div>
+                      );
+                    })}
+
                     {pendingReservationsCount > 0 && (
                       <Link
                         href="/restaurant/reservations"
@@ -703,5 +736,7 @@ export default function DashboardHeader({
         </div>
       </div>
     </header>
+    <SystemAnnouncementBanner />
+    </>
   );
 }

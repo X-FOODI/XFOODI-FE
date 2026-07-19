@@ -18,6 +18,7 @@ import {
   UserCheck,
   Settings,
   ShieldCheck,
+  ShieldAlert,
   Calendar,
   History,
   ChefHat,
@@ -28,7 +29,10 @@ import {
   Wallet,
   Palette,
   Play,
-  ChevronLeft
+  ChevronLeft,
+  Ticket,
+  TicketPercent,
+  Megaphone
 } from "lucide-react";
 
 interface NavItem {
@@ -156,6 +160,12 @@ export default function DashboardSidebar({
           icon: <CreditCard className="dashboard-sidebar-item-icon" size={20} strokeWidth={2} />,
         },
         {
+          id: "vouchers",
+          label: "Quản lý Voucher",
+          path: "/admin/vouchers",
+          icon: <TicketPercent className="dashboard-sidebar-item-icon" size={20} strokeWidth={2} />,
+        },
+        {
           id: "knowledge-base",
           label: "Cài đặt AI chatbox",
           path: "/admin/knowledge-base",
@@ -183,6 +193,24 @@ export default function DashboardSidebar({
           label: "Bảo mật 2FA",
           path: "/admin/security",
           icon: <ShieldCheck className="dashboard-sidebar-item-icon" size={20} strokeWidth={2} />,
+        },
+        {
+          id: "security-monitor",
+          label: "Giám sát bảo mật",
+          path: "/admin/security-monitor",
+          icon: <ShieldAlert className="dashboard-sidebar-item-icon" size={20} strokeWidth={2} />,
+        },
+        {
+          id: "announcements",
+          label: "Thông báo hệ thống",
+          path: "/admin/announcements",
+          icon: <Megaphone className="dashboard-sidebar-item-icon" size={20} strokeWidth={2} />,
+        },
+        {
+          id: "audit-logs",
+          label: "Nhật ký hệ thống",
+          path: "/admin/audit-logs",
+          icon: <History className="dashboard-sidebar-item-icon" size={20} strokeWidth={2} />,
         },
       ],
     },
@@ -268,6 +296,12 @@ export default function DashboardSidebar({
           label: "Nguyên liệu",
           path: "/restaurant/ingredients",
           icon: <Package className="dashboard-sidebar-item-icon" size={20} strokeWidth={2} />,
+        },
+        {
+          id: "vouchers",
+          label: "Voucher",
+          path: "/restaurant/vouchers",
+          icon: <Ticket className="dashboard-sidebar-item-icon" size={20} strokeWidth={2} />,
         },
       ],
     },

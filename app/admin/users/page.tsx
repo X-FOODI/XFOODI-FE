@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/contexts/AuthContext";
 import axiosInstance from "@/lib/services/axiosInstance";
-import { Modal, Switch, message, Spin, Input, Tag } from "antd";
+import { App, Modal, Switch, Spin, Input, Tag, Button, Popconfirm } from "antd";
 import { ExclamationCircleOutlined, SearchOutlined } from "@ant-design/icons";
 
 interface SystemUser {
@@ -12,12 +12,14 @@ interface SystemUser {
   fullName: string | null;
   phoneNumber: string | null;
   avatarUrl: string | null;
-  status: boolean; // mapped from ACTIVE/BANNED
+  status: 'ACTIVE' | 'DISABLED';
+  disabledReason: string | null;
   createdAt: string;
   roles: string[];
 }
 
 export default function AdminUsersPage() {
+  const { message } = App.useApp();
   const { user } = useAuth();
   const [users, setUsers] = useState<SystemUser[]>([]);
   const [total, setTotal] = useState(0);
@@ -30,13 +32,13 @@ export default function AdminUsersPage() {
   const [confirmModal, setConfirmModal] = useState<{
     visible: boolean;
     sysUser: SystemUser | null;
-    nextState: boolean;
     loading: boolean;
+    reason: string;
   }>({
     visible: false,
     sysUser: null,
-    nextState: false,
     loading: false,
+    reason: "",
   });
 
   useEffect(() => {
@@ -73,28 +75,58 @@ export default function AdminUsersPage() {
       setConfirmModal({
         visible: true,
         sysUser,
-        nextState: false,
         loading: false,
+        reason: "",
       });
     } else {
-      updateStatus(sysUser.id, true);
+      enableUser(sysUser.id);
     }
   };
 
-  const updateStatus = async (id: string, isActive: boolean) => {
+  const disableUser = async (id: string, reason: string) => {
     try {
-      if (!isActive) setConfirmModal(prev => ({ ...prev, loading: true }));
-      
-      const res = await axiosInstance.patch(`/users/admin/${id}/status`, { isActive });
+      setConfirmModal(prev => ({ ...prev, loading: true }));
+      const res = await axiosInstance.patch(`/admin/users/${id}/disable`, { reason });
       if (res.data?.success) {
         message.success(res.data.message);
-        setUsers(prev => prev.map(u => u.id === id ? { ...u, status: isActive } : u));
-        setConfirmModal({ visible: false, sysUser: null, nextState: false, loading: false });
+        if (res.data.data?.emailSent === false && res.data.data?.emailWarning) {
+          message.warning(res.data.data.emailWarning, 8);
+        }
+        setUsers(prev => prev.map(u => u.id === id ? { ...u, status: 'DISABLED', disabledReason: reason } : u));
+        setConfirmModal({ visible: false, sysUser: null, loading: false, reason: "" });
       }
     } catch (err: any) {
       console.error(err);
-      message.error(err.response?.data?.message || "Lỗi khi cập nhật trạng thái");
-      if (!isActive) setConfirmModal(prev => ({ ...prev, loading: false }));
+      message.error(err.response?.data?.message || "Lỗi khi vô hiệu hóa");
+      setConfirmModal(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  const enableUser = async (id: string) => {
+    try {
+      const res = await axiosInstance.patch(`/admin/users/${id}/enable`);
+      if (res.data?.success) {
+        message.success(res.data.message);
+        setUsers(prev => prev.map(u => u.id === id ? { ...u, status: 'ACTIVE', disabledReason: null } : u));
+      }
+    } catch (err: any) {
+      console.error(err);
+      message.error(err.response?.data?.message || "Lỗi khi kích hoạt lại");
+    }
+  };
+
+  const toggleAdminRole = async (u: SystemUser) => {
+    const isAdmin = u.roles.includes("Admin");
+    try {
+      const res = await axiosInstance.patch(`/admin/users/${u.id}/admin-role`, { grant: !isAdmin });
+      if (res.data?.success) {
+        message.success(res.data.message);
+        setUsers(prev => prev.map(x => x.id === u.id
+          ? { ...x, roles: isAdmin ? x.roles.filter(r => r !== "Admin") : [...x.roles, "Admin"] }
+          : x));
+      }
+    } catch (err: any) {
+      message.error(err.response?.data?.message || "Lỗi khi cập nhật quyền");
     }
   };
 
@@ -181,10 +213,27 @@ export default function AdminUsersPage() {
                       <p className="text-sm" style={{ color: "var(--text)" }}>{u.phoneNumber || "—"}</p>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-1">
+                      <div className="flex flex-wrap items-center gap-1">
                         {u.roles.length > 0 ? u.roles.map(role => (
                           <Tag color={getRoleColor(role)} key={role}>{role}</Tag>
                         )) : <span className="text-xs text-gray-400">Không có</span>}
+                        <Popconfirm
+                          title={u.roles.includes("Admin") ? "Thu hồi quyền Admin?" : "Cấp quyền Admin cho người dùng này?"}
+                          okText="Xác nhận"
+                          cancelText="Hủy"
+                          onConfirm={() => toggleAdminRole(u)}
+                          disabled={u.id === user?.id && u.roles.includes("Admin")}
+                        >
+                          <Button
+                            size="small"
+                            type="link"
+                            danger={u.roles.includes("Admin")}
+                            disabled={u.id === user?.id && u.roles.includes("Admin")}
+                            style={{ padding: "0 4px", fontSize: 12 }}
+                          >
+                            {u.roles.includes("Admin") ? "− Admin" : "+ Admin"}
+                          </Button>
+                        </Popconfirm>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-center text-sm" style={{ color: "var(--text-muted)" }}>
@@ -192,11 +241,16 @@ export default function AdminUsersPage() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <Switch
-                        checked={u.status}
+                        checked={u.status === 'ACTIVE'}
                         onChange={(checked) => handleToggleClick(checked, u)}
-                        style={{ background: u.status ? "var(--primary)" : "var(--border)" }}
+                        style={{ background: u.status === 'ACTIVE' ? "var(--primary)" : "var(--border)" }}
                         disabled={u.id === user?.id} // Cannot disable self
                       />
+                      {u.status === 'DISABLED' && u.disabledReason && (
+                        <div className="text-xs text-red-500 mt-1 max-w-[150px] truncate ml-auto" title={u.disabledReason}>
+                          {u.disabledReason}
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -233,10 +287,19 @@ export default function AdminUsersPage() {
           </div>
         }
         open={confirmModal.visible}
-        onCancel={() => !confirmModal.loading && setConfirmModal({ visible: false, sysUser: null, nextState: false, loading: false })}
+        onCancel={() => !confirmModal.loading && setConfirmModal({ visible: false, sysUser: null, loading: false, reason: "" })}
         onOk={() => {
           if (confirmModal.sysUser) {
-            updateStatus(confirmModal.sysUser.id, false);
+            const reason = confirmModal.reason.trim();
+            if (!reason) {
+              message.error("Vui lòng nhập lý do khóa");
+              return;
+            }
+            if (reason.length < 10 || reason.length > 500) {
+              message.error("Lý do khóa phải từ 10 đến 500 ký tự");
+              return;
+            }
+            disableUser(confirmModal.sysUser.id, reason);
           }
         }}
         okText="Khóa tài khoản"
@@ -245,7 +308,16 @@ export default function AdminUsersPage() {
         cancelButtonProps={{ disabled: confirmModal.loading }}
       >
         <p>Bạn có chắc chắn muốn khóa tài khoản <strong>{confirmModal.sysUser?.fullName || confirmModal.sysUser?.email}</strong>?</p>
-        <p className="text-sm text-gray-500 mt-2">
+        <div className="mt-4">
+          <label className="block text-sm font-medium mb-1">Lý do khóa tài khoản <span className="text-red-500">*</span></label>
+          <Input.TextArea
+            rows={3}
+            value={confirmModal.reason}
+            onChange={(e) => setConfirmModal(prev => ({ ...prev, reason: e.target.value }))}
+            placeholder="Nhập lý do để thông báo qua email..."
+          />
+        </div>
+        <p className="text-sm text-gray-500 mt-4">
           Khi bị khóa, người dùng sẽ bị đăng xuất khỏi tất cả các thiết bị và không thể đăng nhập lại vào bất kỳ nhà hàng nào trên nền tảng.
         </p>
       </Modal>

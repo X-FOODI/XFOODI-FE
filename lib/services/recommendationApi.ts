@@ -38,3 +38,17 @@ export async function fetchMenuRecommendations(
   });
   return res.data?.success ? res.data.data : [];
 }
+
+/**
+ * "Món bán chạy & theo thói quen" — gọi với giỏ trống để backend
+ * trả về top sellers + phân tích thói quen người dùng qua Gemini.
+ */
+export async function fetchTopSellers(
+  restaurantId: string
+): Promise<RecommendedDish[]> {
+  const res = await axiosInstance.post("/ai/recommendations/menu", {
+    restaurantId,
+    cartDishIds: [],
+  });
+  return res.data?.success ? res.data.data : [];
+}
