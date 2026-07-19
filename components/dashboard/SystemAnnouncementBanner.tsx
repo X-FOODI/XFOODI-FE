@@ -28,7 +28,11 @@ function getDismissed(): string[] {
   }
 }
 
-export default function SystemAnnouncementBanner() {
+export default function SystemAnnouncementBanner({
+  variant = "inline",
+}: {
+  variant?: "inline" | "floating-bottom";
+}) {
   const [items, setItems] = useState<Announcement[]>([]);
 
   useEffect(() => {
@@ -59,8 +63,25 @@ export default function SystemAnnouncementBanner() {
 
   if (items.length === 0) return null;
 
+  const floating = variant === "floating-bottom";
+
   return (
-    <div className="w-full">
+    <div
+      className="w-full"
+      style={
+        floating
+          ? {
+              position: "fixed",
+              bottom: 0,
+              left: 0,
+              right: 0,
+              zIndex: 60,
+              background: "var(--card)",
+              boxShadow: "0 -4px 16px rgba(0,0,0,0.12)",
+            }
+          : undefined
+      }
+    >
       {items.map((a) => {
         const s = LEVEL_STYLE[a.level] || LEVEL_STYLE.INFO;
         const Icon = s.Icon;
