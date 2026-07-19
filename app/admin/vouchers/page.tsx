@@ -4,8 +4,6 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Plus, RefreshCw, Search, Filter, Lock, Unlock, X } from 'lucide-react';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import DashboardHeader from '@/components/dashboard/DashboardHeader';
-import DashboardSidebar from '@/components/dashboard/DashboardSidebar';
 import VoucherCard from '@/components/vouchers/VoucherCard';
 import voucherService, { Voucher, CreateAdminVoucherPayload } from '@/lib/services/voucherService';
 
@@ -20,10 +18,10 @@ const defaultForm = (): CreateAdminVoucherPayload => ({
   endDate: new Date(Date.now() + 30 * 864e5).toISOString().split('T')[0],
 });
 
-const inputCls = "w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500 transition-colors";
+const inputCls = "w-full bg-[var(--card)] border border-[var(--border)] rounded-xl px-3 py-2.5 text-sm text-[var(--text)] focus:outline-none focus:border-orange-500 transition-colors";
 const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
   <div className="space-y-1">
-    <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">{label}</label>
+    <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">{label}</label>
     {children}
   </div>
 );
@@ -92,26 +90,22 @@ export default function AdminVouchersPage() {
   };
 
   if (!isAuthReady || !user) {
-    return <div className="min-h-screen flex items-center justify-center bg-[#0A0E14]"><RefreshCw className="w-6 h-6 animate-spin text-orange-400" /></div>;
+    return <div className="min-h-[60vh] flex items-center justify-center"><RefreshCw className="w-6 h-6 animate-spin text-orange-400" /></div>;
   }
 
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-[#0A0E14]">
-      <DashboardHeader role="admin" restaurantName="XFOODI Admin" userName={user?.name ?? ''} />
-      <div className="flex flex-1 overflow-hidden">
-        <DashboardSidebar role="admin" restaurantName="XFOODI Admin" userName={user?.name ?? ''} userEmail={user?.email ?? ''} />
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6">
-          <div className="max-w-[1400px] mx-auto space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div className="max-w-[1400px] mx-auto space-y-6">
 
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h1 className="text-2xl font-black text-white">Quản lý Voucher</h1>
-                <p className="text-sm text-zinc-400 mt-0.5">Toàn bộ mã khuyến mãi trên hệ thống.</p>
+                <h1 className="text-2xl font-black" style={{ color: "var(--text)" }}>Quản lý Voucher</h1>
+                <p className="text-sm mt-0.5" style={{ color: "var(--text-muted)" }}>Toàn bộ mã khuyến mãi trên hệ thống.</p>
               </div>
               <div className="flex gap-2">
-                <button onClick={fetchVouchers} className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white transition-colors"><RefreshCw size={16} /></button>
+                <button onClick={fetchVouchers} className="p-2.5 rounded-xl bg-[var(--card)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"><RefreshCw size={16} /></button>
                 {tab === 'platform' && (
                   <button onClick={() => setDialogOpen(true)} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-orange-500 text-gray-900 font-black text-sm hover:bg-orange-400 transition-colors">
                     <Plus size={16} /> Tạo Voucher XFOODI
@@ -121,10 +115,10 @@ export default function AdminVouchersPage() {
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-1 p-1 bg-zinc-900/80 rounded-xl border border-zinc-800 w-fit">
+            <div className="flex gap-1 p-1 bg-[var(--card)]/80 rounded-xl border border-[var(--border)] w-fit">
               {([['owner', `Chủ sân (${ownerVouchers.length})`], ['platform', `XFOODI / Admin (${platformVouchers.length})`]] as const).map(([key, label]) => (
                 <button key={key} onClick={() => setTab(key)}
-                  className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${tab === key ? 'bg-orange-500 text-gray-900' : 'text-zinc-400 hover:text-white'}`}>
+                  className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${tab === key ? 'bg-orange-500 text-gray-900' : 'text-[var(--text-muted)] hover:text-[var(--text)]'}`}>
                   {label}
                 </button>
               ))}
@@ -135,24 +129,24 @@ export default function AdminVouchersPage() {
               <div className="flex items-center gap-2"><Filter size={14} className="text-orange-400" /><span className="text-sm font-bold">Bộ lọc</span></div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="relative sm:col-span-2">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
                   <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Mã, tên chiến dịch…"
-                    className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl pl-9 pr-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-orange-500/50" />
+                    className="w-full bg-[var(--card)]/80 border border-[var(--border)] rounded-xl pl-9 pr-3 py-2 text-sm text-[var(--text)] placeholder-[var(--text-muted)] focus:outline-none focus:border-orange-500/50" />
                 </div>
                 <select value={fStatus} onChange={e => setFStatus(e.target.value as any)}
-                  className="bg-zinc-900/80 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none">
+                  className="bg-[var(--card)]/80 border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-[var(--text)] focus:outline-none">
                   <option value="all">Tất cả trạng thái</option>
                   <option value="active">Hoạt động</option>
                   <option value="disabled">Đã khóa</option>
                 </select>
               </div>
-              <p className="text-xs text-zinc-500">{filtered.length} / {sourceRows.length} mã {tab === 'owner' ? 'chủ sân' : 'XFOODI'}</p>
+              <p className="text-xs text-[var(--text-muted)]">{filtered.length} / {sourceRows.length} mã {tab === 'owner' ? 'chủ sân' : 'XFOODI'}</p>
             </div>
 
             {/* Platform voucher cards preview */}
             {tab === 'platform' && !loading && filtered.filter(v => v.status === 'active').length > 0 && (
               <div>
-                <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-3">Đang hoạt động (preview thẻ)</p>
+                <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-3">Đang hoạt động (preview thẻ)</p>
                 <div className="flex gap-4 overflow-x-auto pb-2" style={{ WebkitOverflowScrolling: 'touch' }}>
                   {filtered.filter(v => v.status === 'active').map(v => (
                     <div key={v._id} className="flex-shrink-0 w-[min(92vw,400px)]">
@@ -168,14 +162,14 @@ export default function AdminVouchersPage() {
               {loading ? (
                 <div className="flex justify-center py-16"><RefreshCw className="w-6 h-6 animate-spin text-orange-400" /></div>
               ) : filtered.length === 0 ? (
-                <div className="text-center py-12 text-zinc-500 font-bold">Chưa có voucher nào.</div>
+                <div className="text-center py-12 text-[var(--text-muted)] font-bold">Chưa có voucher nào.</div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-white/[0.08]">
                         {['Mã Code', 'Phạm vi', 'Giảm giá', 'Lượt dùng', 'Trạng thái', 'Hành động'].map(h => (
-                          <th key={h} className="text-left px-4 py-3 text-[10px] font-black uppercase tracking-wider text-zinc-500">{h}</th>
+                          <th key={h} className="text-left px-4 py-3 text-[10px] font-black uppercase tracking-wider text-[var(--text-muted)]">{h}</th>
                         ))}
                       </tr>
                     </thead>
@@ -184,7 +178,7 @@ export default function AdminVouchersPage() {
                         <tr key={v._id} className="border-b border-white/[0.05] hover:bg-white/[0.02] transition-colors">
                           <td className="px-4 py-3">
                             <p className="font-black text-orange-400 font-mono">{v.code}</p>
-                            <p className="text-xs text-zinc-500">{v.title}</p>
+                            <p className="text-xs text-[var(--text-muted)]">{v.title}</p>
                             <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border mt-1 inline-block ${v.distributionMode === 'private' ? 'text-violet-300 bg-violet-400/10 border-violet-400/20' : 'text-teal-300 bg-teal-400/10 border-teal-400/20'}`}>
                               {v.distributionMode === 'private' ? 'PRIVATE' : 'PUBLIC'}
                             </span>
@@ -194,15 +188,15 @@ export default function AdminVouchersPage() {
                               ? <span className="text-xs font-bold px-2 py-0.5 rounded-lg border text-amber-300 bg-amber-400/10 border-amber-400/20">XFOODI Platform</span>
                               : <div>
                                   <span className="text-xs font-bold px-2 py-0.5 rounded-lg border text-sky-300 bg-sky-400/10 border-sky-400/20">Chủ sân</span>
-                                  {v.venueApplication?.label && <p className="text-[11px] text-zinc-500 mt-0.5">{v.venueApplication.label}</p>}
+                                  {v.venueApplication?.label && <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{v.venueApplication.label}</p>}
                                 </div>
                             }
                           </td>
                           <td className="px-4 py-3">
                             <p className="font-bold text-teal-400">{v.discountType === 'percentage' ? `${v.discountValue}%` : `${(v.discountValue).toLocaleString('vi-VN')} điểm`}</p>
-                            <p className="text-xs text-zinc-500">Từ {(v.minOrderValue ?? 0).toLocaleString('vi-VN')} điểm</p>
+                            <p className="text-xs text-[var(--text-muted)]">Từ {(v.minOrderValue ?? 0).toLocaleString('vi-VN')} điểm</p>
                           </td>
-                          <td className="px-4 py-3 font-mono text-zinc-300">{v.usedCount ?? 0} / {v.usageLimit ?? '∞'}</td>
+                          <td className="px-4 py-3 font-mono text-[var(--text)]">{v.usedCount ?? 0} / {v.usageLimit ?? '∞'}</td>
                           <td className="px-4 py-3">
                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${v.status === 'active' ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' : 'text-red-400 bg-red-400/10 border-red-400/20'}`}>
                               {v.status === 'active' ? 'Hoạt động' : 'Đã khóa'}
@@ -222,16 +216,14 @@ export default function AdminVouchersPage() {
               )}
             </div>
           </div>
-        </main>
-      </div>
 
       {/* ── Create Dialog ── */}
       {dialogOpen && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="w-full max-w-lg bg-[#111620] rounded-3xl border border-white/10 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
-              <h2 className="font-black text-white">Tạo Voucher XFOODI (Platform)</h2>
-              <button onClick={() => setDialogOpen(false)} className="text-zinc-500 hover:text-white"><X size={18} /></button>
+          <div className="w-full max-w-lg bg-[var(--card)] rounded-3xl border border-[var(--border)] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
+              <h2 className="font-black text-[var(--text)]">Tạo Voucher XFOODI (Platform)</h2>
+              <button onClick={() => setDialogOpen(false)} className="text-[var(--text-muted)] hover:text-[var(--text)]"><X size={18} /></button>
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
               <Field label="Mã code *">
@@ -245,7 +237,7 @@ export default function AdminVouchersPage() {
                   {(['public', 'private'] as const).map(m => (
                     <label key={m} className="flex items-center gap-2 cursor-pointer">
                       <input type="radio" checked={form.distributionMode === m} onChange={() => setForm(f => ({...f, distributionMode: m}))} className="accent-orange-500" />
-                      <span className="text-sm text-zinc-300">{m === 'public' ? 'Công khai' : 'Riêng tư'}</span>
+                      <span className="text-sm text-[var(--text)]">{m === 'public' ? 'Công khai' : 'Riêng tư'}</span>
                     </label>
                   ))}
                 </div>
@@ -285,8 +277,8 @@ export default function AdminVouchersPage() {
                 </Field>
               </div>
             </div>
-            <div className="px-6 py-4 border-t border-white/10 flex gap-3">
-              <button onClick={() => setDialogOpen(false)} className="flex-1 py-2.5 rounded-xl border border-zinc-700 text-zinc-400 font-bold hover:text-white transition-colors text-sm">Hủy</button>
+            <div className="px-6 py-4 border-t border-[var(--border)] flex gap-3">
+              <button onClick={() => setDialogOpen(false)} className="flex-1 py-2.5 rounded-xl border border-[var(--border)] text-[var(--text-muted)] font-bold hover:text-[var(--text)] transition-colors text-sm">Hủy</button>
               <button onClick={handleCreate} disabled={saving || !form.code || !form.discountValue}
                 className="flex-1 py-2.5 rounded-xl bg-orange-500 text-gray-900 font-black text-sm hover:bg-orange-400 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
                 {saving ? <RefreshCw size={14} className="animate-spin" /> : 'Phát hành mã'}
