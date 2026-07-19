@@ -110,10 +110,33 @@ function readBackendErrorText(data: unknown): string | undefined {
   return undefined;
 }
 
+function isAccountBanResponse(status: number | undefined, message: string | undefined): boolean {
+  if (status !== 403 || !message) return false;
+  const lower = message.toLowerCase();
+  return lower.includes('disabled') || lower.includes('khóa') || lower.includes('khoa');
+}
+
+function dispatchGlobalBanIfNeeded(error: any): void {
+  if (typeof window === 'undefined') return;
+  const status = error.response?.status;
+  const data = error.response?.data;
+  const message = readBackendErrorText(data);
+  if (!isAccountBanResponse(status, message)) return;
+
+  const reason =
+    (typeof data?.reason === 'string' && data.reason.trim())
+      ? data.reason.trim()
+      : 'Không có lý do được cung cấp';
+
+  window.dispatchEvent(new CustomEvent('globalBan', { detail: { message, reason } }));
+}
+
 function throwNormalizedLoginError(error: any, mode: 'password' | 'google'): never {
   console.error('Login error:', error);
   console.error('Error response:', error.response?.data);
   console.error('Error status:', error.response?.status);
+
+  dispatchGlobalBanIfNeeded(error);
 
   const status: number | undefined = error.response?.status;
   const backendMessage = readBackendErrorText(error.response?.data);

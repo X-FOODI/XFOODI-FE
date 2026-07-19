@@ -13,6 +13,7 @@ import "./globals.css";
 import AntdProvider from "./theme/AntdProvider";
 
 import { ChatAssistantClient } from "@/components/ui/ChatAssistantClient";
+import GlobalBanModal from "@/components/GlobalBanModal";
 
 const inter = Inter({ subsets: ["latin", "vietnamese"] });
 
@@ -150,6 +151,7 @@ export default function RootLayout({
                     <CartProvider>
                       {children}
                       <ChatAssistantClient />
+                      <GlobalBanModal />
                     </CartProvider>
                   </AntdProvider>
                 </ToastProvider>
