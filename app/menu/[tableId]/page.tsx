@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import axiosInstance from "@/lib/services/axiosInstance";
 import { 
@@ -16,11 +16,40 @@ import {
   XCircle, 
   ChefHat,
   MessageSquare,
-  Sparkles
+  Sparkles,
+  RefreshCw
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { io } from "socket.io-client";
 import { useAuth } from "@/lib/contexts/AuthContext";
+import OrderTimeline, { computeEta } from "@/components/order/OrderTimeline";
+import Recommendations from "@/components/menu/Recommendations";
+
+/** Phát tiếng chuông "món sẵn sàng" bằng Web Audio (không cần file asset). */
+function playReadyChime() {
+  try {
+    const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    const notes = [880, 1174.66]; // A5 → D6
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      const start = ctx.currentTime + i * 0.18;
+      gain.gain.setValueAtTime(0, start);
+      gain.gain.linearRampToValueAtTime(0.35, start + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.4);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.42);
+    });
+    setTimeout(() => ctx.close().catch(() => {}), 1200);
+  } catch {
+    /* trình duyệt chặn autoplay audio — bỏ qua im lặng */
+  }
+}
 
 interface Dish {
   id: string;
@@ -84,6 +113,7 @@ export default function CustomerMenuPage() {
 
   // State
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [table, setTable] = useState<TableInfo | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [dishes, setDishes] = useState<Dish[]>([]);
@@ -98,12 +128,13 @@ export default function CustomerMenuPage() {
   // Tracking active order state
   const [activeOrders, setActiveOrders] = useState<TrackedOrder[]>([]);
   const [showTracker, setShowTracker] = useState(false);
+  // Ref giữ id các đơn của bàn này (tránh stale closure trong socket handler)
+  const trackedOrderIdsRef = useRef<Set<string>>(new Set());
+  const prevStatusRef = useRef<Record<string, string>>({});
 
   // Show login/loyalty prompt on load for guest users
   useEffect(() => {
-    console.log("LOYALTY DIALOG CHECK:", { isAuthReady, user, hasTable: !!table });
     if (isAuthReady && !user && table) {
-      console.log("SHOWING DIALOG");
       setShowLoginPrompt(true);
     }
   }, [isAuthReady, user, table]);
@@ -119,6 +150,7 @@ export default function CustomerMenuPage() {
     const fetchData = async () => {
       try {
         setLoading(true);
+        setLoadError(false);
         // 1. Fetch public table info
         const tableRes = await axiosInstance.get(`/tables/public/${tableId}`);
         if (tableRes.data?.success) {
@@ -130,7 +162,7 @@ export default function CustomerMenuPage() {
           // 2. Fetch categories and dishes for this restaurant
           const [catRes, dishRes] = await Promise.all([
             axiosInstance.get("/categories", { params: { restaurantId } }),
-            axiosInstance.get("/dishes", { params: { restaurantId } }),
+            axiosInstance.get("/dishes", { params: { restaurantId, limit: 1000 } }),
           ]);
 
           if (catRes.data?.success) {
@@ -143,8 +175,14 @@ export default function CustomerMenuPage() {
           // 3. Fetch active orders for this table session
           fetchActiveOrders();
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error("Lỗi khi tải thông tin thực đơn:", err);
+        // A 404 means the table/QR is genuinely invalid → fall through to the
+        // "table not found" screen. Any other failure (network, 5xx) is transient
+        // and should offer a retry instead of a misleading empty/blank menu.
+        if (err?.response?.status !== 404) {
+          setLoadError(true);
+        }
       } finally {
         setLoading(false);
       }
@@ -159,9 +197,15 @@ export default function CustomerMenuPage() {
       // Find orders belonging to this table
       const res = await axiosInstance.get("/orders", { params: { tableId } });
       if (res.data?.success) {
+        const list = res.data.data as TrackedOrder[];
         // Filter out completed/cancelled if we only want active tracking
-        setActiveOrders(res.data.data);
-        if (res.data.data.length > 0) {
+        setActiveOrders(list);
+        // Cập nhật ref để socket handler nhận diện đơn của bàn này + trạng thái trước đó
+        trackedOrderIdsRef.current = new Set(list.map((o) => o.id));
+        const prev: Record<string, string> = {};
+        list.forEach((o) => { prev[o.id] = o.status; });
+        prevStatusRef.current = prev;
+        if (list.length > 0) {
           setShowTracker(true);
         }
       }
@@ -189,9 +233,20 @@ export default function CustomerMenuPage() {
       fetchActiveOrders();
     };
 
+    // Notify customer with a sound + open tracker when THEIR food is ready
+    const handleStatusChange = (data: any) => {
+      const isOwnOrder = data?.orderId && trackedOrderIdsRef.current.has(data.orderId);
+      const wasNotReady = data?.orderId && prevStatusRef.current[data.orderId] !== "READY";
+      fetchActiveOrders();
+      if (data?.status === "READY" && isOwnOrder && wasNotReady) {
+        setShowTracker(true);
+        playReadyChime();
+      }
+    };
+
     socket.on("NEW_ORDER", handleUpdate);
     socket.on("ORDER_UPDATED", handleUpdate);
-    socket.on("ORDER_STATUS_CHANGED", handleUpdate);
+    socket.on("ORDER_STATUS_CHANGED", handleStatusChange);
     socket.on("ORDER_ITEM_STATUS_CHANGED", handleUpdate);
 
     return () => {
@@ -210,6 +265,12 @@ export default function CustomerMenuPage() {
       }
       return [...prev, { dish, quantity: 1, note: "" }];
     });
+  };
+
+  // Thêm vào giỏ từ block gợi ý (chỉ có dishId) — resolve sang Dish đầy đủ
+  const addToCartById = (dishId: string) => {
+    const full = dishes.find((d) => d.id === dishId);
+    if (full) addToCart(full);
   };
 
   const updateQuantity = (dishId: string, delta: number) => {
@@ -277,6 +338,22 @@ export default function CustomerMenuPage() {
       <div className="min-h-screen bg-zinc-950 text-white flex flex-col items-center justify-center gap-4">
         <Loader2 className="w-10 h-10 animate-spin text-amber-500" />
         <p className="text-zinc-400 font-medium">Đang tải thực đơn...</p>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-white flex flex-col items-center justify-center p-6 text-center gap-4">
+        <XCircle className="w-16 h-16 text-amber-500" />
+        <h1 className="text-xl font-bold">Không tải được thực đơn</h1>
+        <p className="text-zinc-400 max-w-sm">Đã có lỗi kết nối. Vui lòng kiểm tra mạng và thử lại.</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="mt-2 inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-amber-500 text-zinc-900 font-semibold hover:bg-amber-400 transition-all active:scale-95"
+        >
+          <RefreshCw className="w-4 h-4" /> Thử lại
+        </button>
       </div>
     );
   }
@@ -604,6 +681,25 @@ export default function CustomerMenuPage() {
                       </div>
                     </div>
                   ))}
+
+                  {/* Gợi ý: thường được gọi kèm (data-driven) + AI theo giỏ hàng */}
+                  {table?.restaurant.id && cart.length > 0 && (
+                    <div className="pt-2 space-y-4">
+                      <Recommendations
+                        variant="frequently-bought"
+                        restaurantId={table.restaurant.id}
+                        dishId={cart[0].dish.id}
+                        excludeIds={cart.map((c) => c.dish.id)}
+                        onAdd={addToCartById}
+                      />
+                      <Recommendations
+                        variant="for-cart"
+                        restaurantId={table.restaurant.id}
+                        cartDishIds={cart.map((c) => c.dish.id)}
+                        onAdd={addToCartById}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Footer Section */}
@@ -691,12 +787,22 @@ export default function CustomerMenuPage() {
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                             order.status === "PENDING" ? "bg-amber-500/10 text-amber-500 border border-amber-500/20" :
                             order.status === "CONFIRMED" ? "bg-blue-500/10 text-blue-500 border border-blue-500/20" :
+                            order.status === "PREPARING" ? "bg-orange-500/10 text-orange-500 border border-orange-500/20" :
+                            order.status === "READY" ? "bg-purple-500/10 text-purple-400 border border-purple-500/20" :
                             "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
                           }`}>
                             {order.status === "PENDING" ? "Chờ xác nhận" :
-                             order.status === "CONFIRMED" ? "Đã xác nhận" : "Hoàn thành"}
+                             order.status === "CONFIRMED" ? "Đã xác nhận" :
+                             order.status === "PREPARING" ? "Đang chế biến" :
+                             order.status === "READY" ? "Sẵn sàng" : "Hoàn thành"}
                           </span>
                         </div>
+
+                        {/* Order tracking timeline (Grab-style) */}
+                        <OrderTimeline
+                          currentStatus={order.status}
+                          estimatedReadyAt={computeEta(order.createdAt, order.items.length, order.status)}
+                        />
 
                         {/* Items list */}
                         <div className="space-y-3">

@@ -27,7 +27,7 @@ interface Order {
   subTotal: number;
   totalAmount: number;
   createdAt: string;
-  status: "PENDING" | "CONFIRMED" | "COMPLETED" | "CANCELLED";
+  status: "PENDING" | "CONFIRMED" | "PREPARING" | "READY" | "COMPLETED" | "CANCELLED";
   isPaid: boolean;
   table: string;
   tableId: string | null;
@@ -119,6 +119,10 @@ export default function OrderHistoryPage() {
         return <Tag color="gold">Chờ xác nhận</Tag>;
       case "CONFIRMED":
         return <Tag color="blue">Đã xác nhận</Tag>;
+      case "PREPARING":
+        return <Tag color="orange">Đang chế biến</Tag>;
+      case "READY":
+        return <Tag color="purple">Sẵn sàng</Tag>;
       case "COMPLETED":
         return <Tag color="green">Hoàn thành</Tag>;
       case "CANCELLED":
@@ -274,6 +278,8 @@ export default function OrderHistoryPage() {
                   { key: "ALL", label: "Tất cả" },
                   { key: "PENDING", label: "Chờ xác nhận" },
                   { key: "CONFIRMED", label: "Đã xác nhận" },
+                  { key: "PREPARING", label: "Đang chế biến" },
+                  { key: "READY", label: "Sẵn sàng" },
                   { key: "COMPLETED", label: "Hoàn thành" },
                   { key: "CANCELLED", label: "Đã hủy" },
                 ].map((t) => (
@@ -435,6 +441,28 @@ export default function OrderHistoryPage() {
                   </Button>
                 )}
                 {selectedOrder.status === "CONFIRMED" && (
+                  <Button
+                    type="primary"
+                    icon={<CheckOutlined />}
+                    onClick={() => handleUpdateStatus(selectedOrder.id, "PREPARING")}
+                    disabled={actionLoading}
+                    className="flex-1 bg-orange-500 hover:bg-orange-600 border-none h-11"
+                  >
+                    Bắt đầu chế biến
+                  </Button>
+                )}
+                {selectedOrder.status === "PREPARING" && (
+                  <Button
+                    type="primary"
+                    icon={<CheckOutlined />}
+                    onClick={() => handleUpdateStatus(selectedOrder.id, "READY")}
+                    disabled={actionLoading}
+                    className="flex-1 bg-purple-500 hover:bg-purple-600 border-none h-11"
+                  >
+                    Món đã sẵn sàng
+                  </Button>
+                )}
+                {selectedOrder.status === "READY" && (
                   <Button
                     type="primary"
                     icon={<CheckOutlined />}
