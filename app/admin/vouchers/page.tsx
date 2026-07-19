@@ -143,8 +143,8 @@ export default function AdminVouchersPage() {
               <p className="text-xs text-[var(--text-muted)]">{filtered.length} / {sourceRows.length} mã {tab === 'owner' ? 'chủ sân' : 'XFOODI'}</p>
             </div>
 
-            {/* Platform voucher cards preview */}
-            {tab === 'platform' && !loading && filtered.filter(v => v.status === 'active').length > 0 && (
+            {/* Voucher cards preview (cả Chủ sân & Platform) */}
+            {!loading && filtered.filter(v => v.status === 'active').length > 0 && (
               <div>
                 <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-3">Đang hoạt động (preview thẻ)</p>
                 <div className="flex gap-4 overflow-x-auto pb-2" style={{ WebkitOverflowScrolling: 'touch' }}>
