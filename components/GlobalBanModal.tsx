@@ -41,7 +41,11 @@ export default function GlobalBanModal() {
       <Result
         status="error"
         icon={<StopOutlined style={{ color: '#ff4d4f' }} />}
-        title={<span style={{ fontSize: '24px', fontWeight: 600 }}>Account Disabled</span>}
+        title={
+          <span style={{ fontSize: '24px', fontWeight: 600 }}>
+            {banInfo?.message?.toLowerCase().includes('restaurant') ? 'Restaurant Disabled' : 'Account Disabled'}
+          </span>
+        }
         subTitle={
           <div style={{ marginTop: '16px' }}>
             <Paragraph>
@@ -68,6 +72,18 @@ export default function GlobalBanModal() {
         }
         extra={[
           <Button
+            key="home"
+            size="large"
+            block
+            style={{ marginBottom: '8px' }}
+            onClick={() => {
+              // Return to root main domain
+              window.location.href = `http://${process.env.NEXT_PUBLIC_BASE_DOMAIN || 'xfoodi.website'}`;
+            }}
+          >
+            Return to Homepage
+          </Button>,
+          <Button
             key="logout"
             type="primary"
             danger
@@ -79,17 +95,6 @@ export default function GlobalBanModal() {
             }}
           >
             Logout
-          </Button>,
-          <Button
-            key="support"
-            type="link"
-            size="large"
-            block
-            onClick={() => {
-              window.location.href = 'mailto:xfoodiprojects@gmail.com';
-            }}
-          >
-            Contact Support
           </Button>
         ]}
       />
