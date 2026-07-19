@@ -18,6 +18,7 @@ import {
   UserCheck,
   Settings,
   ShieldCheck,
+  ShieldAlert,
   Calendar,
   History,
   ChefHat,
@@ -198,6 +199,12 @@ export default function DashboardSidebar({
           label: "Bảo mật 2FA",
           path: "/admin/security",
           icon: <ShieldCheck className="dashboard-sidebar-item-icon" size={20} strokeWidth={2} />,
+        },
+        {
+          id: "security-monitor",
+          label: "Giám sát bảo mật",
+          path: "/admin/security-monitor",
+          icon: <ShieldAlert className="dashboard-sidebar-item-icon" size={20} strokeWidth={2} />,
         },
         {
           id: "announcements",
