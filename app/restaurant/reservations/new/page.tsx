@@ -29,10 +29,13 @@ import {
   Check,
   Info,
   Landmark,
-  Search
+  Search,
+  Hourglass
 } from "lucide-react";
 import { TableMap2D, Layout, Floor } from "@/app/restaurant/tables/components/TableMap2D";
 import TablePreview3DModal from "@/app/restaurant/tables/components/TablePreview3DModal";
+import Recommendations from "@/components/menu/Recommendations";
+import ReservationTimeline from "@/components/reservations/ReservationTimeline";
 
 // ── Vietnamese banks (reused from wallet page) ─────────────────────────────────
 const VIETNAMESE_BANKS = [
@@ -344,6 +347,27 @@ export default function NewReservationPage() {
 
   const brandColor = tenant?.primaryColor || "#FF5A2C";
   const restaurantId = tenant?.id || user?.restaurantId || "";
+
+  const addRecommendedDish = (dishId: string) => {
+    let foundDish: any = null;
+    for (const category of menu) {
+      const dish = category.items?.find((item: any) => item.id === dishId);
+      if (dish) {
+        foundDish = dish;
+        break;
+      }
+    }
+    if (!foundDish) return;
+    setSelectedDishes(prev => ({
+      ...prev,
+      [dishId]: {
+        quantity: (prev[dishId]?.quantity || 0) + 1,
+        name: foundDish.name || "",
+        price: foundDish.price || 0,
+        note: prev[dishId]?.note || ""
+      }
+    }));
+  };
 
   // Group tables by floor
   const floorsMap: Record<string, { id: string; name: string; tables: AvailableTable[] }> = {};
@@ -1575,6 +1599,26 @@ export default function NewReservationPage() {
                               </div>
                             </div>
                           )}
+
+                          {/* AI Recommendations for Pre-order */}
+                          {restaurantId && Object.keys(selectedDishes).length > 0 && (
+                            <div className="pt-4 border-t border-dashed border-[var(--border)] space-y-4">
+                              <Recommendations
+                                variant="frequently-bought"
+                                restaurantId={restaurantId}
+                                dishId={Object.keys(selectedDishes)[0]}
+                                excludeIds={Object.keys(selectedDishes)}
+                                onAdd={addRecommendedDish}
+                              />
+                              <Recommendations
+                                variant="for-cart"
+                                restaurantId={restaurantId}
+                                cartDishIds={Object.keys(selectedDishes)}
+                                excludeIds={Object.keys(selectedDishes)}
+                                onAdd={addRecommendedDish}
+                              />
+                            </div>
+                          )}
                         </>
                       )}
                     </div>
@@ -1584,17 +1628,23 @@ export default function NewReservationPage() {
                 {/* Summary card */}
                 <div className="p-4 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-xs space-y-2.5">
                   <p className="m-0 font-bold text-sm text-[var(--text)] border-b border-[var(--border)] pb-2">Tóm tắt thông tin đặt chỗ</p>
-                  <div className="flex justify-between">
-                    <span className="text-[var(--text-muted)]">📅 Thời gian</span>
+                  <div className="flex justify-between items-center">
+                    <span className="flex items-center gap-1.5 text-[var(--text-muted)]">
+                      <Calendar className="w-3.5 h-3.5" /> Thời gian
+                    </span>
                     <span className="font-semibold text-[var(--text)]">{date} lúc {time}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-[var(--text-muted)]">👥 Số khách</span>
+                  <div className="flex justify-between items-center">
+                    <span className="flex items-center gap-1.5 text-[var(--text-muted)]">
+                      <Users className="w-3.5 h-3.5" /> Số khách
+                    </span>
                     <span className="font-semibold text-[var(--text)]">{guests} người</span>
                   </div>
                   {selectedTableIds.length > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-[var(--text-muted)]">🪑 Danh sách bàn</span>
+                    <div className="flex justify-between items-center">
+                      <span className="flex items-center gap-1.5 text-[var(--text-muted)]">
+                        <MapPin className="w-3.5 h-3.5" /> Danh sách bàn
+                      </span>
                       <span className="font-semibold text-[var(--text)]">
                         {selectedTableIds.map(id => allTables.find(t => t.id === id)?.code).filter(Boolean).join(", ")}
                       </span>
@@ -1602,14 +1652,18 @@ export default function NewReservationPage() {
                   )}
                   {wantPreOrder && Object.keys(selectedDishes).length > 0 && (
                     <>
-                      <div className="flex justify-between border-t border-dashed border-[var(--border)] pt-2 mt-1">
-                        <span className="text-[var(--text-muted)]">🍽️ Số món đặt trước</span>
+                      <div className="flex justify-between items-center border-t border-dashed border-[var(--border)] pt-2 mt-1">
+                        <span className="flex items-center gap-1.5 text-[var(--text-muted)]">
+                          <FileText className="w-3.5 h-3.5" /> Số món đặt trước
+                        </span>
                         <span className="font-semibold text-[var(--text)]">
                           {Object.values(selectedDishes).reduce((s, item) => s + item.quantity, 0)} món
                         </span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-[var(--text-muted)]">💵 Tổng tiền món ăn</span>
+                      <div className="flex justify-between items-center">
+                        <span className="flex items-center gap-1.5 text-[var(--text-muted)]">
+                          <Landmark className="w-3.5 h-3.5" /> Tổng tiền món ăn
+                        </span>
                         <span className="font-bold text-[var(--text)] text-[var(--primary)]">
                           {Object.values(selectedDishes).reduce((s, item) => s + item.quantity * item.price, 0).toLocaleString("vi-VN")}đ
                         </span>
@@ -1617,13 +1671,17 @@ export default function NewReservationPage() {
                     </>
                   )}
                   {estimatedDeposit > 0 ? (
-                    <div className="flex justify-between border-t border-dashed border-[var(--border)] pt-2 mt-1">
-                      <span className="text-[var(--text-muted)] font-medium">💰 Yêu cầu cọc (bắt buộc)</span>
+                    <div className="flex justify-between items-center border-t border-dashed border-[var(--border)] pt-2 mt-1">
+                      <span className="flex items-center gap-1.5 text-[var(--text-muted)] font-medium">
+                        <Landmark className="w-3.5 h-3.5" /> Yêu cầu cọc (bắt buộc)
+                      </span>
                       <span className="font-black text-sm text-[var(--primary)]">{estimatedDeposit.toLocaleString("vi-VN")}đ</span>
                     </div>
                   ) : (
-                    <div className="flex justify-between border-t border-dashed border-[var(--border)] pt-2 mt-1">
-                      <span className="text-[var(--text-muted)] font-medium">💰 Yêu cầu cọc</span>
+                    <div className="flex justify-between items-center border-t border-dashed border-[var(--border)] pt-2 mt-1">
+                      <span className="flex items-center gap-1.5 text-[var(--text-muted)] font-medium">
+                        <Landmark className="w-3.5 h-3.5" /> Yêu cầu cọc
+                      </span>
                       <span className="font-bold text-sm text-green-500">Miễn phí (Không yêu cầu)</span>
                     </div>
                   )}
@@ -1662,13 +1720,16 @@ export default function NewReservationPage() {
                   onSkip={() => setTransferInfo(null)} 
                 />
               ) : (
-                <div className="text-center py-4">
+                <div className="text-center py-4 space-y-6">
+                  <div className="border border-[var(--border)] rounded-2xl p-4 md:p-6 bg-[var(--surface)]">
+                    <ReservationTimeline currentStatus={createdReservation?.statusValue?.code || "PENDING"} />
+                  </div>
+                  
                   {(() => {
                     const hasDeposit = Number(createdReservation?.depositAmount) > 0;
                     if (depositPaid) {
                       return (
                         <>
-                          <div className="text-5xl mb-4">⏳</div>
                           <h2 className="text-xl font-extrabold text-[var(--text)] m-0 mb-2">
                             Thanh toán cọc thành công!
                           </h2>
@@ -1680,7 +1741,6 @@ export default function NewReservationPage() {
                     } else if (hasDeposit) {
                       return (
                         <>
-                          <div className="text-5xl mb-4">⏳</div>
                           <h2 className="text-xl font-extrabold text-[var(--text)] m-0 mb-2">
                             Chờ thanh toán tiền cọc
                           </h2>
@@ -1692,7 +1752,6 @@ export default function NewReservationPage() {
                     } else {
                       return (
                         <>
-                          <div className="text-5xl mb-4">⏳</div>
                           <h2 className="text-xl font-extrabold text-[var(--text)] m-0 mb-2">
                             Đang chờ xác nhận từ nhà hàng!
                           </h2>

@@ -130,7 +130,37 @@ export default function Recommendations({
                     {dish.reason}
                   </p>
                 )}
-                <div className="mt-auto flex items-center justify-between gap-1 pt-1">
+                {dish.flavors && (
+                  <div className="py-1 mt-1 border-t border-zinc-800/60 space-y-1">
+                    <div className="grid grid-cols-2 gap-x-1.5 gap-y-1 text-[8px] text-zinc-400 font-medium">
+                      <div className="flex items-center gap-1">
+                        <span title="Ngọt">🍭</span>
+                        <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                          <div className="h-full bg-pink-500 rounded-full" style={{ width: `${(dish.flavors.sweet / 5) * 100}%` }} />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span title="Cay">🔥</span>
+                        <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                          <div className="h-full bg-red-500 rounded-full" style={{ width: `${(dish.flavors.spicy / 5) * 100}%` }} />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span title="Đậm đà">🍲</span>
+                        <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                          <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${(dish.flavors.savory / 5) * 100}%` }} />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span title="Cồn">🍺</span>
+                        <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                          <div className="h-full bg-amber-500 rounded-full" style={{ width: `${(dish.flavors.alcohol / 5) * 100}%` }} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div className="mt-auto flex items-center justify-between gap-1 pt-1.5 border-t border-zinc-800/20">
                   <span className="text-xs font-bold text-amber-400">{formatVND(dish.price)}</span>
                   <button
                     onClick={() => onAdd(dish.id)}
