@@ -51,6 +51,16 @@ export default function SystemAnnouncementBanner({
     };
   }, []);
 
+  // Với banner cố định đầu trang: đẩy header xuống bằng CSS var để không bị che
+  useEffect(() => {
+    if (variant !== "floating-top") return;
+    const h = items.length > 0 ? "46px" : "0px";
+    document.documentElement.style.setProperty("--ann-banner-height", h);
+    return () => {
+      document.documentElement.style.setProperty("--ann-banner-height", "0px");
+    };
+  }, [variant, items.length]);
+
   const dismiss = (id: string) => {
     const next = [...getDismissed(), id];
     try {

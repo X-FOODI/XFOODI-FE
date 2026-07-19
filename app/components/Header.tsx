@@ -250,7 +250,7 @@ const Header: React.FC = () => {
         <AntHeader
           style={{
             position: isFixed ? "fixed" : "absolute",
-            top: (isFixed && scrolled) ? 10 : 20,
+            top: `calc(${(isFixed && scrolled) ? 10 : 20}px + var(--ann-banner-height, 0px))`,
             left: "50%",
             transform: "translateX(-50%)",
             width: (isFixed && scrolled) ? "calc(100% - 40px)" : "calc(100% - 80px)",
