@@ -532,8 +532,8 @@ export default function RestaurantKnowledgeBasePage() {
     const arr = Array.from(files);
     const valid = arr.filter(f => {
       const ext = f.name.split(".").pop()?.toLowerCase();
-      if (ext !== "pdf" && ext !== "txt" && ext !== "md") {
-        messageApi.error(`Định dạng "${f.name}" không được hỗ trợ (PDF, TXT, MD).`);
+      if (ext !== "pdf" && ext !== "txt" && ext !== "md" && ext !== "docx" && ext !== "doc") {
+        messageApi.error(`Định dạng "${f.name}" không được hỗ trợ (PDF, TXT, MD, DOCX).`);
         return false;
       }
       if (f.size > 10 * 1024 * 1024) {
@@ -991,16 +991,16 @@ export default function RestaurantKnowledgeBasePage() {
                       ) : (
                         <div className="p-6 border-2 border-dashed border-[var(--border)] rounded-xl text-center hover:bg-[var(--surface)] transition-all relative">
                           <input 
-                            type="file" 
-                            accept=".pdf,.txt,.md" 
-                            onChange={(e) => handleWizardMenuFileChange(e.target.files?.[0] || null)}
-                            className="absolute inset-0 opacity-0 cursor-pointer"
-                          />
-                          <Upload className="w-8 h-8 mx-auto text-[var(--text-muted)] mb-2" />
-                          <span className="text-xs font-bold text-[var(--text)] block">
-                            Kéo thả hoặc bấm để chọn file menu
-                          </span>
-                          <span className="text-[10px] text-[var(--text-muted)] mt-1 block">Hỗ trợ PDF, TXT, MD (tối đa 10MB)</span>
+                              type="file" 
+                              accept=".pdf,.txt,.md,.docx,.doc" 
+                              onChange={(e) => handleWizardMenuFileChange(e.target.files?.[0] || null)}
+                              className="absolute inset-0 opacity-0 cursor-pointer"
+                            />
+                            <Upload className="w-8 h-8 mx-auto text-[var(--text-muted)] mb-2" />
+                            <span className="text-xs font-bold text-[var(--text)] block">
+                              Kéo thả hoặc bấm để chọn file menu
+                            </span>
+                            <span className="text-[10px] text-[var(--text-muted)] mt-1 block">Hỗ trợ PDF, TXT, MD, DOCX (tối đa 10MB)</span>
                         </div>
                       )}
                     </motion.div>
@@ -2185,13 +2185,13 @@ export default function RestaurantKnowledgeBasePage() {
                                 ref={fileInputRef}
                                 type="file"
                                 multiple
-                                accept=".pdf,.txt,.md"
+                                accept=".pdf,.txt,.md,.docx,.doc"
                                 onChange={e => { if (e.target.files?.length) uploadFiles(e.target.files); }}
                                 className="hidden"
                               />
                               <Upload className="w-10 h-10 mx-auto text-[var(--text-muted)] mb-3" />
                               <span className="text-sm font-bold text-[var(--text)] block">Tải lên tài liệu kiến thức</span>
-                              <span className="text-xs text-[var(--text-muted)] mt-1 block">Kéo thả hoặc bấm để chọn tệp PDF, TXT, MD (tối đa 10MB)</span>
+                              <span className="text-xs text-[var(--text-muted)] mt-1 block">Kéo thả hoặc bấm để chọn tệp PDF, TXT, MD, DOCX (tối đa 10MB)</span>
                             </div>
 
                             {/* Tip */}

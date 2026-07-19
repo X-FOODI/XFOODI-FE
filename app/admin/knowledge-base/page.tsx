@@ -697,7 +697,7 @@ export default function SuperAdminKnowledgeBasePage() {
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const ext = file.name.split(".").pop()?.toLowerCase();
-      if (ext !== "pdf" && ext !== "txt" && ext !== "md") { message.error(`${file.name}: Không hỗ trợ (Chỉ PDF, TXT, MD)`); continue; }
+      if (ext !== "pdf" && ext !== "txt" && ext !== "md" && ext !== "docx" && ext !== "doc") { message.error(`${file.name}: Không hỗ trợ (Chỉ PDF, TXT, MD, DOCX)`); continue; }
       if (file.size > 10 * 1024 * 1024) { message.error(`${file.name}: Vượt quá 10MB`); continue; }
       validFiles.push(file);
     }
@@ -1281,7 +1281,7 @@ export default function SuperAdminKnowledgeBasePage() {
                         )}
                       </div>
 
-                      <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".pdf,.txt,.md" multiple className="hidden" />
+                      <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".pdf,.txt,.md,.docx,.doc" multiple className="hidden" />
                       <input type="file" ref={folderInputRef} onChange={handleFolderChange} {...{ webkitdirectory: "", directory: "" } as any} multiple className="hidden" />
 
                       {/* Info banner */}
@@ -1339,7 +1339,7 @@ export default function SuperAdminKnowledgeBasePage() {
                         </div>
 
                         <div className="flex gap-1">
-                          {(["ALL", "PDF", "TXT", "MD"] as const).map(f => (
+                          {(["ALL", "PDF", "TXT", "MD", "DOCX"] as const).map(f => (
                             <button key={f} onClick={() => setTypeFilter(f)} className="px-2.5 py-1.5 rounded-lg text-[10px] font-semibold border transition-all" style={{ background: typeFilter === f ? "var(--primary)" : "var(--bg-base)", color: typeFilter === f ? "#fff" : "var(--text)", borderColor: typeFilter === f ? "var(--primary)" : "var(--border)" }}>
                               {f === "ALL" ? "All" : f}
                             </button>
