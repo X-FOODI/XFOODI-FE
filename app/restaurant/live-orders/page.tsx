@@ -36,7 +36,7 @@ interface Order {
   subTotal: number;
   totalAmount: number;
   createdAt: string;
-  status: "PENDING" | "CONFIRMED" | "COMPLETED" | "CANCELLED";
+  status: "PENDING" | "CONFIRMED" | "PREPARING" | "READY" | "COMPLETED" | "CANCELLED";
   items: OrderItem[];
   table?: string;
   customerName?: string | null;
@@ -164,7 +164,12 @@ export default function LiveOrdersPage() {
       const res = await axiosInstance.get("/orders");
       if (res.data?.success) {
         const activeOrders = (res.data.data as Order[]).filter(
-          (o) => o.status === "PENDING" || o.status === "CONFIRMED" || (o.status === "COMPLETED" && !o.isPaid)
+          (o) =>
+            o.status === "PENDING" ||
+            o.status === "CONFIRMED" ||
+            o.status === "PREPARING" ||
+            o.status === "READY" ||
+            (o.status === "COMPLETED" && !o.isPaid)
         );
         setOrders(activeOrders);
       }
@@ -424,7 +429,7 @@ export default function LiveOrdersPage() {
             await updateOrderStatus(orderId, status);
           }
         }}
-        className={`flex-1 min-w-[340px] rounded-2xl p-5 flex flex-col border transition-all duration-300 shadow-lg ${
+        className={`flex-1 min-w-[300px] rounded-2xl p-5 flex flex-col border transition-all duration-300 shadow-lg ${
           dragOverColumn === status 
             ? "bg-zinc-800/60 border-amber-500/50 scale-[1.01] ring-2 ring-amber-500/10" 
             : "bg-zinc-900/50 border-zinc-800/80"
@@ -434,7 +439,9 @@ export default function LiveOrdersPage() {
           <div className="flex items-center gap-2">
             <span className={`w-2.5 h-2.5 rounded-full ${
               status === "PENDING" ? "bg-amber-500 animate-pulse" :
-              status === "CONFIRMED" ? "bg-blue-500 animate-pulse" : "bg-emerald-500"
+              status === "CONFIRMED" ? "bg-blue-500 animate-pulse" :
+              status === "PREPARING" ? "bg-orange-500 animate-pulse" :
+              status === "READY" ? "bg-purple-500 animate-pulse" : "bg-emerald-500"
             }`} />
             <h3 className={`font-black text-xs tracking-widest uppercase ${colorClass}`}>{title}</h3>
           </div>
@@ -559,18 +566,40 @@ export default function LiveOrdersPage() {
                     ) : (
                       <>
                         {status === "PENDING" && (
-                          <button 
+                          <button
                             onClick={(e) => {
                               e.stopPropagation();
                               updateOrderStatus(order.id, "CONFIRMED");
                             }}
                             className="px-3.5 py-2 text-xs font-black text-black bg-amber-500 hover:bg-amber-400 rounded-lg transition-all shadow-md shadow-amber-500/10 active:scale-95"
                           >
-                            Bắt đầu nấu
+                            Xác nhận
                           </button>
                         )}
                         {status === "CONFIRMED" && (
-                          <button 
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              updateOrderStatus(order.id, "PREPARING");
+                            }}
+                            className="px-3.5 py-2 text-xs font-black text-black bg-orange-500 hover:bg-orange-400 rounded-lg transition-all shadow-md shadow-orange-500/10 active:scale-95"
+                          >
+                            Bắt đầu nấu
+                          </button>
+                        )}
+                        {status === "PREPARING" && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              updateOrderStatus(order.id, "READY");
+                            }}
+                            className="px-3.5 py-2 text-xs font-black text-white bg-purple-600 hover:bg-purple-500 rounded-lg transition-all shadow-md shadow-purple-600/10 active:scale-95"
+                          >
+                            Món xong
+                          </button>
+                        )}
+                        {status === "READY" && (
+                          <button
                             onClick={(e) => {
                               e.stopPropagation();
                               updateOrderStatus(order.id, "COMPLETED");
@@ -632,8 +661,10 @@ export default function LiveOrdersPage() {
             </div>
 
             <div className="flex-1 flex gap-6 overflow-x-auto pb-4">
-              {renderColumn("PENDING", "CHỜ XÁC NHẬN", "text-orange-500")}
-              {renderColumn("CONFIRMED", "ĐANG CHẾ BIẾN", "text-blue-500")}
+              {renderColumn("PENDING", "CHỜ XÁC NHẬN", "text-amber-500")}
+              {renderColumn("CONFIRMED", "ĐÃ XÁC NHẬN", "text-blue-500")}
+              {renderColumn("PREPARING", "ĐANG CHẾ BIẾN", "text-orange-500")}
+              {renderColumn("READY", "SẴN SÀNG", "text-purple-500")}
               {renderColumn("COMPLETED", "CHỜ THANH TOÁN", "text-emerald-500")}
             </div>
           </div>
@@ -692,10 +723,14 @@ export default function LiveOrdersPage() {
                 <span className={`text-xs font-black px-2.5 py-1 rounded-md border uppercase tracking-wider ${
                   selectedOrder.status === "PENDING" ? "bg-amber-500/10 text-amber-500 border-amber-500/20" :
                   selectedOrder.status === "CONFIRMED" ? "bg-blue-500/10 text-blue-500 border-blue-500/20" :
+                  selectedOrder.status === "PREPARING" ? "bg-orange-500/10 text-orange-500 border-orange-500/20" :
+                  selectedOrder.status === "READY" ? "bg-purple-500/10 text-purple-400 border-purple-500/20" :
                   "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
                 }`}>
                   {selectedOrder.status === "PENDING" ? "Chờ xác nhận" :
-                   selectedOrder.status === "CONFIRMED" ? "Đang chế biến" : "Đã hoàn thành"}
+                   selectedOrder.status === "CONFIRMED" ? "Đã xác nhận" :
+                   selectedOrder.status === "PREPARING" ? "Đang chế biến" :
+                   selectedOrder.status === "READY" ? "Sẵn sàng" : "Đã hoàn thành"}
                 </span>
               </div>
               <button 
