@@ -30,7 +30,8 @@ import {
   Play,
   ChevronLeft,
   Ticket,
-  TicketPercent
+  TicketPercent,
+  Megaphone
 } from "lucide-react";
 
 interface NavItem {
@@ -197,6 +198,12 @@ export default function DashboardSidebar({
           label: "Bảo mật 2FA",
           path: "/admin/security",
           icon: <ShieldCheck className="dashboard-sidebar-item-icon" size={20} strokeWidth={2} />,
+        },
+        {
+          id: "announcements",
+          label: "Thông báo hệ thống",
+          path: "/admin/announcements",
+          icon: <Megaphone className="dashboard-sidebar-item-icon" size={20} strokeWidth={2} />,
         },
         {
           id: "audit-logs",
