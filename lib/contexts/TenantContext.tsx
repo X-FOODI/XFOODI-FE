@@ -80,6 +80,7 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
       console.error("[TenantContext] Failed to load tenant config:", err);
 
       if (err.response?.status === 403 && err.response?.data?.message?.toLowerCase().includes("disabled")) {
+        console.log("[TenantContext] Restaurant is disabled! Setting disabledInfo...");
         setDisabledInfo({
           message: err.response?.data?.message,
           reason: err.response?.data?.reason || "Không có lý do",

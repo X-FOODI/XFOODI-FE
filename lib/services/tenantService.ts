@@ -9,6 +9,7 @@ import {
   BusinessHour,
 } from "../types/tenant";
 import adminAxiosInstance from "./adminAxiosInstance";
+import axiosInstance from "./axiosInstance";
 
 export interface TenantConfig {
   id: string;
@@ -364,7 +365,7 @@ export const tenantService = {
    */
   getTenantConfig: async (domain: string): Promise<TenantConfig | null> => {
     try {
-      const response = await adminAxiosInstance.get(`/tenants/${domain}`);
+      const response = await axiosInstance.get(`/tenants/${domain}`);
 
       if (response.status === 204) {
         return null;
@@ -435,7 +436,7 @@ export const tenantService = {
         // (GET /api/tenants returns full Tenant entities which include Id)
         if (!data.id && data.hostname) {
           try {
-            const listResponse = await adminAxiosInstance.get("/tenants");
+            const listResponse = await axiosInstance.get("/tenants");
             const allTenants = listResponse.data;
             const match = allTenants.find(
               (t: any) => (t.hostname || t.Hostname) === data.hostname,
