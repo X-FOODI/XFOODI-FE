@@ -300,7 +300,7 @@ export default function SuperAdminKnowledgeBasePage() {
 
   /* ── Search / Filter ── */
   const [searchQuery, setSearchQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState<"ALL" | "PDF" | "TXT" | "MD">("ALL");
+  const [typeFilter, setTypeFilter] = useState<"ALL" | "PDF" | "TXT" | "MD" | "DOCX">("ALL");
 
   /* ── File Preview Panel ── */
   const [selectedDoc, setSelectedDoc] = useState<DocumentItem | null>(null);
