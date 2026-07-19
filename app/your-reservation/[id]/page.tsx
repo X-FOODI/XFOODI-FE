@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { io as socketIO } from "socket.io-client";
 import { Button, Card, Spin, Alert, Badge, Tag, Descriptions, Divider, Modal } from "antd";
 import { ArrowLeftOutlined, CopyOutlined, CheckCircleOutlined, ExclamationCircleOutlined, InfoCircleOutlined, WalletOutlined } from "@ant-design/icons";
 import Header from "../../components/Header";
@@ -102,6 +103,41 @@ export default function CustomerReservationDetailPage() {
       if (pollInterval) clearInterval(pollInterval);
     };
   }, [tenant, id]);
+
+  // Real-time reservation status updates via Socket.IO
+  useEffect(() => {
+    if (!id || !tenant) return;
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL ||
+      process.env.NEXT_PUBLIC_API_URL ||
+      "https://api.xfoodi.website";
+    const socket = socketIO(socketUrl, {
+      transports: ["polling"],
+      withCredentials: true,
+    });
+
+    socket.on("connect", () => {
+      // Subscribe to this specific reservation's room
+      socket.emit("join_reservation", id);
+    });
+
+    socket.on("RESERVATION_STATUS_CHANGED", (data: {
+      reservationId: string;
+      status: string;
+      statusName: string;
+      colorCode: string | null;
+      updatedAt: string;
+    }) => {
+      if (data.reservationId !== id) return;
+      // Re-fetch full reservation to get latest data
+      fetchReservation();
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, tenant]);
+
 
   const handleCopy = (text: string, fieldName: string) => {
     navigator.clipboard.writeText(text);
