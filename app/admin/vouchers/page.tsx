@@ -101,8 +101,8 @@ export default function AdminVouchersPage() {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h1 className="text-2xl font-black text-white">Quản lý Voucher</h1>
-                <p className="text-sm text-zinc-400 mt-0.5">Toàn bộ mã khuyến mãi trên hệ thống.</p>
+                <h1 className="text-2xl font-black" style={{ color: "var(--text)" }}>Quản lý Voucher</h1>
+                <p className="text-sm mt-0.5" style={{ color: "var(--text-muted)" }}>Toàn bộ mã khuyến mãi trên hệ thống.</p>
               </div>
               <div className="flex gap-2">
                 <button onClick={fetchVouchers} className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white transition-colors"><RefreshCw size={16} /></button>
