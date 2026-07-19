@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { X, Info, AlertTriangle, AlertOctagon } from "lucide-react";
 import axiosInstance from "@/lib/services/axiosInstance";
 
@@ -31,7 +31,7 @@ function getDismissed(): string[] {
 export default function SystemAnnouncementBanner({
   variant = "inline",
 }: {
-  variant?: "inline" | "floating-bottom";
+  variant?: "inline" | "floating-top" | "floating-bottom";
 }) {
   const [items, setItems] = useState<Announcement[]>([]);
 
@@ -63,25 +63,31 @@ export default function SystemAnnouncementBanner({
 
   if (items.length === 0) return null;
 
-  const floating = variant === "floating-bottom";
+  const floatingStyle: CSSProperties | undefined =
+    variant === "floating-top"
+      ? {
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 60,
+          background: "var(--card)",
+          boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+        }
+      : variant === "floating-bottom"
+        ? {
+            position: "fixed",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 60,
+            background: "var(--card)",
+            boxShadow: "0 -4px 16px rgba(0,0,0,0.12)",
+          }
+        : undefined;
 
   return (
-    <div
-      className="w-full"
-      style={
-        floating
-          ? {
-              position: "fixed",
-              bottom: 0,
-              left: 0,
-              right: 0,
-              zIndex: 60,
-              background: "var(--card)",
-              boxShadow: "0 -4px 16px rgba(0,0,0,0.12)",
-            }
-          : undefined
-      }
-    >
+    <div className="w-full" style={floatingStyle}>
       {items.map((a) => {
         const s = LEVEL_STYLE[a.level] || LEVEL_STYLE.INFO;
         const Icon = s.Icon;
