@@ -183,12 +183,6 @@ export default function DashboardSidebar({
       label: "Hệ thống",
       items: [
         {
-          id: "withdrawals",
-          label: "Duyệt rút tiền",
-          path: "/admin/withdrawals",
-          icon: <Wallet className="dashboard-sidebar-item-icon" size={20} strokeWidth={2} />,
-        },
-        {
           id: "settings",
           label: "Cài đặt",
           path: "/admin/settings",
