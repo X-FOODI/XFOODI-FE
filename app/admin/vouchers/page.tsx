@@ -4,8 +4,6 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Plus, RefreshCw, Search, Filter, Lock, Unlock, X } from 'lucide-react';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import DashboardHeader from '@/components/dashboard/DashboardHeader';
-import DashboardSidebar from '@/components/dashboard/DashboardSidebar';
 import VoucherCard from '@/components/vouchers/VoucherCard';
 import voucherService, { Voucher, CreateAdminVoucherPayload } from '@/lib/services/voucherService';
 
@@ -92,17 +90,13 @@ export default function AdminVouchersPage() {
   };
 
   if (!isAuthReady || !user) {
-    return <div className="min-h-screen flex items-center justify-center bg-[#0A0E14]"><RefreshCw className="w-6 h-6 animate-spin text-orange-400" /></div>;
+    return <div className="min-h-[60vh] flex items-center justify-center"><RefreshCw className="w-6 h-6 animate-spin text-orange-400" /></div>;
   }
 
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-[#0A0E14]">
-      <DashboardHeader role="admin" restaurantName="XFOODI Admin" userName={user?.name ?? ''} />
-      <div className="flex flex-1 overflow-hidden">
-        <DashboardSidebar role="admin" restaurantName="XFOODI Admin" userName={user?.name ?? ''} userEmail={user?.email ?? ''} />
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6">
-          <div className="max-w-[1400px] mx-auto space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div className="max-w-[1400px] mx-auto space-y-6">
 
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -222,8 +216,6 @@ export default function AdminVouchersPage() {
               )}
             </div>
           </div>
-        </main>
-      </div>
 
       {/* ── Create Dialog ── */}
       {dialogOpen && (
