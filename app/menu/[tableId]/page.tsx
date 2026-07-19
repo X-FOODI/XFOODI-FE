@@ -23,6 +23,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { io } from "socket.io-client";
 import { useAuth } from "@/lib/contexts/AuthContext";
 import OrderTimeline, { computeEta } from "@/components/order/OrderTimeline";
+import Recommendations from "@/components/menu/Recommendations";
 
 /** Phát tiếng chuông "món sẵn sàng" bằng Web Audio (không cần file asset). */
 function playReadyChime() {
@@ -161,7 +162,7 @@ export default function CustomerMenuPage() {
           // 2. Fetch categories and dishes for this restaurant
           const [catRes, dishRes] = await Promise.all([
             axiosInstance.get("/categories", { params: { restaurantId } }),
-            axiosInstance.get("/dishes", { params: { restaurantId } }),
+            axiosInstance.get("/dishes", { params: { restaurantId, limit: 1000 } }),
           ]);
 
           if (catRes.data?.success) {
@@ -264,6 +265,12 @@ export default function CustomerMenuPage() {
       }
       return [...prev, { dish, quantity: 1, note: "" }];
     });
+  };
+
+  // Thêm vào giỏ từ block gợi ý (chỉ có dishId) — resolve sang Dish đầy đủ
+  const addToCartById = (dishId: string) => {
+    const full = dishes.find((d) => d.id === dishId);
+    if (full) addToCart(full);
   };
 
   const updateQuantity = (dishId: string, delta: number) => {
@@ -674,6 +681,25 @@ export default function CustomerMenuPage() {
                       </div>
                     </div>
                   ))}
+
+                  {/* Gợi ý: thường được gọi kèm (data-driven) + AI theo giỏ hàng */}
+                  {table?.restaurant.id && cart.length > 0 && (
+                    <div className="pt-2 space-y-4">
+                      <Recommendations
+                        variant="frequently-bought"
+                        restaurantId={table.restaurant.id}
+                        dishId={cart[0].dish.id}
+                        excludeIds={cart.map((c) => c.dish.id)}
+                        onAdd={addToCartById}
+                      />
+                      <Recommendations
+                        variant="for-cart"
+                        restaurantId={table.restaurant.id}
+                        cartDishIds={cart.map((c) => c.dish.id)}
+                        onAdd={addToCartById}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Footer Section */}
