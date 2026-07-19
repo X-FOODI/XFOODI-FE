@@ -56,14 +56,14 @@ const nextConfig = {
     const adminBase = adminApiUrl.replace(/\/api$/, '');
 
     console.log('[next.config] Rewrite destinations:');
-    console.log('  /api/admin/* ->', `${adminBase}/api/:path*`);
+    console.log('  /api/admin/* ->', `${adminBase}/api/admin/:path*`);
     console.log('  /api/*       ->', `${tenantBase}/api/:path*`);
     console.log('  /hubs/*      ->', `${tenantBase}/hubs/:path*`);
 
     return [
       {
         source: '/api/admin/:path*',
-        destination: `${adminBase}/api/:path*`,
+        destination: `${adminBase}/api/admin/:path*`,
       },
       {
         source: '/hubs/:path*',
