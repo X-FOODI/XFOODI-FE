@@ -703,28 +703,45 @@ export default function SuperAdminKnowledgeBasePage() {
     }
     if (validFiles.length === 0) return;
     setUploading(true);
-    const formData = new FormData();
-    validFiles.forEach(file => {
-      formData.append("files", file, file.webkitRelativePath || file.name);
-      formData.append("paths", file.webkitRelativePath || file.name);
-    });
-    if (selectedBucketId !== "all" && selectedBucketId !== "unassigned") formData.append("bucketId", selectedBucketId);
-    formData.append("restaurantId", selectedRestaurantId);
-    /* skipProcessing=true → backend chỉ lưu file, không chunking */
-    formData.append("skipProcessing", "true");
+    let successCount = 0;
+    const BATCH_SIZE = 3;
+
     try {
-      const response = await axiosInstance.post("/ai/kb/upload", formData);
-      if (response.data.success) {
-        message.success(response.data.message || `Đã lưu ${validFiles.length} tài liệu vào bucket. Vào tab Properties để bắt đầu xử lý AI.`);
+      for (let i = 0; i < validFiles.length; i += BATCH_SIZE) {
+        const batch = validFiles.slice(i, i + BATCH_SIZE);
+        const formData = new FormData();
+        batch.forEach(file => {
+          formData.append("files", file, file.webkitRelativePath || file.name);
+          formData.append("paths", file.webkitRelativePath || file.name);
+        });
+        if (selectedBucketId !== "all" && selectedBucketId !== "unassigned") formData.append("bucketId", selectedBucketId);
+        formData.append("restaurantId", selectedRestaurantId);
+        /* skipProcessing=true → backend chỉ lưu file, không chunking */
+        formData.append("skipProcessing", "true");
+
+        try {
+          const response = await axiosInstance.post("/ai/kb/upload", formData);
+          if (response.data.success) {
+            successCount += batch.length;
+          }
+        } catch (err: any) {
+          console.error(`[KB Upload Error Batch ${Math.floor(i / BATCH_SIZE) + 1}]`, err);
+        }
+      }
+
+      if (successCount > 0) {
+        message.success(`Đã lưu thành công ${successCount}/${validFiles.length} tài liệu vào bucket!`);
         fetchDocuments(selectedRestaurantId, false);
+      } else {
+        message.error("Tải lên thất bại. Máy chủ quá tải hoặc gặp sự cố kết nối.");
       }
     } catch (err: any) {
-      console.error("[KB Upload Error]", err);
-      const serverMsg = err.response?.data?.message || err.response?.data?.error || err.message;
-      const statusCode = err.response?.status ? `(${err.response.status}) ` : "";
-      message.error(`Tải lên thất bại ${statusCode}: ${serverMsg || "Không thể gửi tệp tới máy chủ."}`);
+      console.error("[KB Upload Outer Error]", err);
+      message.error("Đã xảy ra lỗi trong quá trình tải lên.");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
-    finally { setUploading(false); if (fileInputRef.current) fileInputRef.current.value = ""; }
   };
 
   const handleDrag = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); };

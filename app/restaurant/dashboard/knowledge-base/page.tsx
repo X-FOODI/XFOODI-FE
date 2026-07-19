@@ -545,23 +545,37 @@ export default function RestaurantKnowledgeBasePage() {
     if (!valid.length) return;
 
     setUploading(true);
-    const form = new FormData();
-    valid.forEach(f => {
-      form.append("files", f, f.name);
-      form.append("paths", f.name);
-    });
+    let successCount = 0;
+    const BATCH_SIZE = 3;
 
     try {
-      const res = await axiosInstance.post("/ai/kb/upload", form);
-      if (res.data.success) {
-        messageApi.success(`✅ Đã tải lên ${valid.length} tài liệu! AI đang học...`);
+      for (let i = 0; i < valid.length; i += BATCH_SIZE) {
+        const batch = valid.slice(i, i + BATCH_SIZE);
+        const form = new FormData();
+        batch.forEach(f => {
+          form.append("files", f, f.name);
+          form.append("paths", f.name);
+        });
+
+        try {
+          const res = await axiosInstance.post("/ai/kb/upload", form);
+          if (res.data.success) {
+            successCount += batch.length;
+          }
+        } catch (err: any) {
+          console.error(`[KB Upload Error Batch ${Math.floor(i / BATCH_SIZE) + 1}]`, err);
+        }
+      }
+
+      if (successCount > 0) {
+        messageApi.success(`✅ Đã tải lên thành công ${successCount}/${valid.length} tài liệu! AI đang học...`);
         fetchDocuments(false);
+      } else {
+        messageApi.error("Tải lên thất bại. Vui lòng kiểm tra lại kết nối mạng hoặc thử lại.");
       }
     } catch (err: any) {
-      console.error("[KB Upload Error]", err);
-      const serverMsg = err.response?.data?.message || err.response?.data?.error || err.message;
-      const statusCode = err.response?.status ? `(${err.response.status}) ` : "";
-      messageApi.error(`Tải lên thất bại ${statusCode}: ${serverMsg || "Không thể gửi tệp tới máy chủ."}`);
+      console.error("[KB Upload Outer Error]", err);
+      messageApi.error("Đã xảy ra lỗi trong quá trình tải lên.");
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
