@@ -17,7 +17,9 @@ import {
   ChefHat,
   MessageSquare,
   Sparkles,
-  RefreshCw
+  RefreshCw,
+  PartyPopper,
+  Receipt
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { io } from "socket.io-client";
@@ -94,6 +96,7 @@ interface TrackedOrder {
   totalAmount: number;
   createdAt: string;
   status: string;
+  isPaid?: boolean;
   items: Array<{
     id: string;
     name: string;
@@ -241,6 +244,10 @@ export default function CustomerMenuPage() {
       if (data?.status === "READY" && isOwnOrder && wasNotReady) {
         setShowTracker(true);
         playReadyChime();
+      }
+      // Mở tracker khi đơn chuyển sang chờ thanh toán
+      if (data?.status === "COMPLETED" && isOwnOrder && !data?.isPaid) {
+        setShowTracker(true);
       }
     };
 
@@ -789,20 +796,50 @@ export default function CustomerMenuPage() {
                             order.status === "CONFIRMED" ? "bg-blue-500/10 text-blue-500 border border-blue-500/20" :
                             order.status === "PREPARING" ? "bg-orange-500/10 text-orange-500 border border-orange-500/20" :
                             order.status === "READY" ? "bg-purple-500/10 text-purple-400 border border-purple-500/20" :
+                            order.status === "COMPLETED" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" :
                             "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
                           }`}>
                             {order.status === "PENDING" ? "Chờ xác nhận" :
                              order.status === "CONFIRMED" ? "Đã xác nhận" :
                              order.status === "PREPARING" ? "Đang chế biến" :
-                             order.status === "READY" ? "Sẵn sàng" : "Hoàn thành"}
+                             order.status === "READY" ? "Sẵn sàng" :
+                             order.status === "COMPLETED" ? "Chờ thanh toán" : "Hoàn thành"}
                           </span>
                         </div>
 
-                        {/* Order tracking timeline (Grab-style) */}
-                        <OrderTimeline
-                          currentStatus={order.status}
-                          estimatedReadyAt={computeEta(order.createdAt, order.items.length, order.status)}
-                        />
+                      {/* Order tracking timeline (Grab-style) */}
+                        {/* Chỉ hiện timeline khi còn món chưa xong */}
+                        {(() => {
+                          const allDone = order.items.length > 0 && order.items.every(
+                            item => item.status === 'COMPLETED' || item.status === 'SERVED'
+                          );
+                          const waitingPayment = order.status === 'COMPLETED' && !order.isPaid;
+                          return !allDone ? (
+                            <OrderTimeline
+                              currentStatus={order.status}
+                              estimatedReadyAt={computeEta(order.createdAt, order.items.length, order.status)}
+                            />
+                          ) : waitingPayment ? (
+                            <div className="py-4 px-3 rounded-2xl bg-gradient-to-br from-emerald-500/10 to-amber-500/5 border border-emerald-500/20 text-center space-y-2">
+                              <div className="flex items-center justify-center gap-2">
+                                <Receipt className="w-5 h-5 text-emerald-400" />
+                                <span className="font-extrabold text-sm text-emerald-300">Đơn hàng sẵn sàng thanh toán</span>
+                              </div>
+                              <p className="text-xs text-zinc-400">Nhấn nút bên dưới để xem hoá đơn và thanh toán.</p>
+                            </div>
+                          ) : (
+                            /* Màn hình Chúc ăn ngon */
+                            <div className="py-4 px-3 rounded-2xl bg-gradient-to-br from-emerald-500/10 to-amber-500/5 border border-emerald-500/20 text-center space-y-2">
+                              <div className="flex items-center justify-center gap-2">
+                                <PartyPopper className="w-5 h-5 text-amber-400 animate-bounce" />
+                                <span className="font-extrabold text-sm text-emerald-300">Tất cả món đã sẵn sàng!</span>
+                                <PartyPopper className="w-5 h-5 text-amber-400 animate-bounce" style={{ animationDelay: '0.2s' }} />
+                              </div>
+                              <p className="text-xl font-black text-white">🍽️ Chúc bạn ăn ngon miệng!</p>
+                              <p className="text-xs text-zinc-400">Khi dùng xong, nhấn nút bên dưới để thanh toán.</p>
+                            </div>
+                          );
+                        })()}
 
                         {/* Items list */}
                         <div className="space-y-3">
@@ -859,14 +896,30 @@ export default function CustomerMenuPage() {
                 </div>
 
                 {/* Payment button */}
-                <div className="p-4 bg-zinc-950/60 border-t border-zinc-800 text-center">
-                  <p className="text-[11px] text-zinc-500 mb-2">Sau khi dùng xong, quý khách vui lòng liên hệ nhân viên hoặc thanh toán tại quầy.</p>
-                  <button 
-                    onClick={() => router.push(`/menu/${tableId}/checkout`)}
-                    className="w-full bg-amber-500 hover:bg-amber-400 text-black font-semibold py-2.5 rounded-xl border border-amber-500 shadow-md shadow-amber-500/10 transition-all active:scale-98 text-xs"
-                  >
-                    Xem hoá đơn & Thanh toán
-                  </button>
+                <div className="p-4 bg-zinc-950/60 border-t border-zinc-800">
+                  {/* Nếu tất cả đơn hàng đều done: hiện nút thanh toán to nổi bật hơn */}
+                  {activeOrders.some(o =>
+                    (o.status === 'COMPLETED' && !o.isPaid) ||
+                    (o.items.length > 0 && o.items.every(item => item.status === 'COMPLETED' || item.status === 'SERVED'))
+                  ) ? (
+                    <button
+                      onClick={() => router.push(`/menu/${tableId}/checkout`)}
+                      className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold py-3.5 rounded-xl shadow-lg shadow-emerald-500/20 transition-all active:scale-98 flex items-center justify-center gap-2"
+                    >
+                      <Receipt className="w-4 h-4" />
+                      Xem hoá đơn & Thanh toán
+                    </button>
+                  ) : (
+                    <>
+                      <p className="text-[11px] text-zinc-500 mb-2 text-center">Sau khi dùng xong, quý khách vui lòng liên hệ nhân viên hoặc thanh toán tại quầy.</p>
+                      <button
+                        onClick={() => router.push(`/menu/${tableId}/checkout`)}
+                        className="w-full bg-amber-500 hover:bg-amber-400 text-black font-semibold py-2.5 rounded-xl border border-amber-500 shadow-md shadow-amber-500/10 transition-all active:scale-98 text-xs"
+                      >
+                        Xem hoá đơn & Thanh toán
+                      </button>
+                    </>
+                  )}
                 </div>
               </motion.div>
             </>

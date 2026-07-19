@@ -121,10 +121,12 @@ const paymentService = {
   },
 
   /** Poll payment status by ID (for SePay QR waiting screen) */
-  async pollStatus(paymentId: string): Promise<{ status: PaymentStatus }> {
-    const res = await axiosInstance.get(API_ROUTES.PAYMENTS.DETAIL(paymentId));
-    const p = unwrap<Payment>(res.data);
-    return { status: p.status };
+  async pollStatus(paymentId: string, orderId?: string): Promise<{ status: PaymentStatus }> {
+    const res = await axiosInstance.get(API_ROUTES.PAYMENTS.POLL_PAYMENT(paymentId), {
+      params: orderId ? { orderId } : undefined,
+    });
+    const data = unwrap<{ status: PaymentStatus }>(res.data);
+    return { status: data.status };
   },
 };
 

@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useParams } from "next/navigation";
 import axiosInstance from "@/lib/services/axiosInstance";
 import reservationService, { AvailableTable } from "@/lib/services/reservationService";
+import TableAvailabilitySelector from "@/components/reservations/TableAvailabilitySelector";
 import paymentService, { TransferInfo } from "@/lib/services/paymentService";
 import PaymentDeadlineCountdown from "@/components/reservations/PaymentDeadlineCountdown";
 import { io } from "socket.io-client";
@@ -798,50 +799,14 @@ function BookingFormCard({ data, accentColor }: { data: any; accentColor: string
 
           {assignmentMode === "manual" && (
             <div style={{ marginTop: 8, padding: "10px", borderRadius: 8, background: "var(--card)", border: "1px solid var(--border)" }}>
-              {loadingTables ? (
-                <div style={{ fontSize: 11, color: "var(--text-muted)", textAlign: "center", padding: "8px 0" }}>
-                  Đang tìm bàn trống...
-                </div>
-              ) : availableTables.length === 0 ? (
-                <div style={{ fontSize: 11, color: "#ef4444", textAlign: "center", padding: "8px 0" }}>
-                  Không tìm thấy bàn trống phù hợp với thời gian và số khách đã chọn.
-                </div>
-              ) : (
-                <div>
-                  <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 6 }}>
-                    Chọn bàn trống (chọn nhiều bàn):
-                  </div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, maxHeight: 150, overflowY: "auto", padding: "2px" }}>
-                    {availableTables.map((t) => {
-                      const isSelected = selectedTableIds.includes(t.id);
-                      return (
-                        <button
-                          key={t.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedTableIds(prev =>
-                              prev.includes(t.id) ? prev.filter(id => id !== t.id) : [...prev, t.id]
-                            );
-                          }}
-                          style={{
-                            padding: "4px 8px",
-                            borderRadius: 6,
-                            fontSize: 11,
-                            fontWeight: 600,
-                            cursor: "pointer",
-                            border: isSelected ? `1.5px solid ${accentColor}` : "1.5px solid var(--border)",
-                            background: isSelected ? accentColor : "var(--surface)",
-                            color: isSelected ? "white" : "var(--text)",
-                            transition: "all 0.15s",
-                          }}
-                        >
-                          {t.code} ({t.seatingCapacity} chỗ)
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+              <TableAvailabilitySelector
+                restaurantId={tenant?.id || ''}
+                time={new Date(`${form.date}T${form.time}:00`).toISOString()}
+                numberOfGuests={Number(form.guests)}
+                onTableSelect={setSelectedTableIds}
+                onSwitchToAuto={() => setAssignmentMode("auto")}
+                selectedTableIds={selectedTableIds}
+              />
             </div>
           )}
         </div>

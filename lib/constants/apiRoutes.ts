@@ -73,7 +73,7 @@ export const API_ROUTES = {
     CASH: '/payments/cash',
     TRANSFER_INFO: '/payments/transfer-info',
     SEPAY_WEBHOOK: '/payments/sepay-webhook',
-    POLL_PAYMENT: (paymentId: string) => `/payments/${paymentId}/status`,
+    POLL_PAYMENT: (paymentId: string) => `/payments/public/${paymentId}/status`,
   },
   FEEDBACKS: {
     LIST: '/feedbacks',

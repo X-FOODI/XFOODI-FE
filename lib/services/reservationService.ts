@@ -1,5 +1,6 @@
 import axiosInstance from './axiosInstance';
 import { API_ROUTES } from '../constants/apiRoutes';
+import { TableAvailabilityStatus } from '../types/tableAvailability';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export interface ReservationTable {
@@ -109,6 +110,8 @@ export interface CreateReservationDto {
     quantity: number;
     note?: string;
   }>;
+  acceptTimeLimit?: boolean;
+  acceptWaitForPendingCheckin?: boolean;
 }
 
 export interface AvailableTable {
@@ -121,6 +124,14 @@ export interface AvailableTable {
   tableStatus: { id: string; code: string; name: string };
   isAvailable?: boolean;
   conflictTime?: string | null;
+  mustLeaveBy?: string | null;
+  limitReason?: string | null;
+  conflictType?: 'PENDING_CHECKIN' | 'TIME_LIMIT' | null;
+  pendingReservation?: {
+    time: string;
+    expectedEndTime: string;
+    status: string;
+  } | null;
   positionX?: number;
   positionY?: number;
   width?: number;
@@ -217,6 +228,24 @@ const reservationService = {
   }): Promise<AvailableTable[]> {
     const res = await axiosInstance.get(API_ROUTES.RESERVATIONS.CHECK_TABLES, { params });
     return unwrap<AvailableTable[]>(res.data);
+  },
+
+  async getTablesAvailability(params: {
+    restaurantId: string;
+    time: string;
+    numberOfGuests: number;
+  }): Promise<TableAvailabilityStatus[]> {
+    const res = await axiosInstance.get('/reservations/tables-availability', { params });
+    return unwrap<TableAvailabilityStatus[]>(res.data);
+  },
+
+  async checkSlots(params: {
+    restaurantId: string;
+    date: string;
+    numberOfGuests: number;
+  }): Promise<Record<string, boolean>> {
+    const res = await axiosInstance.get('/reservations/check-slots', { params });
+    return unwrap<Record<string, boolean>>(res.data);
   },
 
   async checkConflict(params: {
