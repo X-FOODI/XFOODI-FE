@@ -8,6 +8,7 @@ import FaqSection from "./components/FaqSection";
 import FeatureSection from "./components/FeatureSection";
 import Footer from "./components/Footer";
 import Header from "./components/Header";
+import SystemAnnouncementBanner from "@/components/dashboard/SystemAnnouncementBanner";
 import HeroSection from "./components/HeroSection";
 import MultiTenantSection from "./components/MultiTenantSection";
 import PageTransition from "./components/PageTransition";
@@ -46,6 +47,7 @@ export default function Home() {
     <PageTransition minimumLoadingTime={2000}>
       <div style={{ minHeight: "100vh" }}>
         <Header />
+        <SystemAnnouncementBanner variant="floating-bottom" />
         <main>
           {/* 1. Hero Section (Includes Trusted By Partners bar) */}
           <section id="hero" style={{ scrollMarginTop: 120 }}>
