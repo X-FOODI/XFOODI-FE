@@ -1600,23 +1600,36 @@ export default function NewReservationPage() {
                             </div>
                           )}
 
-                          {/* AI Recommendations for Pre-order */}
-                          {restaurantId && Object.keys(selectedDishes).length > 0 && (
+                          {/* AI Recommendations for Pre-order — luôn hiện khi toggle bật */}
+                          {restaurantId && (
                             <div className="pt-4 border-t border-dashed border-[var(--border)] space-y-4">
+                              {/* Bán chạy & thói quen — luôn hiện */}
                               <Recommendations
-                                variant="frequently-bought"
+                                variant="top-sellers"
                                 restaurantId={restaurantId}
-                                dishId={Object.keys(selectedDishes)[0]}
                                 excludeIds={Object.keys(selectedDishes)}
                                 onAdd={addRecommendedDish}
                               />
-                              <Recommendations
-                                variant="for-cart"
-                                restaurantId={restaurantId}
-                                cartDishIds={Object.keys(selectedDishes)}
-                                excludeIds={Object.keys(selectedDishes)}
-                                onAdd={addRecommendedDish}
-                              />
+                              {/* Thường được gọi kèm — hiện khi đã có món */}
+                              {Object.keys(selectedDishes).length > 0 && (
+                                <Recommendations
+                                  variant="frequently-bought"
+                                  restaurantId={restaurantId}
+                                  dishId={Object.keys(selectedDishes)[0]}
+                                  excludeIds={Object.keys(selectedDishes)}
+                                  onAdd={addRecommendedDish}
+                                />
+                              )}
+                              {/* AI gợi ý theo giỏ — hiện khi đã có món */}
+                              {Object.keys(selectedDishes).length > 0 && (
+                                <Recommendations
+                                  variant="for-cart"
+                                  restaurantId={restaurantId}
+                                  cartDishIds={Object.keys(selectedDishes)}
+                                  excludeIds={Object.keys(selectedDishes)}
+                                  onAdd={addRecommendedDish}
+                                />
+                              )}
                             </div>
                           )}
                         </>
