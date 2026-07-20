@@ -301,10 +301,14 @@ export default function CustomerCheckoutPage() {
       // immediately — so it can never leak if the component unmounts.
       const socketUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/?$/, "") || "http://localhost:5000";
       const socket = io(socketUrl, {
-        transports: ["websocket"],
+        transports: ["polling"], // dùng polling để khớp với dashboard
+        reconnection: false,
       });
 
+      let closed = false;
       const closeSocket = () => {
+        if (closed) return;
+        closed = true;
         if (socket.connected) socket.disconnect();
         else socket.close();
       };
@@ -320,10 +324,11 @@ export default function CustomerCheckoutPage() {
           orderReference: activeOrder.reference,
           message: `Bàn ${table.code} yêu cầu thanh toán tiền mặt (Đơn: ${activeOrder.reference})`,
         });
-        closeSocket();
+        // Đợi 2s để server nhận event rồi mới đóng socket
+        setTimeout(closeSocket, 2000);
       });
-      // Safety net: ensure the socket is torn down even if it never connects.
-      setTimeout(closeSocket, 5000);
+      // Safety net: đóng sau 8s nếu không connect được
+      setTimeout(closeSocket, 8000);
 
       // Quick UI feedback (independent of the socket lifecycle)
       setTimeout(() => {
