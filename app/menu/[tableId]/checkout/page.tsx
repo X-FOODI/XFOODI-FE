@@ -16,11 +16,13 @@ import {
   Bell,
   Sparkles,
   Utensils,
-  Receipt
+  Receipt,
+  Ticket
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { io } from "socket.io-client";
 import { useAuth } from "@/lib/contexts/AuthContext";
+import voucherService from "@/lib/services/voucherService";
 
 interface TableInfo {
   id: string;
@@ -38,10 +40,14 @@ interface TableInfo {
 interface ActiveOrder {
   id: string;
   reference: string;
+  subTotal: number;
+  discountAmount: number;
+  taxAmount: number;
   totalAmount: number;
   createdAt: string;
   reservationId?: string | null;
   depositPaid?: number; // tổng tiền cọc đã thanh toán
+  metadata?: any;
   items: Array<{
     id: string;
     name: string;
@@ -77,6 +83,15 @@ export default function CustomerCheckoutPage() {
   const [callingStaff, setCallingStaff] = useState(false);
   const [staffCalled, setStaffCalled] = useState(false);
 
+  // Voucher states
+  const [myVouchers, setMyVouchers] = useState<any[]>([]);
+  const [selectedVoucher, setSelectedVoucher] = useState<any | null>(null);
+  const [voucherLoading, setVoucherLoading] = useState(false);
+  const [applyingVoucher, setApplyingVoucher] = useState(false);
+  const [voucherError, setVoucherError] = useState<string | null>(null);
+  const [showVoucherList, setShowVoucherList] = useState(false);
+  const [voucherCodeInput, setVoucherCodeInput] = useState("");
+
   // Load data
   const loadData = useCallback(async () => {
     if (!tableId) return;
@@ -108,6 +123,11 @@ export default function CustomerCheckoutPage() {
           }
 
           setActiveOrder(order);
+
+          // Restore selected voucher from order metadata
+          if (order.metadata?.appliedVoucher) {
+            setSelectedVoucher({ id: order.metadata.appliedVoucher.userVoucherId, voucher: { code: order.metadata.appliedVoucher.code, title: order.metadata.appliedVoucher.code, discountType: order.metadata.appliedVoucher.discountType, discountValue: order.metadata.appliedVoucher.discountValue } });
+          }
         }
       }
     } catch (err) {
@@ -120,6 +140,124 @@ export default function CustomerCheckoutPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Fetch user's available vouchers when user is logged in and table info is loaded
+  useEffect(() => {
+    if (!user || !table?.restaurant?.id) return;
+    const fetchVouchers = async () => {
+      setVoucherLoading(true);
+      try {
+        const res = await voucherService.getMyVouchers(table.restaurant.id, true);
+        setMyVouchers(res.data || []);
+      } catch {
+        setMyVouchers([]);
+      } finally {
+        setVoucherLoading(false);
+      }
+    };
+    fetchVouchers();
+  }, [user, table?.restaurant?.id]);
+
+  // Apply or remove voucher
+  const handleApplyVoucher = async (userVoucher: any | null) => {
+    if (!activeOrder) return;
+    setApplyingVoucher(true);
+    setVoucherError(null);
+    try {
+      await voucherService.applyVoucherToOrder(activeOrder.id, userVoucher?.id ?? null);
+      setSelectedVoucher(userVoucher);
+      setShowVoucherList(false);
+      // Reset QR code since total has changed
+      setQrUrl(null);
+      setBankInfo(null);
+      setPaymentId(null);
+      // Reload order to get updated totals
+      await loadData();
+    } catch (err: any) {
+      setVoucherError(err?.response?.data?.message || "Không thể áp dụng voucher. Vui lòng thử lại.");
+    } finally {
+      setApplyingVoucher(false);
+    }
+  };
+
+  // Apply voucher by typed code
+  const handleApplyByCode = async () => {
+    if (!activeOrder || !voucherCodeInput.trim()) return;
+    setApplyingVoucher(true);
+    setVoucherError(null);
+    try {
+      const code = voucherCodeInput.trim().toUpperCase();
+      
+      // 1. Search in user's already redeemed vouchers
+      const foundUserVoucher = myVouchers.find(
+        (uv: any) => uv.voucher?.code?.toUpperCase() === code && !uv.isUsed
+      );
+
+      if (foundUserVoucher) {
+        await voucherService.applyVoucherToOrder(activeOrder.id, foundUserVoucher.id);
+        setSelectedVoucher(foundUserVoucher);
+        setVoucherCodeInput("");
+        setQrUrl(null);
+        setBankInfo(null);
+        setPaymentId(null);
+        await loadData();
+        return;
+      }
+
+      // 2. Not found in user's redeemed vouchers, search in eligible vouchers to auto-redeem
+      const eligibleRes = await voucherService.getEligibleVouchers();
+      const allEligible = [
+        ...(eligibleRes.platformVouchers || []),
+        ...(eligibleRes.ownerVouchers || [])
+      ];
+
+      const matchVoucher = allEligible.find(
+        (v: any) => v.code?.toUpperCase() === code
+      );
+
+      if (!matchVoucher) {
+        throw new Error("Mã voucher không tồn tại, hết hạn hoặc không đủ điều kiện áp dụng.");
+      }
+
+      // Check if points are required
+      const pointsRequired = matchVoucher.pointsRequired ?? 0;
+      if (pointsRequired > 0) {
+        throw new Error(`Voucher này cần ${pointsRequired} điểm để đổi. Hãy đổi voucher ở trang Voucher trước.`);
+      }
+
+      // Auto-redeem for 0 points
+      const redeemRes = await voucherService.redeemVoucher({
+        voucherId: matchVoucher.id || matchVoucher._id
+      });
+
+      if (!redeemRes.success || !redeemRes.data) {
+        throw new Error(redeemRes.message || "Không thể tự động đổi voucher.");
+      }
+
+      const newUserVoucher = redeemRes.data;
+
+      // Apply the newly redeemed voucher
+      await voucherService.applyVoucherToOrder(activeOrder.id, newUserVoucher.id || null);
+      setSelectedVoucher(newUserVoucher);
+      setVoucherCodeInput("");
+      
+      // Refresh myVouchers list
+      if (table?.restaurant?.id) {
+        const freshVouchers = await voucherService.getMyVouchers(table.restaurant.id, true);
+        setMyVouchers(freshVouchers.data || []);
+      }
+
+      setQrUrl(null);
+      setBankInfo(null);
+      setPaymentId(null);
+      await loadData();
+    } catch (err: any) {
+      console.error(err);
+      setVoucherError(err?.response?.data?.message || err.message || "Không thể áp dụng voucher.");
+    } finally {
+      setApplyingVoucher(false);
+    }
+  };
 
   // Handle Bank Transfer QR Code Generation
   const generateQRCode = useCallback(async () => {
@@ -404,11 +542,20 @@ export default function CustomerCheckoutPage() {
             <div className="border-t border-zinc-850 pt-3 space-y-2 text-xs">
               <div className="flex justify-between text-zinc-400">
                 <span>Cộng món</span>
-                <span>{(activeOrder.totalAmount / 1.1).toLocaleString("vi-VN")}đ</span>
+                <span>{(activeOrder.subTotal ?? activeOrder.totalAmount / 1.1).toLocaleString("vi-VN")}đ</span>
               </div>
+              {(activeOrder.discountAmount ?? 0) > 0 && (
+                <div className="flex justify-between text-emerald-400">
+                  <span className="flex items-center gap-1">
+                    <Ticket className="w-3 h-3" />
+                    Giảm giá voucher
+                  </span>
+                  <span>-{(activeOrder.discountAmount!).toLocaleString("vi-VN")}đ</span>
+                </div>
+              )}
               <div className="flex justify-between text-zinc-400">
                 <span>Thuế VAT (10%)</span>
-                <span>{(activeOrder.totalAmount - (activeOrder.totalAmount / 1.1)).toLocaleString("vi-VN")}đ</span>
+                <span>{(activeOrder.taxAmount ?? (activeOrder.totalAmount - (activeOrder.subTotal ?? activeOrder.totalAmount / 1.1))).toLocaleString("vi-VN")}đ</span>
               </div>
               {(activeOrder.depositPaid ?? 0) > 0 && (
                 <div className="flex justify-between text-emerald-400">
@@ -428,6 +575,125 @@ export default function CustomerCheckoutPage() {
               </div>
             </div>
           </div>
+
+          {/* ─── VOUCHER SECTION ─── */}
+          {user && (
+            <div className="p-4 rounded-2xl bg-zinc-900/80 border border-zinc-800 space-y-3">
+              <div className="flex items-center gap-2">
+                <Ticket className="w-4 h-4 text-amber-500" />
+                <h2 className="font-bold text-sm text-white">Voucher giảm giá</h2>
+              </div>
+
+              {selectedVoucher ? (
+                <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                      <Ticket className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-emerald-400">{selectedVoucher.voucher?.code || selectedVoucher.code}</p>
+                      <p className="text-[10px] text-zinc-400">
+                        {selectedVoucher.voucher?.discountType === 'percentage'
+                          ? `Giảm ${selectedVoucher.voucher?.discountValue}%`
+                          : `Giảm ${Number(selectedVoucher.voucher?.discountValue).toLocaleString('vi-VN')}đ`
+                        }
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleApplyVoucher(null)}
+                    disabled={applyingVoucher}
+                    className="text-[10px] text-zinc-400 hover:text-red-400 transition-colors px-2 py-1 rounded-lg hover:bg-red-500/10"
+                  >
+                    {applyingVoucher ? <Loader2 className="w-3 h-3 animate-spin" /> : "Hủy"}
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Nhập mã voucher (ví dụ: SALE25)"
+                      value={voucherCodeInput}
+                      onChange={(e) => setVoucherCodeInput(e.target.value)}
+                      className="flex-1 px-3 py-2 text-xs rounded-xl bg-zinc-800/80 border border-zinc-700 text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500/50 transition-all"
+                      disabled={applyingVoucher}
+                    />
+                    <button
+                      onClick={handleApplyByCode}
+                      disabled={applyingVoucher || !voucherCodeInput.trim()}
+                      className="px-4 py-2 text-xs font-bold text-black bg-amber-500 hover:bg-amber-400 disabled:bg-zinc-800 disabled:text-zinc-500 rounded-xl transition-all flex items-center gap-1 shrink-0"
+                    >
+                      {applyingVoucher && <Loader2 className="w-3 h-3 animate-spin" />}
+                      Áp dụng
+                    </button>
+                  </div>
+
+                  <div className="text-center text-[10px] text-zinc-500">hoặc</div>
+
+                  <button
+                    onClick={() => setShowVoucherList(v => !v)}
+                    disabled={voucherLoading || myVouchers.length === 0}
+                    className="w-full flex items-center justify-between p-3 rounded-xl border border-dashed border-zinc-700 text-zinc-400 hover:text-amber-400 hover:border-amber-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <span className="text-xs">
+                      {voucherLoading ? "Đang tải voucher..." : myVouchers.length === 0 ? "Bạn không có voucher khả dụng" : `Chọn voucher (${myVouchers.length} khả dụng)`}
+                    </span>
+                    {!voucherLoading && myVouchers.length > 0 && (
+                      <Ticket className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {voucherError && (
+                <p className="text-[10px] text-red-400 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" /> {voucherError}
+                </p>
+              )}
+
+              {/* Voucher list dropdown */}
+              <AnimatePresence>
+                {showVoucherList && myVouchers.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="space-y-2 max-h-56 overflow-y-auto pt-1">
+                      {myVouchers.map((uv: any) => {
+                        const v = uv.voucher || uv;
+                        const discountLabel = v.discountType === 'percentage'
+                          ? `Giảm ${v.discountValue}%`
+                          : `Giảm ${Number(v.discountValue).toLocaleString('vi-VN')}đ`;
+                        return (
+                          <button
+                            key={uv.id}
+                            onClick={() => handleApplyVoucher(uv)}
+                            disabled={applyingVoucher}
+                            className="w-full flex items-center gap-3 p-3 rounded-xl bg-zinc-800/60 border border-zinc-700/50 hover:border-amber-500/50 hover:bg-amber-500/5 transition-all text-left"
+                          >
+                            <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
+                              <Ticket className="w-4 h-4 text-amber-400" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-bold text-white truncate">{v.code}</p>
+                              <p className="text-[10px] text-amber-400">{discountLabel}</p>
+                              {v.title && v.title !== v.code && (
+                                <p className="text-[10px] text-zinc-500 truncate">{v.title}</p>
+                              )}
+                            </div>
+                            {applyingVoucher && <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400 shrink-0" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
 
           {/* ─── PAYMENT METHOD CHOICE ─── */}
           <div className="space-y-2.5">

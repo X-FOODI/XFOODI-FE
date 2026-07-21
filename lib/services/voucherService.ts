@@ -47,6 +47,7 @@ export interface Voucher {
   venueApplication?: VoucherVenueApplication | null;
   bookingTimeFromMin?: number;
   bookingTimeToMin?: number;
+  pointsRequired?: number;
 }
 
 export interface ApiResponse<T = unknown> {
@@ -198,6 +199,26 @@ class VoucherService {
       '/vouchers/redeem',
       payload
     );
+    return response.data;
+  }
+
+  /**
+   * Lấy danh sách voucher đã đổi của tôi (khách hàng)
+   */
+  async getMyVouchers(restaurantId?: string, onlyUnused?: boolean): Promise<ApiResponse<any[]>> {
+    const response = await axiosInstance.get<ApiResponse<any[]>>('/vouchers/my', {
+      params: { restaurantId, onlyUnused },
+    });
+    return response.data;
+  }
+
+  /**
+   * Áp dụng voucher vào đơn hàng
+   */
+  async applyVoucherToOrder(orderId: string, userVoucherId: string | null): Promise<ApiResponse<any>> {
+    const response = await axiosInstance.post<ApiResponse<any>>(`/orders/${orderId}/apply-voucher`, {
+      userVoucherId,
+    });
     return response.data;
   }
 
