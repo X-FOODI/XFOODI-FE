@@ -63,6 +63,10 @@ export interface Reservation {
     id: string;
     reference: string;
     totalAmount: string | number;
+    subTotal?: string | number;
+    discountAmount?: string | number;
+    taxAmount?: string | number;
+    metadata?: any;
     orderDetails: Array<{
       id: string;
       quantity: number;
@@ -112,6 +116,7 @@ export interface CreateReservationDto {
   }>;
   acceptTimeLimit?: boolean;
   acceptWaitForPendingCheckin?: boolean;
+  userVoucherId?: string;
 }
 
 export interface AvailableTable {
