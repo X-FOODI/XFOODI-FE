@@ -602,10 +602,43 @@ export default function ReservationDetailPage() {
                 </div>
               </div>
             ))}
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 12, paddingTop: 12, borderTop: "1px dashed var(--border)" }}>
-              <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>Tổng hóa đơn tạm tính:</span>
-              <span style={{ fontSize: 15, fontWeight: 700, color: brandColor }}>{Number(res.orders[0].totalAmount).toLocaleString("vi-VN")}đ</span>
-            </div>
+            {(() => {
+              const order = res.orders[0] as any;
+              const subTotal = Number(order.subTotal || 0);
+              const discountAmount = Number(order.discountAmount || 0);
+              const taxAmount = Number(order.taxAmount || 0);
+              const totalAmount = Number(order.totalAmount || 0);
+              const voucherCode = order.metadata?.appliedVoucher?.code;
+
+              return (
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px dashed var(--border)", display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ fontSize: 13, color: "var(--text-muted)" }}>Tạm tính món ăn:</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{subTotal.toLocaleString("vi-VN")}đ</span>
+                  </div>
+                  {discountAmount > 0 && (
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ fontSize: 13, color: "#10b981", fontWeight: 600 }}>
+                        Voucher giảm giá {voucherCode ? `(${voucherCode})` : ""}:
+                      </span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "#10b981" }}>
+                        -{discountAmount.toLocaleString("vi-VN")}đ
+                      </span>
+                    </div>
+                  )}
+                  {taxAmount > 0 && (
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ fontSize: 13, color: "var(--text-muted)" }}>Thuế VAT (10%):</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{taxAmount.toLocaleString("vi-VN")}đ</span>
+                    </div>
+                  )}
+                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, paddingTop: 8, borderTop: "1.5px solid var(--border)" }}>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>Số tiền phải trả:</span>
+                    <span style={{ fontSize: 16, fontWeight: 900, color: brandColor }}>{totalAmount.toLocaleString("vi-VN")}đ</span>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
 
