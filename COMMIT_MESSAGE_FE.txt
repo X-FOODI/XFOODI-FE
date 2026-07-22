@@ -1,0 +1,42 @@
+fix(live-orders): Add pre-flight auth check and enhanced error handling for cash payment
+
+Problem:
+- Cash payment real-time was broken (no POST /api/payments/cash in backend log)
+- Staff getting 401 Unauthorized due to expired/missing access token
+- Poor error messages made debugging difficult
+
+Changes:
+- Added pre-flight token validation before API call
+- Enhanced console logging with emoji markers for easier debugging
+- Added specific error handling for 401 (expired session) and 400 (bad data)
+- Added validation for cashReceived > 0
+- Improved user-facing error messages with actionable steps
+
+Technical Details:
+- Check localStorage/sessionStorage for accessToken before calling payCash API
+- If token missing/invalid, prompt staff to logout and login again
+- Added detailed console logs at each step:
+  * 🔍 Pre-flight check (order ID, amount, token status)
+  * 📞 API call start
+  * ✅ Success confirmation
+  * ❌ Error details (status, message, response)
+
+Files Modified:
+- app/restaurant/live-orders/page.tsx (handleCashPayment function)
+
+Related Issue:
+Real-time cash payment flow requires valid staff session. When token expires,
+the API call fails silently before reaching backend, causing checkout page
+to hang on payment status polling.
+
+Solution for Staff:
+1. Logout (click avatar in top right)
+2. Login again with email + password
+3. Check "Remember me" to keep token longer
+4. Retry cash payment
+
+Testing:
+- Open DevTools Console (F12) when clicking "Thu tiền mặt"
+- Should see: [Cash Payment] 🔍 Pre-flight check with Token exists: YES
+- Backend log should show: POST /api/payments/cash
+- Checkout page should auto-navigate to success page via socket event
