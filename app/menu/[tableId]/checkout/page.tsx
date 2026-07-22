@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import axiosInstance from "@/lib/services/axiosInstance";
 import paymentService, { PaymentStatus } from "@/lib/services/paymentService";
@@ -91,6 +91,7 @@ export default function CustomerCheckoutPage() {
   const [vatEmail, setVatEmail] = useState("ketoan@xeko.com");
   const [vatSubmitting, setVatSubmitting] = useState(false);
   const [vatResult, setVatResult] = useState<{ status: string; lookupCode?: string } | null>(null);
+  const vatSubmittedRef = useRef(false);
 
   // Load data
   const loadData = useCallback(async () => {
@@ -210,10 +211,11 @@ export default function CustomerCheckoutPage() {
   useEffect(() => {
     if (!paymentId || !polling) return;
 
-    const markPaid = () => {
+    const markPaid = (completedPaymentId?: string) => {
       setPaymentSuccess(true);
       setPolling(false);
-      if (wantVatInvoice && paymentId) submitVatInvoice(paymentId);
+      const targetId = completedPaymentId || paymentId;
+      if (wantVatInvoice && targetId) submitVatInvoice(targetId);
       setTimeout(() => setShowFeedback(true), 1500);
     };
 
@@ -230,13 +232,13 @@ export default function CustomerCheckoutPage() {
 
     socket.on("PAYMENT_COMPLETED", (data: any) => {
       if (data?.paymentId === paymentId || data?.orderId === activeOrder?.id) {
-        markPaid();
+        markPaid(data?.paymentId);
       }
     });
 
     socket.on("ORDER_STATUS_CHANGED", (data: any) => {
       if (data?.orderId === activeOrder?.id && data?.isPaid === true) {
-        markPaid();
+        markPaid(data?.paymentId);
       }
     });
 
@@ -245,7 +247,7 @@ export default function CustomerCheckoutPage() {
       try {
         const check = await paymentService.pollStatus(paymentId, activeOrder?.id);
         if (check.status === PaymentStatus.COMPLETED) {
-          markPaid();
+          markPaid(paymentId);
           clearInterval(interval);
         }
       } catch (err) {
@@ -275,7 +277,8 @@ export default function CustomerCheckoutPage() {
       if (data?.orderId === activeOrder?.id) {
         setPaymentSuccess(true);
         setPolling(false);
-        if (wantVatInvoice && data?.paymentId) submitVatInvoice(data.paymentId);
+        const targetId = data?.paymentId || paymentId;
+        if (wantVatInvoice && targetId) submitVatInvoice(targetId);
         setTimeout(() => setShowFeedback(true), 1500);
       }
     });
@@ -344,9 +347,10 @@ export default function CustomerCheckoutPage() {
 
   // Submit VAT invoice after payment success
   const submitVatInvoice = async (completedPaymentId: string) => {
-    if (!wantVatInvoice || !table) return;
+    if (!wantVatInvoice || !table || vatSubmittedRef.current) return;
     if (!vatCompanyName || !vatTaxId || !vatAddress || !vatEmail) return;
     try {
+      vatSubmittedRef.current = true;
       setVatSubmitting(true);
       const res = await axiosInstance.post("/vat-invoices", {
         paymentId: completedPaymentId,
@@ -364,6 +368,7 @@ export default function CustomerCheckoutPage() {
       }
     } catch (err: any) {
       console.error("Lỗi tạo hóa đơn VAT:", err);
+      vatSubmittedRef.current = false;
       setVatResult({ status: "FAILED" });
     } finally {
       setVatSubmitting(false);
