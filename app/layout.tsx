@@ -14,6 +14,7 @@ import AntdProvider from "./theme/AntdProvider";
 
 import { ChatAssistantClient } from "@/components/ui/ChatAssistantClient";
 import GlobalBanModal from "@/components/GlobalBanModal";
+import GlobalMaintenanceScreen from "@/components/GlobalMaintenanceScreen";
 
 const inter = Inter({ subsets: ["latin", "vietnamese"] });
 
@@ -152,6 +153,7 @@ export default function RootLayout({
                       {children}
                       <ChatAssistantClient />
                       <GlobalBanModal />
+                      <GlobalMaintenanceScreen />
                     </CartProvider>
                   </AntdProvider>
                 </ToastProvider>
