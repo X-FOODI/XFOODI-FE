@@ -153,6 +153,19 @@ axiosInstance.interceptors.response.use(
       }
     }
 
+    // Check for Maintenance Mode
+    if (error.response?.status === 503 && error.response?.data?.isMaintenance) {
+      if (typeof window !== 'undefined') {
+        const event = new CustomEvent('maintenanceMode', {
+          detail: { 
+            message: error.response?.data?.message,
+            estimatedFinish: error.response?.data?.estimatedFinish
+          },
+        });
+        window.dispatchEvent(event);
+      }
+    }
+
     return Promise.reject(error);
   }
 );
