@@ -675,7 +675,7 @@ export default function NewReservationPage() {
   useEffect(() => {
     if (timeSlots.length > 0) {
       // Find first slot that is neither in past nor has zero available tables
-      const firstAvailable = timeSlots.find(slot => {
+      const firstAvailable = timeSlots.find((slot: string) => {
         const isPast = isSlotInPast(slot);
         const isBooked = availableSlots[slot] === false;
         return !isPast && !isBooked;
