@@ -3,7 +3,7 @@
 import type { ReactionType, SocialComment, SocialPost } from '@/lib/types/social';
 import { motion } from 'framer-motion';
 import socialService from '@/lib/services/socialService';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   formatRelativeTime,
   getAvatarUrl,
@@ -63,14 +63,22 @@ export default function PostCard({
   const [menuOpen, setMenuOpen] = useState(false);
   const [comments, setComments] = useState<SocialComment[]>(post.comments ?? []);
   const [loadingComments, setLoadingComments] = useState(false);
+  // Track whether we've already fetched comments for this post to avoid infinite re-fetch
+  const fetchedRef = useRef(false);
 
   useEffect(() => {
+    // When the post itself changes (e.g. optimistic → real ID swap), reset state
+    fetchedRef.current = false;
     setComments(post.comments ?? []);
-  }, [post.comments, post.id]);
+    setLoadingComments(false);
+  }, [post.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!showComments || comments.length > 0 || loadingComments) return;
+    if (!showComments) return;
     if (isOptimisticId(post.id)) return;
+    // Only fetch once per post; reset happens in the post.id effect above
+    if (fetchedRef.current) return;
+    fetchedRef.current = true;
     let cancelled = false;
     setLoadingComments(true);
     socialService
@@ -87,7 +95,8 @@ export default function PostCard({
     return () => {
       cancelled = true;
     };
-  }, [showComments, post.id, comments.length, loadingComments]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showComments, post.id]);
   const totalReactions = reactionTotal(post.reactions);
   const shareUrl =
     typeof window !== 'undefined'
