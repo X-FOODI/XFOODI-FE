@@ -132,11 +132,36 @@ export default function CustomerReservationDetailPage() {
       fetchReservation();
     });
 
+    // Staff/owner changed tables → deposit amount may have changed → refresh QR
+    socket.on("RESERVATION_UPDATED", (data: {
+      reservationId: string;
+      depositAmount: number;
+      tables: { id: string; code: string }[];
+      updatedAt: string;
+    }) => {
+      if (data.reservationId !== id) return;
+      showToast("info", "Thông tin đặt bàn đã cập nhật", `Bàn đã được đổi. Tiền cọc mới: ${Number(data.depositAmount).toLocaleString("vi-VN")}đ`);
+      // Re-fetch reservation and new transfer info (new amount → new QR)
+      fetchReservation();
+    });
+
+    // Real-time deposit confirmation from SePay webhook
+    socket.on("DEPOSIT_PAID", (data: { reservationId: string; paymentId: string; status: number }) => {
+      if (data.reservationId !== id) return;
+      setDepositPaid(true);
+      setTransferInfo(null);
+      if (pollInterval) clearInterval(pollInterval);
+      showToast("success", "Thanh toán thành công", "Đã nhận tiền cọc! Đặt bàn của bạn đang chờ nhà hàng xác nhận.");
+      fetchReservation();
+    });
+
     return () => {
       socket.disconnect();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, tenant]);
+
+
 
 
   const handleCopy = (text: string, fieldName: string) => {
