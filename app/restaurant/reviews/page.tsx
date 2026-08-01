@@ -13,6 +13,7 @@ import {
 } from "@ant-design/icons";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
+import SentimentCard from "@/components/dashboard/SentimentCard";
 import { useAuth } from "@/lib/contexts/AuthContext";
 import { useTenant } from "@/lib/contexts/TenantContext";
 import axiosInstance from "@/lib/services/axiosInstance";
@@ -236,6 +237,9 @@ export default function ReviewsPage() {
                 Làm mới
               </button>
             </div>
+
+            {/* ── AI Sentiment ────────────────────────────────────────────── */}
+            <SentimentCard />
 
             {/* ── Stats row ───────────────────────────────────────────────── */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
