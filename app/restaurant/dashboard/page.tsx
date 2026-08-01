@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import AIInsightCard from "@/components/dashboard/AIInsightCard";
+import LowStockCard from "@/components/dashboard/LowStockCard";
 import BestSellingDishesCard from "@/components/dashboard/BestSellingDishesCard";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
@@ -508,6 +510,12 @@ export default function RestaurantDashboardPage() {
                   }
                 />
               </div>
+            </section>
+
+            {/* AI Insight + cảnh báo tồn kho */}
+            <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <AIInsightCard />
+              <LowStockCard />
             </section>
 
             {/* Charts */}
