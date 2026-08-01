@@ -1136,7 +1136,7 @@ export default function NewReservationPage() {
                             Nhà hàng đóng cửa hoặc không nhận đặt bàn vào ngày này
                           </p>
                         ) : (
-                          timeSlots.map((slot) => {
+                          timeSlots.map((slot: string) => {
                             const isSelected = time === slot;
                             const isPast = isSlotInPast(slot);
                             // Disabled if slot is in past OR no available tables
