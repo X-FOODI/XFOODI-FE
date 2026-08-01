@@ -32,7 +32,8 @@ import {
   ChevronLeft,
   Ticket,
   TicketPercent,
-  Megaphone
+  Megaphone,
+  Wrench
 } from "lucide-react";
 
 interface NavItem {
@@ -187,6 +188,12 @@ export default function DashboardSidebar({
           label: "Cài đặt",
           path: "/admin/settings",
           icon: <Settings className="dashboard-sidebar-item-icon" size={20} strokeWidth={2} />,
+        },
+        {
+          id: "module-maintenance",
+          label: "Bảo trì module",
+          path: "/admin/module-maintenance",
+          icon: <Wrench className="dashboard-sidebar-item-icon" size={20} strokeWidth={2} />,
         },
         {
           id: "security",
