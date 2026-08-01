@@ -268,19 +268,13 @@ class VoucherService {
   // ── Admin APIs ────────────────────────────────────────────────────────────────
 
   /**
-   * [Admin] Lấy toàn bộ voucher hệ thống — phân tách platform/owner
-   * Gọi GET /vouchers/eligible không có restaurantId (trả về tất cả active)
+   * [Admin] Lấy toàn bộ voucher hệ thống — bao gồm cả đã khóa, hết hạn
+   * Gọi GET /vouchers/admin/all (endpoint riêng cho Admin, không lọc status)
    */
   async getAllAdminVouchers(): Promise<Voucher[]> {
     try {
-      const response = await axiosInstance.get<ApiResponse<any>>('/vouchers/eligible');
+      const response = await axiosInstance.get<ApiResponse<any>>('/vouchers/admin/all');
       const data = response.data?.data ?? response.data;
-      if (data && typeof data === 'object' && !Array.isArray(data)) {
-        return normalizeList([
-          ...(data.platformVouchers ?? []),
-          ...(data.ownerVouchers ?? []),
-        ]);
-      }
       if (Array.isArray(data)) return normalizeList(data);
       return [];
     } catch {
@@ -303,7 +297,10 @@ class VoucherService {
    * Khóa / vô hiệu hóa voucher (Admin)
    */
   async disableVoucher(id: string): Promise<ApiResponse<void>> {
-    const response = await axiosInstance.patch<ApiResponse<void>>(`/vouchers/${id}/disable`);
+    const response = await axiosInstance.patch<ApiResponse<void>>(`/vouchers/${id}`, {
+      status: 'disabled',
+      isActive: false
+    });
     return response.data;
   }
 
@@ -311,7 +308,10 @@ class VoucherService {
    * Kích hoạt lại voucher (Admin / Owner)
    */
   async enableVoucher(id: string): Promise<ApiResponse<void>> {
-    const response = await axiosInstance.patch<ApiResponse<void>>(`/vouchers/${id}/enable`);
+    const response = await axiosInstance.patch<ApiResponse<void>>(`/vouchers/${id}`, {
+      status: 'active',
+      isActive: true
+    });
     return response.data;
   }
 }
