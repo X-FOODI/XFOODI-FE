@@ -113,9 +113,9 @@ export default function ReservationDetailPage() {
     if (!res || !rejectReason.trim()) return;
     setRejectLoading(true);
     try {
-      const updated = await reservationService.updateStatus(res.id, "CANCELLED", rejectReason.trim());
-      setRes((r) => r ? { ...r, statusValue: updated.statusValue } : r);
-      showToast("success", "Từ chối đặt bàn", "Email thông báo từ chối và lý do đã được gửi tới khách. ✉️");
+      const updated = await reservationService.cancel(res.id, true, rejectReason.trim());
+      setRes(updated);
+      showToast("success", "Từ chối đặt bàn", "Đã từ chối đặt bàn và kích hoạt quy trình hoàn tiền (nếu có). Email thông báo đã gửi tới khách. ✉️");
       setShowRejectModal(false);
       setRejectReason("");
     } catch (err: any) {

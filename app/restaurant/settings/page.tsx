@@ -37,6 +37,9 @@ interface RestaurantMetadata {
     deposit_amount?: number | null;
     deposit_confirmation_timeout_minutes?: number;
     free_cancellation_hours?: number;
+    time_slot_mode?: "INTERVAL" | "FIXED_SLOTS";
+    slot_interval_minutes?: number;
+    fixed_time_slots?: string[];
   };
 }
 
@@ -81,6 +84,7 @@ export default function RestaurantSettingsPage() {
   // Tabs
   const [activeTab, setActiveTab] = useState<"general" | "appearance" | "reservation">("general");
   const [newClosedDate, setNewClosedDate] = useState("");
+  const [newFixedSlot, setNewFixedSlot] = useState("");
 
   // Form State
   const [formData, setFormData] = useState({
@@ -114,6 +118,9 @@ export default function RestaurantSettingsPage() {
       deposit_amount: "" as string | number,
       deposit_confirmation_timeout_minutes: 120,
       free_cancellation_hours: 12,
+      time_slot_mode: "INTERVAL" as "INTERVAL" | "FIXED_SLOTS",
+      slot_interval_minutes: 30,
+      fixed_time_slots: ["08:00", "09:00", "10:00", "11:30", "12:30", "18:00", "19:30", "21:00"] as string[],
     },
   });
 
@@ -163,6 +170,9 @@ export default function RestaurantSettingsPage() {
             deposit_amount: config.deposit_amount !== null && config.deposit_amount !== undefined ? config.deposit_amount : "",
             deposit_confirmation_timeout_minutes: config.deposit_confirmation_timeout_minutes ?? 120,
             free_cancellation_hours: config.free_cancellation_hours ?? 12,
+            time_slot_mode: config.time_slot_mode || "INTERVAL",
+            slot_interval_minutes: config.slot_interval_minutes ?? 30,
+            fixed_time_slots: config.fixed_time_slots || ["08:00", "09:00", "10:00", "11:30", "12:30", "18:00", "19:30", "21:00"],
           }
         });
       })
@@ -671,6 +681,121 @@ export default function RestaurantSettingsPage() {
                         })}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-transparent text-slate-900 dark:text-slate-100"
                       />
+                    </div>
+
+                    {/* Time Slot Mode Config */}
+                    <div className="space-y-3 md:col-span-2 pt-3 border-t border-gray-100 dark:border-gray-700">
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300 block">
+                        Chế độ hiển thị khung giờ đặt bàn cho khách
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <label 
+                          className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${formData.reservationConfig.time_slot_mode === "INTERVAL" ? "border-primary bg-primary/5 text-primary" : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"}`}
+                        >
+                          <input 
+                            type="radio" 
+                            name="time_slot_mode"
+                            value="INTERVAL"
+                            checked={formData.reservationConfig.time_slot_mode === "INTERVAL"}
+                            onChange={() => setFormData({
+                              ...formData,
+                              reservationConfig: { ...formData.reservationConfig, time_slot_mode: "INTERVAL" }
+                            })}
+                            className="mt-1 text-primary focus:ring-primary"
+                          />
+                          <div>
+                            <span className="font-semibold text-sm block text-slate-900 dark:text-slate-100">Khoảng thời gian linh hoạt (Interval)</span>
+                            <span className="text-xs text-slate-500 dark:text-slate-400 block mt-0.5">Khách chọn bất kỳ giờ nào cách nhau X phút (VD: 15p, 30p, 60p)</span>
+                          </div>
+                        </label>
+
+                        <label 
+                          className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${formData.reservationConfig.time_slot_mode === "FIXED_SLOTS" ? "border-primary bg-primary/5 text-primary" : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"}`}
+                        >
+                          <input 
+                            type="radio" 
+                            name="time_slot_mode"
+                            value="FIXED_SLOTS"
+                            checked={formData.reservationConfig.time_slot_mode === "FIXED_SLOTS"}
+                            onChange={() => setFormData({
+                              ...formData,
+                              reservationConfig: { ...formData.reservationConfig, time_slot_mode: "FIXED_SLOTS" }
+                            })}
+                            className="mt-1 text-primary focus:ring-primary"
+                          />
+                          <div>
+                            <span className="font-semibold text-sm block text-slate-900 dark:text-slate-100">Khung giờ cố định (Fixed Slots)</span>
+                            <span className="text-xs text-slate-500 dark:text-slate-400 block mt-0.5">Nhà hàng tự cài đặt các mốc giờ nhận bàn cố định (VD: Ca trưa, Ca tối)</span>
+                          </div>
+                        </label>
+                      </div>
+
+                      {formData.reservationConfig.time_slot_mode === "INTERVAL" ? (
+                        <div className="mt-2 space-y-1.5 max-w-xs">
+                          <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Khoảng bước giờ (phút)</label>
+                          <select 
+                            value={formData.reservationConfig.slot_interval_minutes ?? 30}
+                            onChange={(e) => setFormData({
+                              ...formData,
+                              reservationConfig: { ...formData.reservationConfig, slot_interval_minutes: parseInt(e.target.value) || 30 }
+                            })}
+                            className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm text-slate-900 dark:text-slate-100"
+                          >
+                            <option value={15}>15 phút</option>
+                            <option value={30}>30 phút (Khuyên dùng)</option>
+                            <option value={45}>45 phút</option>
+                            <option value={60}>60 phút (1 tiếng)</option>
+                          </select>
+                        </div>
+                      ) : (
+                        <div className="mt-3 space-y-2">
+                          <label className="text-xs font-medium text-slate-600 dark:text-slate-400 block">Danh sách khung giờ cố định nhận đặt bàn:</label>
+                          <div className="flex flex-wrap gap-2">
+                            {(formData.reservationConfig.fixed_time_slots || []).map((slot, idx) => (
+                              <span key={idx} className="inline-flex items-center gap-1.5 px-3 py-1 bg-primary/10 text-primary font-semibold text-sm rounded-full border border-primary/20">
+                                🕒 {slot}
+                                <button 
+                                  type="button"
+                                  onClick={() => setFormData({
+                                    ...formData,
+                                    reservationConfig: {
+                                      ...formData.reservationConfig,
+                                      fixed_time_slots: (formData.reservationConfig.fixed_time_slots || []).filter((_, i) => i !== idx)
+                                    }
+                                  })}
+                                  className="w-4 h-4 rounded-full bg-primary/20 hover:bg-primary hover:text-white text-xs flex items-center justify-center transition-colors"
+                                >
+                                  &times;
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                          <div className="flex items-center gap-2 max-w-xs mt-2">
+                            <input 
+                              type="time" 
+                              value={newFixedSlot}
+                              onChange={(e) => setNewFixedSlot(e.target.value)}
+                              className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-slate-900 dark:text-slate-100"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (newFixedSlot && !(formData.reservationConfig.fixed_time_slots || []).includes(newFixedSlot)) {
+                                  const updatedSlots = [...(formData.reservationConfig.fixed_time_slots || []), newFixedSlot].sort();
+                                  setFormData({
+                                    ...formData,
+                                    reservationConfig: { ...formData.reservationConfig, fixed_time_slots: updatedSlots }
+                                  });
+                                  setNewFixedSlot("");
+                                }
+                              }}
+                              className="px-3 py-1.5 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors"
+                            >
+                              + Thêm khung giờ
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

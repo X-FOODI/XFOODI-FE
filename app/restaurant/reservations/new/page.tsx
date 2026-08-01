@@ -617,9 +617,22 @@ export default function NewReservationPage() {
     
     const lastBookingBeforeClose = config.last_booking_before_close_minutes ?? 60;
     const latestBookingMin = closeMin - lastBookingBeforeClose;
+
+    // Check mode
+    if (config.time_slot_mode === "FIXED_SLOTS" && Array.isArray(config.fixed_time_slots) && config.fixed_time_slots.length > 0) {
+      // Filter fixed slots that fall within operating hours
+      return config.fixed_time_slots.filter((slotStr: string) => {
+        const parts = slotStr.split(":");
+        if (parts.length < 2) return false;
+        const slotMin = parseInt(parts[0]) * 60 + parseInt(parts[1]);
+        return slotMin >= openMin && slotMin <= latestBookingMin;
+      });
+    }
     
+    // Default INTERVAL mode
+    const step = config.slot_interval_minutes ?? 30;
     const slots = [];
-    for (let min = openMin; min <= latestBookingMin; min += 30) {
+    for (let min = openMin; min <= latestBookingMin; min += step) {
       const displayMin = min % (24 * 60);
       const h = Math.floor(displayMin / 60).toString().padStart(2, '0');
       const m = (displayMin % 60).toString().padStart(2, '0');
