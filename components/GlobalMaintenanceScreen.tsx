@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Settings, Clock, AlertTriangle } from 'lucide-react';
+import { usePathname } from 'next/navigation';
 
 interface MaintenanceEventDetail {
   message?: string;
@@ -12,6 +13,7 @@ export default function GlobalMaintenanceScreen() {
   const [isMaintenance, setIsMaintenance] = useState(false);
   const [message, setMessage] = useState('Hệ thống đang được bảo trì để nâng cấp. Vui lòng quay lại sau.');
   const [estimatedFinish, setEstimatedFinish] = useState('');
+  const pathname = usePathname();
 
   useEffect(() => {
     // Also fetch current public status in case the user refreshes the page during maintenance
@@ -45,6 +47,10 @@ export default function GlobalMaintenanceScreen() {
       window.removeEventListener('maintenanceMode', handleMaintenance);
     };
   }, []);
+
+  if (pathname?.startsWith('/admin') || pathname?.startsWith('/login')) {
+    return null;
+  }
 
   if (!isMaintenance) return null;
 

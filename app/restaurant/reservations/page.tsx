@@ -203,8 +203,8 @@ export default function ReservationsPage() {
     if (!rejectTarget || !rejectReason.trim()) return;
     setRejectLoading(true);
     try {
-      await reservationService.updateStatus(rejectTarget.id, "CANCELLED", rejectReason.trim());
-      showToast("success", "Đã từ chối", "Đặt bàn đã bị từ chối. Email thông báo và lý do đã gửi tới khách.");
+      await reservationService.cancel(rejectTarget.id, true, rejectReason.trim());
+      showToast("success", "Đã từ chối", "Đặt bàn đã bị từ chối và quy trình hoàn tiền (nếu có) đã được kích hoạt. Email thông báo đã gửi tới khách.");
       setRejectTarget(null);
       setRejectReason("");
       fetchData();
