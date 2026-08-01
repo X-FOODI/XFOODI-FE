@@ -193,12 +193,18 @@ function normalizeImages(raw: Record<string, unknown>): string[] {
 }
 
 export function normalizePost(raw: Record<string, unknown>, currentUserId?: string): SocialPost {
+  // Guard: server must always return an id
+  if (!raw.id) {
+    console.error('[socialService] normalizePost: server response missing id', raw);
+    throw new Error('Phản hồi từ máy chủ không hợp lệ: bài viết không có ID');
+  }
+
   const author = normalizeUser((raw.author ?? raw.user ?? {}) as Record<string, unknown>);
   const stats = (raw.stats ?? {}) as Record<string, unknown>;
   const viewer = (raw.viewer ?? {}) as Record<string, unknown>;
 
   return {
-    id: String(raw.id ?? ''),
+    id: String(raw.id),
     author,
     content: String(raw.content ?? ''),
     images: normalizeImages(raw),
@@ -273,7 +279,9 @@ const socialService = {
         `${SOCIAL_BASE}/posts`,
         { content: payload.content, imageUrls }
       );
-      return normalizePost(unwrap(response) as Record<string, unknown>);
+      const rawPost = unwrap(response) as Record<string, unknown>;
+      console.log('[socialService] createPost response:', rawPost);
+      return normalizePost(rawPost);
     } catch (error) {
       extractError(error, 'Không thể đăng bài viết');
     }
@@ -350,10 +358,11 @@ const socialService = {
       throw new Error('Bài viết chưa được lưu trên máy chủ');
     }
     try {
-      await axiosInstance.post(`${SOCIAL_BASE}/reactions`, {
-        postId: id,
-        type: toApiReaction(reaction),
-      });
+      const response = await axiosInstance.post<ApiResponse<Record<string, unknown>>>(
+        `${SOCIAL_BASE}/reactions`,
+        { postId: id, type: toApiReaction(reaction) }
+      );
+      // Reaction endpoint returns { action, type }; fetch updated post to get fresh counts
       return this.getPostById(id);
     } catch (error) {
       extractError(error, 'Không thể phản ứng bài viết');
