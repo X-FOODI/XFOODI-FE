@@ -91,13 +91,17 @@ export default function CustomerCheckoutPage() {
 
   // VAT Invoice states
   const [wantVatInvoice, setWantVatInvoice] = useState(false);
-  const [vatCompanyName, setVatCompanyName] = useState("Công ty TNHH Xeko Demo");
-  const [vatTaxId, setVatTaxId] = useState("0312345678");
-  const [vatAddress, setVatAddress] = useState("123 Nguyễn Văn Linh, Quận 7, TP.HCM");
-  const [vatEmail, setVatEmail] = useState("ketoan@xeko.com");
+  const [vatCompanyName, setVatCompanyName] = useState("");
+  const [vatTaxId, setVatTaxId] = useState("");
+  const [vatAddress, setVatAddress] = useState("");
+  const [vatEmail, setVatEmail] = useState("");
   const [vatSubmitting, setVatSubmitting] = useState(false);
   const [vatResult, setVatResult] = useState<{ status: string; lookupCode?: string } | null>(null);
   const vatSubmittedRef = useRef(false);
+  // Refs to avoid stale closure in socket callbacks
+  const wantVatInvoiceRef = useRef(false);
+  const submitVatInvoiceRef = useRef<((id: string) => void) | null>(null);
+  useEffect(() => { wantVatInvoiceRef.current = wantVatInvoice; }, [wantVatInvoice]);
 
   // Voucher states
   const [myVouchers, setMyVouchers] = useState<any[]>([]);
@@ -416,7 +420,10 @@ export default function CustomerCheckoutPage() {
         setPaymentSuccess(true);
         setPolling(false);
         const targetId = data?.paymentId || paymentId;
-        if (wantVatInvoice && targetId) submitVatInvoice(targetId);
+        // Use ref to avoid stale closure (wantVatInvoice may have changed after mount)
+        if (wantVatInvoiceRef.current && targetId && submitVatInvoiceRef.current) {
+          submitVatInvoiceRef.current(targetId);
+        }
         setTimeout(() => setShowFeedback(true), 1500);
       }
     });
@@ -485,7 +492,7 @@ export default function CustomerCheckoutPage() {
 
   // Submit VAT invoice after payment success
   const submitVatInvoice = async (completedPaymentId: string) => {
-    if (!wantVatInvoice || !table || vatSubmittedRef.current) return;
+    if (!wantVatInvoiceRef.current || !table || vatSubmittedRef.current) return;
     if (!vatCompanyName || !vatTaxId || !vatAddress || !vatEmail) return;
     try {
       vatSubmittedRef.current = true;
@@ -512,6 +519,9 @@ export default function CustomerCheckoutPage() {
       setVatSubmitting(false);
     }
   };
+  // Keep ref in sync so socket callbacks (stale closure) always call latest version
+  useEffect(() => { submitVatInvoiceRef.current = submitVatInvoice; });
+
 
   if (loading) {
     return (
@@ -671,7 +681,7 @@ export default function CustomerCheckoutPage() {
             <div className="border-t border-zinc-850 pt-3 space-y-2 text-xs">
               <div className="flex justify-between text-zinc-400">
                 <span>Cộng món</span>
-                <span>{(activeOrder.subTotal ?? activeOrder.totalAmount / 1.1).toLocaleString("vi-VN")}đ</span>
+                <span>{(activeOrder.subTotal ?? activeOrder.totalAmount).toLocaleString("vi-VN")}đ</span>
               </div>
               {(activeOrder.discountAmount ?? 0) > 0 && (
                 <div className="flex justify-between text-emerald-400">
@@ -682,10 +692,6 @@ export default function CustomerCheckoutPage() {
                   <span>-{(activeOrder.discountAmount!).toLocaleString("vi-VN")}đ</span>
                 </div>
               )}
-              <div className="flex justify-between text-zinc-400">
-                <span>Thuế VAT (10%)</span>
-                <span>{(activeOrder.taxAmount ?? (activeOrder.totalAmount - (activeOrder.subTotal ?? activeOrder.totalAmount / 1.1))).toLocaleString("vi-VN")}đ</span>
-              </div>
               {(activeOrder.depositPaid ?? 0) > 0 && (
                 <div className="flex justify-between text-emerald-400">
                   <span className="flex items-center gap-1">
