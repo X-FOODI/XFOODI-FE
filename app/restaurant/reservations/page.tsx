@@ -10,6 +10,7 @@ import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { io as socketIO } from "socket.io-client";
 import { Button, DatePicker, Input, Select } from "antd";
 import type { Dayjs } from "dayjs";
 
@@ -128,13 +129,51 @@ export default function ReservationsPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Auto refresh every 15 seconds to sync late arrivals and cancellations
+  // Auto refresh every 15 seconds to sync late arrivals and cancellations (fallback)
   useEffect(() => {
     const timer = setInterval(() => {
       fetchData();
     }, 15000);
     return () => clearInterval(timer);
   }, [fetchData]);
+
+  // Real-time socket: join restaurant room and react to reservation events immediately
+  useEffect(() => {
+    if (!restaurantId) return;
+    const socketUrl = (process.env.NEXT_PUBLIC_API_URL || "https://api.xfoodi.website").replace(/\/api$/, "");
+    const socket = socketIO(socketUrl, { transports: ["polling"], withCredentials: true });
+
+    socket.on("connect", () => {
+      socket.emit("join_restaurant", restaurantId);
+    });
+
+    // A deposit was just paid → new reservation appears in PENDING list
+    socket.on("DEPOSIT_PAID", () => {
+      fetchData();
+    });
+
+    // Status changed on any reservation (CONFIRMED, CANCELLED, CHECKED_IN…)
+    socket.on("RESERVATION_STATUS_CHANGED", (data: { reservationId: string; status: string }) => {
+      // Always refresh so list reflects the new state
+      fetchData();
+    });
+
+    // Cron auto-cancelled a reservation (payment deadline exceeded)
+    socket.on("RESERVATION_AUTO_CANCELLED", () => {
+      fetchData();
+    });
+
+    // Tables/info changed on a reservation (staff updated via another session)
+    socket.on("RESERVATION_UPDATED", () => {
+      fetchData();
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  // fetchData is stable via useCallback, restaurantId changes only on tenant switch
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restaurantId]);
 
   const handleDateChange = (from: string, to: string) => {
     if (from && to && new Date(from) > new Date(to)) {
