@@ -712,17 +712,9 @@ export default function CustomerMenuPage() {
                 {/* Footer Section */}
                 <div className="p-4 bg-zinc-950/40 border-t border-zinc-800 space-y-4">
                   <div className="space-y-1.5">
-                    <div className="flex justify-between text-xs text-zinc-400">
-                      <span>Tạm tính</span>
-                      <span>{cartTotal.toLocaleString("vi-VN")}đ</span>
-                    </div>
-                    <div className="flex justify-between text-xs text-zinc-400">
-                      <span>Thuế VAT (10%)</span>
-                      <span>{(cartTotal * 0.1).toLocaleString("vi-VN")}đ</span>
-                    </div>
-                    <div className="flex justify-between text-sm font-bold text-white pt-1.5 border-t border-zinc-850">
+                    <div className="flex justify-between text-sm font-bold text-white pt-1.5">
                       <span>Tổng cộng</span>
-                      <span className="text-amber-500 font-extrabold">{(cartTotal * 1.1).toLocaleString("vi-VN")}đ</span>
+                      <span className="text-amber-500 font-extrabold">{cartTotal.toLocaleString("vi-VN")}đ</span>
                     </div>
                   </div>
 
@@ -736,7 +728,7 @@ export default function CustomerMenuPage() {
                         <Loader2 className="w-5 h-5 animate-spin" /> Đang đặt món...
                       </>
                     ) : (
-                      <>Gọi món ngay ({(cartTotal * 1.1).toLocaleString("vi-VN")}đ)</>
+                      <>Gọi món ngay ({cartTotal.toLocaleString("vi-VN")}đ)</>
                     )}
                   </button>
                 </div>
