@@ -357,7 +357,11 @@ export default function CustomerCheckoutPage() {
       setPaymentSuccess(true);
       setPolling(false);
       const targetId = completedPaymentId || paymentId;
-      if (wantVatInvoice && targetId) submitVatInvoice(targetId);
+      // Dùng ref để tránh stale closure — wantVatInvoice / submitVatInvoice
+      // có thể thay đổi sau khi effect này được setup (user điền VAT info sau khi QR đã tạo)
+      if (wantVatInvoiceRef.current && targetId && submitVatInvoiceRef.current) {
+        submitVatInvoiceRef.current(targetId);
+      }
       setTimeout(() => setShowFeedback(true), 1500);
     };
 
@@ -401,7 +405,7 @@ export default function CustomerCheckoutPage() {
       socket.disconnect();
       clearInterval(interval);
     };
-  }, [paymentId, polling, activeOrder, table, wantVatInvoice]);
+  }, [paymentId, polling, activeOrder, table]);
 
   // Cash payment socket listener — always active so staff can trigger success from live-orders
   useEffect(() => {
