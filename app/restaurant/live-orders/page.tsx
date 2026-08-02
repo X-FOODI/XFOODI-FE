@@ -340,6 +340,13 @@ export default function LiveOrdersPage() {
         fetchOrders();
       });
 
+      // Cập nhật tổng tiền khi voucher được áp/xóa — KHÔNG di chuyển order giữa các cột
+      newSocket.on("ORDER_TOTAL_UPDATED", ({ orderId, totalAmount, discountAmount }: { orderId: string; totalAmount: number; discountAmount: number }) => {
+        setOrders(prev => prev.map(o =>
+          o.id === orderId ? { ...o, totalAmount, discountAmount } : o
+        ));
+      });
+
       setSocket(newSocket);
 
       return () => {
