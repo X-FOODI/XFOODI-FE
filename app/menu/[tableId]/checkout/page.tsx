@@ -196,6 +196,7 @@ export default function CustomerCheckoutPage() {
       setQrUrl(null);
       setBankInfo(null);
       setPaymentId(null);
+      setQrError(null);
       // Reload order to get updated totals
       await loadData();
     } catch (err: any) {
@@ -225,6 +226,7 @@ export default function CustomerCheckoutPage() {
         setQrUrl(null);
         setBankInfo(null);
         setPaymentId(null);
+        setQrError(null);
         await loadData();
         return;
       }
@@ -275,6 +277,7 @@ export default function CustomerCheckoutPage() {
       setQrUrl(null);
       setBankInfo(null);
       setPaymentId(null);
+      setQrError(null);
       await loadData();
     } catch (err: any) {
       console.error(err);
